@@ -39,6 +39,13 @@ class MessageRole(StrEnum):
     ASSISTANT = "assistant"
 
 
+class DecisionStatus(StrEnum):
+    """Lifecycle states for a prediction-only decision."""
+
+    OPEN = "open"
+    RESOLVED = "resolved"
+
+
 @dataclass(frozen=True, slots=True)
 class Profile:
     id: str
@@ -102,6 +109,90 @@ class Message:
         _require_utc_aware(self.created_at)
         if not self.content:
             raise ValueError("Message content must not be empty.")
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionEvent:
+    id: str
+    profile_id: str
+    domain: str
+    question: str
+    context: dict[str, object]
+    status: DecisionStatus
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at)
+        if not self.domain.strip() or not self.question.strip():
+            raise ValueError("Decision domain and question must not be empty.")
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionOption:
+    id: str
+    decision_id: str
+    label: str
+    description: str
+    features: dict[str, float]
+    feature_confidence: float
+
+    def __post_init__(self) -> None:
+        if not self.label.strip() or not self.description.strip():
+            raise ValueError("Decision option label and description must not be empty.")
+        if not self.features:
+            raise ValueError("Decision option features must not be empty.")
+        if any(not key.strip() or not -1.0 <= value <= 1.0 for key, value in self.features.items()):
+            raise ValueError("Decision option features must have keys and values between -1 and 1.")
+        if not 0.0 <= self.feature_confidence <= 1.0:
+            raise ValueError("Decision option feature confidence must be between 0 and 1.")
+
+
+@dataclass(frozen=True, slots=True)
+class OptionProbability:
+    option_id: str
+    probability: float
+    utility: float
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.probability <= 1.0:
+            raise ValueError("Option probability must be between 0 and 1.")
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionPrediction:
+    id: str
+    decision_id: str
+    profile_id: str
+    ranking: tuple[OptionProbability, ...]
+    confidence: float
+    important_factors: tuple[str, ...]
+    uncertain_factors: tuple[str, ...]
+    supporting_evidence_ids: tuple[str, ...]
+    similar_decision_ids: tuple[str, ...]
+    model_snapshot_version: int
+    algorithm_version: str
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at)
+        if not self.ranking or not self.algorithm_version:
+            raise ValueError("Prediction ranking and algorithm version must not be empty.")
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError("Prediction confidence must be between 0 and 1.")
+        if self.model_snapshot_version < 1:
+            raise ValueError("Prediction must reference a persisted model snapshot.")
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionResolution:
+    id: str
+    decision_id: str
+    chosen_option_id: str
+    source_event_id: str
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at)
 
 
 @dataclass(frozen=True, slots=True)

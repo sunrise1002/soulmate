@@ -7,6 +7,10 @@ from typing import Protocol
 from soulmate_core.domain.models import (
     AuditEvent,
     Conversation,
+    DecisionEvent,
+    DecisionOption,
+    DecisionPrediction,
+    DecisionResolution,
     DerivedModel,
     Evidence,
     Job,
@@ -51,6 +55,24 @@ class MessageRepository(Protocol):
     def get(self, message_id: str) -> Message | None: ...
 
     def list_for_conversation(self, conversation_id: str) -> tuple[Message, ...]: ...
+
+
+class DecisionRepository(Protocol):
+    def add(self, decision: DecisionEvent, options: tuple[DecisionOption, ...]) -> None: ...
+
+    def get(self, decision_id: str) -> tuple[DecisionEvent, tuple[DecisionOption, ...]] | None: ...
+
+    def list_resolved(
+        self, profile_id: str
+    ) -> tuple[tuple[DecisionEvent, tuple[DecisionOption, ...], DecisionResolution], ...]: ...
+
+    def add_prediction(self, prediction: DecisionPrediction) -> None: ...
+
+    def latest_prediction(self, decision_id: str) -> DecisionPrediction | None: ...
+
+    def resolve(self, resolution: DecisionResolution) -> None: ...
+
+    def get_resolution(self, decision_id: str) -> DecisionResolution | None: ...
 
 
 class EvidenceRepository(Protocol):

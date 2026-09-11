@@ -1,4 +1,4 @@
-"""Verify migrations, repository behavior, constraints, and durable job recovery."""
+"""Verify migrations, repositories, decision history, and durable job recovery."""
 
 import asyncio
 from datetime import UTC, datetime, timedelta
@@ -8,10 +8,13 @@ import pytest
 from alembic import command
 from soulmate_core.domain import (
     AuditEvent,
+    Conversation,
     Evidence,
     EvidenceTargetType,
     Job,
     JobStatus,
+    Message,
+    MessageRole,
     Profile,
     RawEvent,
     Source,
@@ -53,12 +56,16 @@ def test_initial_migration_creates_base_tables_and_required_pragmas(tmp_path: Pa
         "alembic_version",
         "conversations",
         "messages",
+        "decision_events",
+        "decision_options",
+        "decision_predictions",
+        "decision_resolutions",
     } == tables
     check = database.check()
     assert check.integrity == "ok"
     assert check.journal_mode == "wal"
     assert check.foreign_keys is True
-    assert check.current_revision == check.head_revision == "0003_phase_3"
+    assert check.current_revision == check.head_revision == "0004_phase_4"
     database.close()
 
 
@@ -129,7 +136,7 @@ def test_phase_1_database_upgrades_without_losing_base_records(tmp_path: Path) -
     database.migrate()
 
     assert repositories.profiles.get(profile.id) == profile
-    assert database.current_revision() == "0003_phase_3"
+    assert database.current_revision() == "0004_phase_4"
     database.close()
 
 
@@ -201,7 +208,51 @@ def test_phase_2_database_upgrades_without_losing_evidence_or_model_state(tmp_pa
         ).scalar_one()
     assert evidence == ("phase-2-test", None, None)
     assert preference_count == 1
-    assert database.current_revision() == "0003_phase_3"
+    assert database.current_revision() == "0004_phase_4"
+    database.close()
+
+
+def test_phase_3_database_upgrades_without_losing_conversation_provenance(tmp_path: Path) -> None:
+    path = tmp_path / "decision-twin.db"
+    database = Database(path)
+    database.connect()
+    command.upgrade(database.migration_config, "0003_phase_3")
+    assert database.session_factory is not None
+    repositories = Repositories(database.session_factory)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    profile = Profile("profile_preserved", None, now)
+    conversation = Conversation("conversation_preserved", profile.id, now, now)
+    message = Message(
+        "message_preserved", conversation.id, MessageRole.USER, "Synthetic preference", now
+    )
+    event = RawEvent("event_preserved", profile.id, None, "conversation_message", {}, now, now)
+    repositories.profiles.add(profile)
+    repositories.conversations.add(conversation)
+    repositories.messages.add(message)
+    repositories.raw_events.add(event)
+    repositories.evidence.add(
+        Evidence(
+            "evidence_preserved",
+            profile.id,
+            EvidenceTargetType.PREFERENCE,
+            "work.remote",
+            0.8,
+            1.0,
+            1.0,
+            {},
+            "explicit_statement",
+            event.id,
+            "phase-3-test",
+            now,
+            source_message_id=message.id,
+        )
+    )
+
+    database.migrate()
+
+    assert repositories.messages.get(message.id) == message
+    assert repositories.evidence.get("evidence_preserved") is not None
+    assert database.current_revision() == "0004_phase_4"
     database.close()
 
 

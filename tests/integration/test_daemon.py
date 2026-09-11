@@ -1,4 +1,4 @@
-"""Exercise Phase 1 API, persistence, restart, and installed CLI behavior."""
+"""Exercise local APIs, persistence, restart, and installed CLI behavior."""
 
 import json
 import os
@@ -17,6 +17,7 @@ from fastapi.testclient import TestClient
 from soulmate_daemon.app import create_app
 from soulmate_daemon.config import Settings
 from soulmate_llm_providers import FakeLLMProvider
+from soulmate_storage_sqlite import Database, Repositories
 
 pytestmark = pytest.mark.integration
 
@@ -325,3 +326,153 @@ def test_chat_rejects_invalid_provider_output_without_persisting_message(tmp_pat
         assert response.status_code == 502
         assert response.json()["detail"] == "The model provider returned invalid structured output."
         assert client.get("/v1/model/summary").json()["evidence_revision"] == 0
+
+
+def _decision_payload() -> dict[str, object]:
+    return {
+        "domain": "career",
+        "question": "Which work arrangement would I choose?",
+        "options": [
+            {
+                "label": "Office role",
+                "description": "Work from an office every day",
+                "features": {"work.remote": -1.0},
+                "feature_confidence": 1.0,
+            },
+            {
+                "label": "Remote role",
+                "description": "Work remotely every day",
+                "features": {"work.remote": 1.0},
+                "feature_confidence": 1.0,
+            },
+        ],
+    }
+
+
+def test_decision_prediction_resolution_learning_and_restart(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path / "owner-data")
+    with TestClient(create_app(settings)) as client:
+        correction = client.post(
+            "/v1/preferences/corrections",
+            json={"target_key": "work.remote", "value": 0.75, "context": {"domain": "career"}},
+        )
+        assert correction.status_code == 201
+        created = client.post("/v1/decisions", json=_decision_payload())
+        assert created.status_code == 201
+        decision = created.json()
+        assert decision["status"] == "open"
+        office_id, remote_id = (item["id"] for item in decision["options"])
+
+        prediction = client.post(f"/v1/decisions/{decision['id']}/predict")
+        assert prediction.status_code == 201
+        predicted = prediction.json()
+        assert predicted["mode"] == "predict_me"
+        assert predicted["predicted_option_id"] == remote_id
+        assert predicted["model_snapshot_version"] == 1
+        assert predicted["important_factors"] == ["work.remote"]
+        assert predicted["supporting_evidence"][0]["source_type"] == "user_correction"
+        assert sum(item["probability"] for item in predicted["ranking"]) == pytest.approx(1.0)
+
+        resolution = client.post(
+            f"/v1/decisions/{decision['id']}/resolve",
+            json={"chosen_option_id": office_id},
+        )
+        assert resolution.status_code == 201
+        resolved = resolution.json()
+        assert resolved["chosen_option_id"] == office_id
+        assert resolved["learned_evidence"][0]["source_type"] == "actual_choice"
+        assert resolved["learned_evidence"][0]["value"] == -1.0
+        assert resolved["snapshot_version"] == 2
+        assert (
+            client.post(
+                f"/v1/decisions/{decision['id']}/resolve", json={"chosen_option_id": office_id}
+            ).status_code
+            == 409
+        )
+
+    database = Database(settings.database_path)
+    database.migrate()
+    repositories = Repositories(database.sessions())
+    assert repositories.decisions.latest_prediction(decision["id"]) is not None
+    assert repositories.decisions.get_resolution(decision["id"]) is not None
+    database.close()
+
+    with TestClient(create_app(settings)) as client:
+        next_decision = client.post("/v1/decisions", json=_decision_payload()).json()
+        next_prediction = client.post(f"/v1/decisions/{next_decision['id']}/predict").json()
+        assert next_prediction["predicted_choice"] == "Office role"
+        assert next_prediction["model_snapshot_version"] == 2
+        assert next_prediction["similar_decision_ids"] == [decision["id"]]
+
+
+def test_decision_extracts_natural_option_features_with_validated_provider_output(
+    tmp_path: Path,
+) -> None:
+    provider = FakeLLMProvider(
+        structured_responses=[
+            {
+                "options": [
+                    {"option_index": 0, "features": {"cost.low": 1.0}, "confidence": 0.8},
+                    {"option_index": 1, "features": {"cost.low": -1.0}, "confidence": 0.9},
+                ]
+            }
+        ]
+    )
+    payload = {
+        "domain": "purchase",
+        "question": "Which plan would I choose?",
+        "options": [
+            {"label": "Basic", "description": "Low monthly price"},
+            {"label": "Premium", "description": "Higher monthly price"},
+        ],
+    }
+    with TestClient(
+        create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
+    ) as client:
+        response = client.post("/v1/decisions", json=payload)
+        assert response.status_code == 201
+        assert response.json()["options"][0]["features"] == {"cost.low": 1.0}
+        assert response.json()["options"][1]["feature_confidence"] == 0.9
+    assert len(provider.requests) == 1
+
+
+def test_decision_prediction_without_prior_model_creates_snapshot_and_validates_input(
+    tmp_path: Path,
+) -> None:
+    with TestClient(create_app(Settings(data_dir=tmp_path / "owner-data"))) as client:
+        invalid = _decision_payload()
+        invalid["domain"] = " "
+        assert client.post("/v1/decisions", json=invalid).status_code == 422
+
+        decision = client.post("/v1/decisions", json=_decision_payload()).json()
+        prediction = client.post(f"/v1/decisions/{decision['id']}/predict")
+        assert prediction.status_code == 201
+        assert prediction.json()["model_snapshot_version"] == 1
+        assert prediction.json()["uncertain_factors"] == ["work.remote"]
+
+
+def test_decision_rejects_invalid_natural_feature_extraction(tmp_path: Path) -> None:
+    provider = FakeLLMProvider(
+        structured_responses=[
+            {
+                "options": [
+                    {"option_index": 0, "features": {"cost.low": 2.0}, "confidence": 0.8},
+                    {"option_index": 1, "features": {"cost.low": -1.0}, "confidence": 0.9},
+                ]
+            }
+        ]
+    )
+    payload = {
+        "domain": "purchase",
+        "question": "Which plan would I choose?",
+        "options": [
+            {"label": "Basic", "description": "Low monthly price"},
+            {"label": "Premium", "description": "Higher monthly price"},
+        ],
+    }
+    with TestClient(
+        create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
+    ) as client:
+        response = client.post("/v1/decisions", json=payload)
+        assert response.status_code == 502
+        assert response.json()["detail"] == "The model provider returned invalid structured output."

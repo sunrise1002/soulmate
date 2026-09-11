@@ -4,6 +4,16 @@
 
 ### Added
 
+- Phase 4 decision records, explicit decision/predict/resolve APIs, validated
+  natural-option feature extraction, and restart-safe SQLite persistence.
+- Provider-independent preference matching, V1 utility scoring, softmax ranking,
+  confidence estimation, and deterministic similar-decision retrieval.
+- Predict Me explanations with important and uncertain factors, supporting
+  Evidence, similar decisions, and persisted model snapshot/algorithm versions.
+- Resolution learning that records the actual choice as a RawEvent, creates
+  high-value relative preference Evidence, and rebuilds the Personal Model.
+- SQLite migration `0004_phase_4` for decision events, options, predictions, and
+  resolutions with snapshot referential integrity.
 - Phase 3 persistent conversations, `/v1/chat`, deterministic minimal context
   compilation, and restart-safe conversational history.
 - Provider-neutral generation interfaces, deterministic fake provider, Ollama and
@@ -37,5 +47,5 @@
   hooks, Conventional Commit and branch validation, CI enforcement, issue/PR
   templates, security guidance, and documented GitHub ruleset settings.
 
-No embeddings, decision prediction, desktop/mobile clients, MCP integration, or
-later-phase features have been implemented.
+No embeddings, evaluation/calibration learning, Advise Me, desktop/mobile clients,
+MCP integration, or later-phase features have been implemented.

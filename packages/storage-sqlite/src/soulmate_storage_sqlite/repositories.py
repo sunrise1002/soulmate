@@ -10,6 +10,11 @@ from soulmate_core.domain.models import (
     AuditEvent,
     Constraint,
     Conversation,
+    DecisionEvent,
+    DecisionOption,
+    DecisionPrediction,
+    DecisionResolution,
+    DecisionStatus,
     DerivedModel,
     Evidence,
     EvidenceTargetType,
@@ -19,6 +24,7 @@ from soulmate_core.domain.models import (
     JobStatus,
     Message,
     MessageRole,
+    OptionProbability,
     Preference,
     Profile,
     RawEvent,
@@ -33,6 +39,10 @@ from soulmate_storage_sqlite.schema import (
     AuditEventRow,
     ConstraintRow,
     ConversationRow,
+    DecisionEventRow,
+    DecisionOptionRow,
+    DecisionPredictionRow,
+    DecisionResolutionRow,
     EvidenceRevisionRow,
     EvidenceRow,
     FactRow,
@@ -213,6 +223,212 @@ class SqliteMessageRepository:
             role=MessageRole(row.role),
             content=row.content,
             provider_model=row.provider_model,
+            created_at=_utc(row.created_at),
+        )
+
+
+class SqliteDecisionRepository:
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def add(self, decision: DecisionEvent, options: tuple[DecisionOption, ...]) -> None:
+        if len(options) < 2 or any(item.decision_id != decision.id for item in options):
+            raise ValueError("A decision requires at least two options belonging to it.")
+        with self._sessions.begin() as session:
+            session.add(
+                DecisionEventRow(
+                    id=decision.id,
+                    profile_id=decision.profile_id,
+                    domain=decision.domain,
+                    question=decision.question,
+                    context_json=_json_dump(decision.context),
+                    status=decision.status.value,
+                    created_at=decision.created_at,
+                )
+            )
+            session.add_all(
+                DecisionOptionRow(
+                    id=item.id,
+                    decision_id=item.decision_id,
+                    label=item.label,
+                    description=item.description,
+                    features_json=_json_dump(item.features),
+                    feature_confidence=item.feature_confidence,
+                )
+                for item in options
+            )
+
+    def get(self, decision_id: str) -> tuple[DecisionEvent, tuple[DecisionOption, ...]] | None:
+        with self._sessions() as session:
+            row = session.get(DecisionEventRow, decision_id)
+            if row is None:
+                return None
+            options = session.scalars(
+                select(DecisionOptionRow)
+                .where(DecisionOptionRow.decision_id == decision_id)
+                .order_by(DecisionOptionRow.id)
+            )
+            return self._event_to_domain(row), tuple(
+                self._option_to_domain(item) for item in options
+            )
+
+    def list_resolved(
+        self, profile_id: str
+    ) -> tuple[tuple[DecisionEvent, tuple[DecisionOption, ...], DecisionResolution], ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(DecisionEventRow)
+                .where(
+                    DecisionEventRow.profile_id == profile_id,
+                    DecisionEventRow.status == DecisionStatus.RESOLVED.value,
+                )
+                .order_by(DecisionEventRow.created_at, DecisionEventRow.id)
+            )
+            result = []
+            for row in rows:
+                options = session.scalars(
+                    select(DecisionOptionRow)
+                    .where(DecisionOptionRow.decision_id == row.id)
+                    .order_by(DecisionOptionRow.id)
+                )
+                resolution = session.scalar(
+                    select(DecisionResolutionRow).where(DecisionResolutionRow.decision_id == row.id)
+                )
+                if resolution is None:
+                    raise RuntimeError("Resolved decision is missing its resolution.")
+                result.append(
+                    (
+                        self._event_to_domain(row),
+                        tuple(self._option_to_domain(item) for item in options),
+                        self._resolution_to_domain(resolution),
+                    )
+                )
+            return tuple(result)
+
+    def add_prediction(self, prediction: DecisionPrediction) -> None:
+        with self._sessions.begin() as session:
+            decision = session.get(DecisionEventRow, prediction.decision_id)
+            if decision is None or decision.profile_id != prediction.profile_id:
+                raise ValueError("Prediction must belong to the decision profile.")
+            session.add(
+                DecisionPredictionRow(
+                    id=prediction.id,
+                    decision_id=prediction.decision_id,
+                    profile_id=prediction.profile_id,
+                    ranking_json=_json_dump(
+                        [
+                            {
+                                "option_id": item.option_id,
+                                "probability": item.probability,
+                                "utility": item.utility,
+                            }
+                            for item in prediction.ranking
+                        ]
+                    ),
+                    confidence=prediction.confidence,
+                    important_factors_json=_json_dump(prediction.important_factors),
+                    uncertain_factors_json=_json_dump(prediction.uncertain_factors),
+                    supporting_evidence_ids_json=_json_dump(prediction.supporting_evidence_ids),
+                    similar_decision_ids_json=_json_dump(prediction.similar_decision_ids),
+                    model_snapshot_version=prediction.model_snapshot_version,
+                    algorithm_version=prediction.algorithm_version,
+                    created_at=prediction.created_at,
+                )
+            )
+
+    def latest_prediction(self, decision_id: str) -> DecisionPrediction | None:
+        with self._sessions() as session:
+            row = session.scalar(
+                select(DecisionPredictionRow)
+                .where(DecisionPredictionRow.decision_id == decision_id)
+                .order_by(DecisionPredictionRow.created_at.desc(), DecisionPredictionRow.id.desc())
+                .limit(1)
+            )
+            return None if row is None else self._prediction_to_domain(row)
+
+    def resolve(self, resolution: DecisionResolution) -> None:
+        with self._sessions.begin() as session:
+            decision = session.get(DecisionEventRow, resolution.decision_id)
+            option = session.get(DecisionOptionRow, resolution.chosen_option_id)
+            if decision is None or option is None or option.decision_id != resolution.decision_id:
+                raise ValueError("Resolution option must belong to the decision.")
+            if decision.status != DecisionStatus.OPEN.value:
+                raise ValueError("Decision has already been resolved.")
+            session.add(
+                DecisionResolutionRow(
+                    id=resolution.id,
+                    decision_id=resolution.decision_id,
+                    chosen_option_id=resolution.chosen_option_id,
+                    source_event_id=resolution.source_event_id,
+                    created_at=resolution.created_at,
+                )
+            )
+            decision.status = DecisionStatus.RESOLVED.value
+
+    def get_resolution(self, decision_id: str) -> DecisionResolution | None:
+        with self._sessions() as session:
+            row = session.scalar(
+                select(DecisionResolutionRow).where(
+                    DecisionResolutionRow.decision_id == decision_id
+                )
+            )
+            return None if row is None else self._resolution_to_domain(row)
+
+    @staticmethod
+    def _event_to_domain(row: DecisionEventRow) -> DecisionEvent:
+        return DecisionEvent(
+            id=row.id,
+            profile_id=row.profile_id,
+            domain=row.domain,
+            question=row.question,
+            context=json.loads(row.context_json),
+            status=DecisionStatus(row.status),
+            created_at=_utc(row.created_at),
+        )
+
+    @staticmethod
+    def _option_to_domain(row: DecisionOptionRow) -> DecisionOption:
+        return DecisionOption(
+            id=row.id,
+            decision_id=row.decision_id,
+            label=row.label,
+            description=row.description,
+            features=json.loads(row.features_json),
+            feature_confidence=row.feature_confidence,
+        )
+
+    @staticmethod
+    def _prediction_to_domain(row: DecisionPredictionRow) -> DecisionPrediction:
+        ranking = cast(list[dict[str, object]], json.loads(row.ranking_json))
+        return DecisionPrediction(
+            id=row.id,
+            decision_id=row.decision_id,
+            profile_id=row.profile_id,
+            ranking=tuple(
+                OptionProbability(
+                    option_id=str(item["option_id"]),
+                    probability=cast(float, item["probability"]),
+                    utility=cast(float, item["utility"]),
+                )
+                for item in ranking
+            ),
+            confidence=row.confidence,
+            important_factors=tuple(json.loads(row.important_factors_json)),
+            uncertain_factors=tuple(json.loads(row.uncertain_factors_json)),
+            supporting_evidence_ids=tuple(json.loads(row.supporting_evidence_ids_json)),
+            similar_decision_ids=tuple(json.loads(row.similar_decision_ids_json)),
+            model_snapshot_version=row.model_snapshot_version,
+            algorithm_version=row.algorithm_version,
+            created_at=_utc(row.created_at),
+        )
+
+    @staticmethod
+    def _resolution_to_domain(row: DecisionResolutionRow) -> DecisionResolution:
+        return DecisionResolution(
+            id=row.id,
+            decision_id=row.decision_id,
+            chosen_option_id=row.chosen_option_id,
+            source_event_id=row.source_event_id,
             created_at=_utc(row.created_at),
         )
 
@@ -740,6 +956,7 @@ class Repositories:
         self.raw_events = SqliteRawEventRepository(sessions)
         self.conversations = SqliteConversationRepository(sessions)
         self.messages = SqliteMessageRepository(sessions)
+        self.decisions = SqliteDecisionRepository(sessions)
         self.evidence = SqliteEvidenceRepository(sessions)
         self.personal_models = SqlitePersonalModelRepository(sessions)
         self.audit_events = SqliteAuditEventRepository(sessions)

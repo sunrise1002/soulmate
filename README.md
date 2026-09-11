@@ -3,9 +3,9 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 3 conversation and evidence extraction are implemented locally.
+**Current status:** Phase 4 Decision MVP is implemented locally.
 See the [phase status](docs/phase-status.md) and detailed
-[Phase 3 report](docs/phases/phase-3-report.md).
+[Phase 4 report](docs/phases/phase-4-report.md).
 
 ## Development setup
 
@@ -71,6 +71,14 @@ Personal Model context to the configured provider, validates structured evidence
 proposals, accepts ordinary low-risk claims, and rebuilds the model when evidence
 is accepted. Ollama is the default local adapter. A generic OpenAI-compatible
 adapter is available in `hybrid` mode; configure its secret through the environment.
+
+The Decision MVP exposes `POST /v1/decisions`,
+`POST /v1/decisions/{id}/predict`, and `POST /v1/decisions/{id}/resolve`.
+Options may supply normalized structured features directly or use the configured
+provider to extract them from natural descriptions. Predict Me scoring is local
+and deterministic, returns probabilities and evidence-backed factors, and records
+the exact Personal Model snapshot. Resolving the actual choice creates
+provenance-bearing `actual_choice` Evidence and rebuilds the model.
 
 Optionally copy `config.example.toml` to `config.toml` and edit it. Local config is
 ignored by Git. See [configuration](docs/contributor-guide/configuration.md) for

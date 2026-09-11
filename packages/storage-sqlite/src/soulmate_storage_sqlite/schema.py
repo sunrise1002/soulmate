@@ -2,7 +2,17 @@
 
 from datetime import datetime
 
-from sqlalchemy import CheckConstraint, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    ForeignKeyConstraint,
+    Index,
+    Integer,
+    String,
+    Text,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -81,6 +91,93 @@ class MessageRow(Base):
         CheckConstraint("role IN ('user', 'assistant')", name="ck_messages_role"),
         Index("ix_messages_conversation_created", "conversation_id", "created_at", "id"),
     )
+
+
+class DecisionEventRow(Base):
+    __tablename__ = "decision_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    domain: Mapped[str] = mapped_column(String, nullable=False)
+    question: Mapped[str] = mapped_column(Text, nullable=False)
+    context_json: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("status IN ('open', 'resolved')", name="ck_decision_events_status"),
+        Index("ix_decision_events_profile_created", "profile_id", "created_at", "id"),
+    )
+
+
+class DecisionOptionRow(Base):
+    __tablename__ = "decision_options"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    decision_id: Mapped[str] = mapped_column(
+        ForeignKey("decision_events.id", ondelete="CASCADE"), nullable=False
+    )
+    label: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    features_json: Mapped[str] = mapped_column(Text, nullable=False)
+    feature_confidence: Mapped[float] = mapped_column(Float, nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "feature_confidence >= 0 AND feature_confidence <= 1",
+            name="ck_decision_options_feature_confidence",
+        ),
+        Index("ix_decision_options_decision", "decision_id", "id"),
+    )
+
+
+class DecisionPredictionRow(Base):
+    __tablename__ = "decision_predictions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    decision_id: Mapped[str] = mapped_column(
+        ForeignKey("decision_events.id", ondelete="CASCADE"), nullable=False
+    )
+    profile_id: Mapped[str] = mapped_column(String, nullable=False)
+    ranking_json: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    important_factors_json: Mapped[str] = mapped_column(Text, nullable=False)
+    uncertain_factors_json: Mapped[str] = mapped_column(Text, nullable=False)
+    supporting_evidence_ids_json: Mapped[str] = mapped_column(Text, nullable=False)
+    similar_decision_ids_json: Mapped[str] = mapped_column(Text, nullable=False)
+    model_snapshot_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    algorithm_version: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_predictions_confidence"),
+        ForeignKeyConstraint(
+            ["profile_id", "model_snapshot_version"],
+            ["user_model_snapshots.profile_id", "user_model_snapshots.version"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_decision_predictions_decision_created", "decision_id", "created_at", "id"),
+    )
+
+
+class DecisionResolutionRow(Base):
+    __tablename__ = "decision_resolutions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    decision_id: Mapped[str] = mapped_column(
+        ForeignKey("decision_events.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    chosen_option_id: Mapped[str] = mapped_column(
+        ForeignKey("decision_options.id", ondelete="RESTRICT"), nullable=False
+    )
+    source_event_id: Mapped[str] = mapped_column(
+        ForeignKey("raw_events.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (Index("ix_decision_resolutions_choice", "chosen_option_id"),)
 
 
 class EvidenceRow(Base):

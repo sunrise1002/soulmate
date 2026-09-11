@@ -8,8 +8,16 @@ from typing import TypedDict, cast
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field, ValidationError, field_validator
-from soulmate_core.domain import Evidence, EvidenceTargetType, Preference, RawEvent
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from soulmate_core.domain import (
+    DecisionEvent,
+    DecisionOption,
+    DecisionPrediction,
+    Evidence,
+    EvidenceTargetType,
+    Preference,
+    RawEvent,
+)
 from soulmate_core.preferences import ModelRebuilder
 from soulmate_llm_providers import EgressDeniedError, LLMProvider, ProviderError
 from soulmate_storage_sqlite import Database, Repositories
@@ -19,6 +27,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from soulmate_daemon import __version__
 from soulmate_daemon.config import Settings
 from soulmate_daemon.conversation import ConversationService
+from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
 from soulmate_daemon.jobs import DurableJobWorker
 from soulmate_daemon.providers import build_provider
 from soulmate_daemon.system import DEFAULT_PROFILE_ID, ensure_installation
@@ -123,8 +132,102 @@ class ChatResponse(BaseModel):
     snapshot_version: int | None
 
 
+class DecisionOptionRequest(BaseModel):
+    label: str = Field(min_length=1, max_length=200)
+    description: str = Field(min_length=1, max_length=10_000)
+    features: dict[str, float] = Field(default_factory=dict)
+    feature_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def validate_features(self) -> "DecisionOptionRequest":
+        if not self.label.strip() or not self.description.strip():
+            raise ValueError("Decision option text must not be blank.")
+        if any(not key.strip() or not -1.0 <= value <= 1.0 for key, value in self.features.items()):
+            raise ValueError("Feature values must be between -1 and 1.")
+        return self
+
+
+class DecisionCreateRequest(BaseModel):
+    domain: str = Field(min_length=1, max_length=200)
+    question: str = Field(min_length=1, max_length=10_000)
+    context: dict[str, object] = Field(default_factory=dict)
+    options: list[DecisionOptionRequest] = Field(min_length=2, max_length=20)
+
+    @model_validator(mode="after")
+    def validate_options(self) -> "DecisionCreateRequest":
+        if not self.domain.strip() or not self.question.strip():
+            raise ValueError("Decision domain and question must not be blank.")
+        labels = [item.label.casefold() for item in self.options]
+        if len(labels) != len(set(labels)):
+            raise ValueError("Decision option labels must be unique.")
+        return self
+
+
+class DecisionOptionResponse(BaseModel):
+    id: str
+    label: str
+    description: str
+    features: dict[str, float]
+    feature_confidence: float
+
+
+class DecisionResponse(BaseModel):
+    id: str
+    domain: str
+    question: str
+    context: dict[str, object]
+    status: str
+    options: list[DecisionOptionResponse]
+    created_at: datetime
+
+
+class RankingResponse(BaseModel):
+    option_id: str
+    label: str
+    probability: float
+    utility: float
+
+
+class DecisionPredictionResponse(BaseModel):
+    id: str
+    decision_id: str
+    mode: str
+    predicted_option_id: str
+    predicted_choice: str
+    ranking: list[RankingResponse]
+    confidence: float
+    important_factors: tuple[str, ...]
+    uncertain_factors: tuple[str, ...]
+    supporting_evidence: list[EvidenceResponse]
+    similar_decision_ids: tuple[str, ...]
+    model_snapshot_version: int
+    algorithm_version: str
+    created_at: datetime
+
+
+class DecisionResolutionRequest(BaseModel):
+    chosen_option_id: str = Field(min_length=1, max_length=200)
+
+
+class DecisionResolutionResponse(BaseModel):
+    id: str
+    decision_id: str
+    chosen_option_id: str
+    learned_evidence: list[EvidenceResponse]
+    snapshot_version: int
+    created_at: datetime
+
+
 def _state(app: FastAPI) -> AppState:
     return cast(AppState, app.state.runtime)
+
+
+def _resolve_provider(runtime: AppState) -> LLMProvider:
+    provider = runtime["provider"]
+    if provider is None:
+        provider = build_provider(runtime["settings"])
+        runtime["provider"] = provider
+    return provider
 
 
 def _evidence_response(evidence: Evidence) -> EvidenceResponse:
@@ -155,6 +258,73 @@ def _preference_response(preference: Preference) -> PreferenceResponse:
         supporting_evidence_ids=preference.supporting_evidence_ids,
         updated_at=preference.updated_at,
         model_version=preference.model_version,
+    )
+
+
+def _decision_response(
+    decision: DecisionEvent, options: tuple[DecisionOption, ...]
+) -> DecisionResponse:
+    return DecisionResponse(
+        id=decision.id,
+        domain=decision.domain,
+        question=decision.question,
+        context=decision.context,
+        status=decision.status.value,
+        options=[
+            DecisionOptionResponse(
+                id=item.id,
+                label=item.label,
+                description=item.description,
+                features=item.features,
+                feature_confidence=item.feature_confidence,
+            )
+            for item in options
+        ],
+        created_at=decision.created_at,
+    )
+
+
+def _prediction_response(
+    prediction: DecisionPrediction,
+    options: tuple[DecisionOption, ...],
+    evidence: list[Evidence],
+) -> DecisionPredictionResponse:
+    labels = {item.id: item.label for item in options}
+    winner = prediction.ranking[0]
+    return DecisionPredictionResponse(
+        id=prediction.id,
+        decision_id=prediction.decision_id,
+        mode="predict_me",
+        predicted_option_id=winner.option_id,
+        predicted_choice=labels[winner.option_id],
+        ranking=[
+            RankingResponse(
+                option_id=item.option_id,
+                label=labels[item.option_id],
+                probability=item.probability,
+                utility=item.utility,
+            )
+            for item in prediction.ranking
+        ],
+        confidence=prediction.confidence,
+        important_factors=prediction.important_factors,
+        uncertain_factors=prediction.uncertain_factors,
+        supporting_evidence=[_evidence_response(item) for item in evidence],
+        similar_decision_ids=prediction.similar_decision_ids,
+        model_snapshot_version=prediction.model_snapshot_version,
+        algorithm_version=prediction.algorithm_version,
+        created_at=prediction.created_at,
+    )
+
+
+def _resolution_response(result: ResolutionResult) -> DecisionResolutionResponse:
+    return DecisionResolutionResponse(
+        id=result.resolution.id,
+        decision_id=result.resolution.decision_id,
+        chosen_option_id=result.resolution.chosen_option_id,
+        learned_evidence=[_evidence_response(item) for item in result.evidence],
+        snapshot_version=result.snapshot_version,
+        created_at=result.resolution.created_at,
     )
 
 
@@ -308,18 +478,121 @@ def create_app(settings: Settings | None = None, *, provider: LLMProvider | None
             evidence=_evidence_response(evidence), snapshot_version=snapshot.version
         )
 
+    @app.post("/v1/decisions", response_model=DecisionResponse, status_code=201)
+    async def create_decision(request: DecisionCreateRequest) -> DecisionResponse:
+        runtime = _state(app)
+        provider = None
+        if any(not item.features for item in request.options):
+            try:
+                provider = _resolve_provider(runtime)
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail="A configured model provider is required for feature extraction.",
+                ) from exc
+        repositories = runtime["repositories"]
+        service = DecisionService(
+            decisions=repositories.decisions,
+            raw_events=repositories.raw_events,
+            evidence=repositories.evidence,
+            models=repositories.personal_models,
+            provider=provider,
+        )
+        try:
+            decision, options = await service.create(
+                profile_id=DEFAULT_PROFILE_ID,
+                domain=request.domain,
+                question=request.question,
+                context=request.context,
+                option_inputs=tuple(
+                    DecisionOptionInput(
+                        item.label,
+                        item.description,
+                        item.features,
+                        item.feature_confidence,
+                    )
+                    for item in request.options
+                ),
+            )
+        except EgressDeniedError as exc:
+            raise HTTPException(
+                status_code=403, detail="The configured privacy mode denied model egress."
+            ) from exc
+        except ProviderError as exc:
+            raise HTTPException(
+                status_code=502, detail="The model provider request failed."
+            ) from exc
+        except (ValidationError, ValueError) as exc:
+            raise HTTPException(
+                status_code=502, detail="The model provider returned invalid structured output."
+            ) from exc
+        return _decision_response(decision, options)
+
+    @app.post(
+        "/v1/decisions/{decision_id}/predict",
+        response_model=DecisionPredictionResponse,
+        status_code=201,
+    )
+    def predict_decision(decision_id: str) -> DecisionPredictionResponse:
+        repositories = _state(app)["repositories"]
+        service = DecisionService(
+            decisions=repositories.decisions,
+            raw_events=repositories.raw_events,
+            evidence=repositories.evidence,
+            models=repositories.personal_models,
+            provider=None,
+        )
+        try:
+            prediction = service.predict(DEFAULT_PROFILE_ID, decision_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Decision was not found.") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        stored = repositories.decisions.get(decision_id)
+        if stored is None:
+            raise HTTPException(status_code=404, detail="Decision was not found.")
+        support = [
+            item
+            for evidence_id in prediction.supporting_evidence_ids
+            if (item := repositories.evidence.get(evidence_id)) is not None
+        ]
+        return _prediction_response(prediction, stored[1], support)
+
+    @app.post(
+        "/v1/decisions/{decision_id}/resolve",
+        response_model=DecisionResolutionResponse,
+        status_code=201,
+    )
+    def resolve_decision(
+        decision_id: str, request: DecisionResolutionRequest
+    ) -> DecisionResolutionResponse:
+        repositories = _state(app)["repositories"]
+        service = DecisionService(
+            decisions=repositories.decisions,
+            raw_events=repositories.raw_events,
+            evidence=repositories.evidence,
+            models=repositories.personal_models,
+            provider=None,
+        )
+        try:
+            result = service.resolve(DEFAULT_PROFILE_ID, decision_id, request.chosen_option_id)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=404, detail="Decision or option was not found."
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return _resolution_response(result)
+
     @app.post("/v1/chat", response_model=ChatResponse)
     async def chat(request: ChatRequest) -> ChatResponse:
         runtime = _state(app)
-        resolved_provider = runtime["provider"]
-        if resolved_provider is None:
-            try:
-                resolved_provider = build_provider(runtime["settings"])
-            except ValueError as exc:
-                raise HTTPException(
-                    status_code=503, detail="The configured model provider is unavailable."
-                ) from exc
-            runtime["provider"] = resolved_provider
+        try:
+            resolved_provider = _resolve_provider(runtime)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=503, detail="The configured model provider is unavailable."
+            ) from exc
         repositories = runtime["repositories"]
         service = ConversationService(
             conversations=repositories.conversations,

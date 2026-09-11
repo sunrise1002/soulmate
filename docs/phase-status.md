@@ -5,9 +5,8 @@ the previous phase before planning or implementing the current phase.
 
 ## Authorized scope
 
-Phase 3 — Conversation and Evidence Extraction is complete locally. Phase 4 is not
-authorized. Stop at the Phase 3 boundary until the user explicitly requests the
-next phase.
+Phase 4 — Decision MVP is complete locally. Phase 5 is not authorized. Stop at the
+Phase 4 boundary until the user explicitly requests the next phase.
 
 ## Reports
 
@@ -17,19 +16,21 @@ next phase.
 | Phase 1 | Complete locally | [Phase 1 report](phases/phase-1-report.md) | Remote CI unverified; deferred diagnostics documented |
 | Phase 2 | Complete locally | [Phase 2 report](phases/phase-2-report.md) | Remote CI unverified; extraction intentionally deferred |
 | Phase 3 | Complete locally | [Phase 3 report](phases/phase-3-report.md) | Remote CI and real provider availability unverified |
+| Phase 4 | Complete locally | [Phase 4 report](phases/phase-4-report.md) | Remote CI, real provider extraction, and calibration unverified |
 
-## Phase 3 exit criteria
+## Phase 4 exit criteria
 
-Passed locally. Chat persists across restart, ordinary conversational statements
-produce validated provenance-bearing Evidence, accepted evidence rebuilds the
-versioned model, explanations retain source-message provenance, and only relevant
-Personal Model entries are compiled for chat. The full report records limitations
-and the Phase 4 handoff.
+Passed locally. An owner can submit structured or natural-language A/B/C options,
+receive a persisted Predict Me ranking with probabilities, confidence, factors,
+supporting evidence, similar decisions, and the exact model snapshot version,
+resolve the actual choice into high-value Evidence, restart, and observe the next
+prediction use the updated model. The full report records limitations and the
+Phase 5 handoff.
 
 ## Next action
 
-Wait for explicit Phase 4 authorization. Before planning it, read the complete
-[Phase 3 report](phases/phase-3-report.md) and inspect current repository state.
+Wait for explicit Phase 5 authorization. Before planning it, read the complete
+[Phase 4 report](phases/phase-4-report.md) and inspect current repository state.
 
 ## Repository governance
 
