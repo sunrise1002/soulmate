@@ -90,6 +90,53 @@ def test_installation_identity_survives_application_restart(tmp_path: Path) -> N
     assert first_id == second_id
 
 
+def test_preference_correction_rebuilds_model_and_exposes_evidence(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path / "owner-data")
+    with TestClient(create_app(settings)) as client:
+        empty = client.get("/v1/model/summary")
+        assert empty.status_code == 200
+        assert empty.json()["version"] is None
+
+        correction = client.post(
+            "/v1/preferences/corrections",
+            json={
+                "target_key": "work.remote",
+                "value": 0.75,
+                "context": {"domain": "career"},
+            },
+        )
+        assert correction.status_code == 201
+        result = correction.json()
+        evidence_id = result["evidence"]["id"]
+        assert result["snapshot_version"] == 1
+
+        preferences = client.get("/v1/preferences")
+        assert preferences.status_code == 200
+        assert preferences.json()[0]["key"] == "work.remote"
+        assert preferences.json()[0]["value"] == pytest.approx(0.75)
+
+        support = client.get("/v1/preferences/work.remote/evidence")
+        assert support.status_code == 200
+        assert [item["id"] for item in support.json()] == [evidence_id]
+        detail = client.get(f"/v1/evidence/{evidence_id}")
+        assert detail.status_code == 200
+        assert detail.json()["source_type"] == "user_correction"
+
+        summary = client.get("/v1/model/summary").json()
+        assert summary["version"] == 1
+        assert summary["evidence_revision"] == 1
+        assert summary["preference_count"] == 1
+
+
+def test_preference_correction_validates_external_input(tmp_path: Path) -> None:
+    with TestClient(create_app(Settings(data_dir=tmp_path / "owner-data"))) as client:
+        response = client.post(
+            "/v1/preferences/corrections",
+            json={"target_key": "work.remote", "value": 2.0},
+        )
+        assert response.status_code == 422
+
+
 def test_installed_cli_status_doctor_and_restart(tmp_path: Path) -> None:
     executable = shutil.which("decision-twin")
     assert executable is not None
@@ -154,6 +201,34 @@ def test_doctor_does_not_create_a_missing_database(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert json.loads(result.stdout)["checks"]["database_exists"] is False
     assert not data_dir.exists()
+
+
+def test_rebuild_model_cli_creates_versioned_snapshots(tmp_path: Path) -> None:
+    executable = shutil.which("decision-twin")
+    assert executable is not None
+    env = dict(os.environ, DATA_DIR=str(tmp_path / "data"))
+
+    first = subprocess.run(
+        [executable, "rebuild-model"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    second = subprocess.run(
+        [executable, "rebuild-model"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert first.returncode == second.returncode == 0
+    assert json.loads(first.stdout)["snapshot_version"] == 1
+    assert json.loads(second.stdout)["snapshot_version"] == 2
+    assert json.loads(second.stdout)["evidence_revision"] == 0
 
 
 def test_cli_reports_bad_config_without_traceback(tmp_path: Path) -> None:

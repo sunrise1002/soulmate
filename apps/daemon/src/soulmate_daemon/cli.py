@@ -11,11 +11,13 @@ from urllib.request import ProxyHandler, build_opener
 
 import uvicorn
 from alembic.util.exc import CommandError
-from soulmate_storage_sqlite import Database
+from soulmate_core.preferences import ModelRebuilder
+from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy.exc import SQLAlchemyError
 
 from soulmate_daemon.app import create_app
 from soulmate_daemon.config import ConfigurationError, Settings, load_settings
+from soulmate_daemon.system import DEFAULT_PROFILE_ID, ensure_installation
 
 
 def _service_url(settings: Settings, path: str) -> str:
@@ -105,6 +107,40 @@ def _doctor(settings: Settings) -> int:
     return 0 if healthy else 1
 
 
+def _rebuild_model(settings: Settings) -> int:
+    database = Database(settings.database_path)
+    try:
+        database.migrate()
+        repositories = Repositories(database.sessions())
+        ensure_installation(repositories.system_metadata, repositories.profiles)
+        snapshot = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
+            DEFAULT_PROFILE_ID
+        )
+    except (CommandError, OSError, RuntimeError, SQLAlchemyError, ValueError) as exc:
+        print(
+            json.dumps(
+                {"rebuilt": False, "error": f"Model rebuild failed with {type(exc).__name__}."},
+                sort_keys=True,
+            )
+        )
+        return 1
+    finally:
+        database.close()
+    print(
+        json.dumps(
+            {
+                "rebuilt": True,
+                "profile_id": snapshot.profile_id,
+                "snapshot_version": snapshot.version,
+                "evidence_revision": snapshot.evidence_revision,
+                "algorithm_version": snapshot.algorithm_version,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="decision-twin", description="Soulmate local daemon")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -112,6 +148,7 @@ def _parser() -> argparse.ArgumentParser:
         ("serve", "Start the local Soulmate daemon"),
         ("status", "Query the running local daemon"),
         ("doctor", "Inspect local configuration and persistence"),
+        ("rebuild-model", "Rebuild the Personal Model from stored evidence"),
     ):
         subcommand = commands.add_parser(command, help=help_text)
         subcommand.add_argument("--config", type=Path, help="Path to a TOML configuration file")
@@ -135,4 +172,6 @@ def main() -> None:
         return
     if args.command == "status":
         raise SystemExit(_status(settings))
-    raise SystemExit(_doctor(settings))
+    if args.command == "doctor":
+        raise SystemExit(_doctor(settings))
+    raise SystemExit(_rebuild_model(settings))

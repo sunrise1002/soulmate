@@ -1,1 +1,5 @@
-"""Evidence validation and provenance boundary; implementation starts in Phase 2."""
+"""Evidence validation and provenance boundary."""
+
+from soulmate_core.domain import Evidence, EvidenceRepository, EvidenceTargetType
+
+__all__ = ["Evidence", "EvidenceRepository", "EvidenceTargetType"]

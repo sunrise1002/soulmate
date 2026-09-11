@@ -3,9 +3,9 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 1 local daemon and persistence are implemented locally.
+**Current status:** Phase 2 evidence and Personal Model foundations are implemented locally.
 See the [phase status](docs/phase-status.md) and detailed
-[Phase 1 report](docs/phases/phase-1-report.md).
+[Phase 2 report](docs/phases/phase-2-report.md).
 
 ## Development setup
 
@@ -50,6 +50,7 @@ Inspect the running service or local persistence:
 ```sh
 uv run --locked decision-twin status
 uv run --locked decision-twin doctor
+uv run --locked decision-twin rebuild-model
 ```
 
 `status` queries `/v1/health` and `/v1/system/info`. `doctor` checks storage
@@ -57,6 +58,13 @@ permissions, database integrity, WAL, foreign keys, migration state, and whether
 the configured port is already in use. Both commands emit machine-readable JSON
 and return nonzero when their required checks fail. Provider and vector diagnostics
 remain deferred to their owning phases.
+
+`rebuild-model` deterministically replaces derived model state from all stored
+evidence and creates a new versioned snapshot. The Phase 2 API also exposes
+`GET /v1/model/summary`, `GET /v1/preferences`, `GET /v1/evidence/{id}`,
+`GET /v1/preferences/{key}/evidence`, and `POST /v1/preferences/corrections`.
+Corrections create a RawEvent and correction Evidence before rebuilding; they do
+not overwrite history.
 
 Optionally copy `config.example.toml` to `config.toml` and edit it. Local config is
 ignored by Git. See [configuration](docs/contributor-guide/configuration.md) for

@@ -1,9 +1,26 @@
 """Domain entities, value objects, and infrastructure-independent ports."""
 
-from soulmate_core.domain.models import AuditEvent, Job, JobStatus, Profile, RawEvent, Source
+from soulmate_core.domain.models import (
+    AuditEvent,
+    Constraint,
+    DerivedModel,
+    Evidence,
+    EvidenceTargetType,
+    Fact,
+    Goal,
+    Job,
+    JobStatus,
+    Preference,
+    Profile,
+    RawEvent,
+    Source,
+    UserModelSnapshot,
+)
 from soulmate_core.domain.ports import (
     AuditEventRepository,
+    EvidenceRepository,
     JobRepository,
+    PersonalModelRepository,
     ProfileRepository,
     RawEventRepository,
     SourceRepository,
@@ -13,9 +30,18 @@ from soulmate_core.domain.ports import (
 __all__ = [
     "AuditEvent",
     "AuditEventRepository",
+    "Constraint",
+    "DerivedModel",
+    "Evidence",
+    "EvidenceRepository",
+    "EvidenceTargetType",
+    "Fact",
+    "Goal",
     "Job",
     "JobRepository",
     "JobStatus",
+    "PersonalModelRepository",
+    "Preference",
     "Profile",
     "ProfileRepository",
     "RawEvent",
@@ -23,4 +49,5 @@ __all__ = [
     "Source",
     "SourceRepository",
     "SystemMetadataRepository",
+    "UserModelSnapshot",
 ]

@@ -1,4 +1,4 @@
-"""Phase 1 domain records shared by persistence ports and application services."""
+"""Domain records shared by persistence ports and application services."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -21,6 +21,15 @@ class JobStatus(StrEnum):
     RUNNING = "running"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+
+
+class EvidenceTargetType(StrEnum):
+    """Kinds of derived Personal Model state supported by evidence."""
+
+    FACT = "fact"
+    PREFERENCE = "preference"
+    GOAL = "goal"
+    CONSTRAINT = "constraint"
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,7 +56,7 @@ class Source:
 
 @dataclass(frozen=True, slots=True)
 class RawEvent:
-    """Immutable input envelope; interpretation begins in Phase 2."""
+    """Immutable input envelope for learning inputs."""
 
     id: str
     profile_id: str
@@ -60,6 +69,121 @@ class RawEvent:
 
     def __post_init__(self) -> None:
         _require_utc_aware(self.created_at, self.ingested_at)
+
+
+@dataclass(frozen=True, slots=True)
+class Evidence:
+    """Immutable, provenance-bearing claim used to derive Personal Model state."""
+
+    id: str
+    profile_id: str
+    target_type: EvidenceTargetType
+    target_key: str
+    value: object
+    strength: float
+    confidence: float
+    context: dict[str, object]
+    source_type: str
+    source_event_id: str
+    extractor_version: str
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at)
+        if not self.target_key:
+            raise ValueError("Evidence target_key must not be empty.")
+        if not self.source_type or not self.source_event_id or not self.extractor_version:
+            raise ValueError("Evidence provenance fields must not be empty.")
+        if not 0.0 <= self.strength <= 1.0:
+            raise ValueError("Evidence strength must be between 0 and 1.")
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError("Evidence confidence must be between 0 and 1.")
+        if self.target_type is EvidenceTargetType.PREFERENCE and (
+            isinstance(self.value, bool)
+            or not isinstance(self.value, (int, float))
+            or not -1.0 <= float(self.value) <= 1.0
+        ):
+            raise ValueError("Preference evidence value must be numeric and between -1 and 1.")
+
+
+@dataclass(frozen=True, slots=True)
+class Preference:
+    key: str
+    value: float
+    uncertainty: float
+    confidence: float
+    context: dict[str, object]
+    supporting_evidence_ids: tuple[str, ...]
+    updated_at: datetime
+    model_version: int
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.updated_at)
+
+
+@dataclass(frozen=True, slots=True)
+class Fact:
+    key: str
+    value: object
+    confidence: float
+    context: dict[str, object]
+    supporting_evidence_ids: tuple[str, ...]
+    updated_at: datetime
+    model_version: int
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.updated_at)
+
+
+@dataclass(frozen=True, slots=True)
+class Goal:
+    key: str
+    value: object
+    confidence: float
+    context: dict[str, object]
+    supporting_evidence_ids: tuple[str, ...]
+    updated_at: datetime
+    model_version: int
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.updated_at)
+
+
+@dataclass(frozen=True, slots=True)
+class Constraint:
+    key: str
+    value: object
+    confidence: float
+    context: dict[str, object]
+    supporting_evidence_ids: tuple[str, ...]
+    updated_at: datetime
+    model_version: int
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.updated_at)
+
+
+@dataclass(frozen=True, slots=True)
+class DerivedModel:
+    """Deterministically aggregated model content before persistence versioning."""
+
+    preferences: tuple[Preference, ...]
+    facts: tuple[Fact, ...]
+    goals: tuple[Goal, ...]
+    constraints: tuple[Constraint, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class UserModelSnapshot:
+    profile_id: str
+    version: int
+    algorithm_version: str
+    evidence_revision: int
+    model: DerivedModel
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at)
 
 
 @dataclass(frozen=True, slots=True)

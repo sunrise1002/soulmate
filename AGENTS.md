@@ -21,8 +21,8 @@ data merely to satisfy this code convention.
 
 ## Phase boundary
 
-Phase 1 local daemon and persistence are complete locally. Phase 2 is not
-authorized; do not implement evidence or Personal Model behavior until the user
+Phase 2 evidence and Personal Model foundation is complete locally. Phase 3 is not
+authorized; do not implement conversation or evidence extraction until the user
 explicitly requests it. Remote CI verification for completed phases remains
 unconfirmed.
 For every later phase, follow specification section 74: plan only the current

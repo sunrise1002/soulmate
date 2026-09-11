@@ -5,9 +5,9 @@ the previous phase before planning or implementing the current phase.
 
 ## Authorized scope
 
-Phase 1 — Local Daemon and Persistence is complete locally. Phase 2 is not
-authorized. Stop at the Phase 1 boundary until the user explicitly requests the
-next phase.
+Phase 2 — Evidence and Personal Model Foundation is complete locally. Phase 3 is
+not authorized. Stop at the Phase 2 boundary until the user explicitly requests
+the next phase.
 
 ## Reports
 
@@ -15,17 +15,20 @@ next phase.
 | --- | --- | --- | --- |
 | Phase 0 | Complete locally | [Phase 0 report](phases/phase-0-report.md) | Remote CI unverified |
 | Phase 1 | Complete locally | [Phase 1 report](phases/phase-1-report.md) | Remote CI unverified; deferred diagnostics documented |
+| Phase 2 | Complete locally | [Phase 2 report](phases/phase-2-report.md) | Remote CI unverified; extraction intentionally deferred |
 
-## Phase 1 exit criteria
+## Phase 2 exit criteria
 
-Passed locally. `decision-twin serve` provides a healthy loopback service,
-persistent SQLite storage, successful restart, and automatic migrations. The full
-report records implementation details, checks, limitations, and Phase 2 handoff.
+Passed locally. Evidence remains provenance-bearing and contradictory, deterministic
+aggregation derives contextual preferences and other model state, corrections add
+evidence, removal plus rebuild changes the model, and every rebuild creates a
+versioned snapshot. The full report records implementation details and Phase 3
+handoff.
 
 ## Next action
 
-Wait for explicit Phase 2 authorization. Before planning it, read the complete
-[Phase 1 report](phases/phase-1-report.md) and inspect current repository state.
+Wait for explicit Phase 3 authorization. Before planning it, read the complete
+[Phase 2 report](phases/phase-2-report.md) and inspect current repository state.
 
 ## Repository governance
 

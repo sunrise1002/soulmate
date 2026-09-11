@@ -5,7 +5,18 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
-from soulmate_core.domain import AuditEvent, Job, JobStatus, Profile, RawEvent, Source
+from alembic import command
+from soulmate_core.domain import (
+    AuditEvent,
+    Evidence,
+    EvidenceTargetType,
+    Job,
+    JobStatus,
+    Profile,
+    RawEvent,
+    Source,
+)
+from soulmate_core.preferences import ModelRebuilder
 from soulmate_daemon.jobs import DurableJobWorker
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy import inspect
@@ -29,6 +40,13 @@ def test_initial_migration_creates_base_tables_and_required_pragmas(tmp_path: Pa
         "profiles",
         "sources",
         "raw_events",
+        "evidence",
+        "evidence_revisions",
+        "preferences",
+        "facts",
+        "goals",
+        "constraints",
+        "user_model_snapshots",
         "audit_events",
         "jobs",
         "system_metadata",
@@ -38,7 +56,7 @@ def test_initial_migration_creates_base_tables_and_required_pragmas(tmp_path: Pa
     assert check.integrity == "ok"
     assert check.journal_mode == "wal"
     assert check.foreign_keys is True
-    assert check.current_revision == check.head_revision == "0001_phase_1"
+    assert check.current_revision == check.head_revision == "0002_phase_2"
     database.close()
 
 
@@ -93,6 +111,157 @@ def test_migration_is_idempotent_across_database_restart(tmp_path: Path) -> None
     second.migrate()
     assert second.current_revision() == second.head_revision()
     second.close()
+
+
+def test_phase_1_database_upgrades_without_losing_base_records(tmp_path: Path) -> None:
+    path = tmp_path / "decision-twin.db"
+    database = Database(path)
+    database.connect()
+    command.upgrade(database.migration_config, "0001_phase_1")
+    assert database.session_factory is not None
+    repositories = Repositories(database.session_factory)
+    now = datetime.now(UTC)
+    profile = Profile("profile_preserved", "Synthetic Owner", now)
+    repositories.profiles.add(profile)
+
+    database.migrate()
+
+    assert repositories.profiles.get(profile.id) == profile
+    assert database.current_revision() == "0002_phase_2"
+    database.close()
+
+
+def test_evidence_rebuild_persists_provenance_snapshots_and_removal(tmp_path: Path) -> None:
+    database, repositories = _storage(tmp_path)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    profile = Profile("profile_test", "Synthetic Owner", now)
+    repositories.profiles.add(profile)
+    for index, value in enumerate((0.8, -0.4), start=1):
+        event = RawEvent(
+            id=f"event_{index}",
+            profile_id=profile.id,
+            source_id=None,
+            event_type="synthetic_preference",
+            content={"value": value},
+            created_at=now + timedelta(seconds=index),
+            ingested_at=now + timedelta(seconds=index),
+        )
+        repositories.raw_events.add(event)
+        repositories.evidence.add(
+            Evidence(
+                id=f"evidence_{index}",
+                profile_id=profile.id,
+                target_type=EvidenceTargetType.PREFERENCE,
+                target_key="work.remote",
+                value=value,
+                strength=1.0,
+                confidence=1.0,
+                context={"domain": "career"},
+                source_type="explicit_statement" if index == 1 else "user_correction",
+                source_event_id=event.id,
+                extractor_version="synthetic-v1",
+                created_at=event.created_at,
+            )
+        )
+
+    rebuilder = ModelRebuilder(repositories.evidence, repositories.personal_models)
+    first = rebuilder.rebuild(profile.id, now + timedelta(minutes=1))
+    assert first.version == 1
+    assert first.evidence_revision == 2
+    assert len(first.model.preferences) == 1
+    assert first.model.preferences[0].supporting_evidence_ids == (
+        "evidence_1",
+        "evidence_2",
+    )
+    corrected_value = first.model.preferences[0].value
+
+    assert repositories.evidence.remove("evidence_2") is True
+    second = rebuilder.rebuild(profile.id, now + timedelta(minutes=2))
+    assert second.version == 2
+    assert second.evidence_revision == 3
+    assert second.model.preferences[0].value == pytest.approx(0.8)
+    assert second.model.preferences[0].value != corrected_value
+    assert repositories.personal_models.latest_snapshot(profile.id) == second
+    database.close()
+
+
+def test_evidence_requires_provenance_from_same_profile(tmp_path: Path) -> None:
+    database, repositories = _storage(tmp_path)
+    now = datetime.now(UTC)
+    repositories.profiles.add(Profile("profile_one", None, now))
+    repositories.profiles.add(Profile("profile_two", None, now))
+    repositories.raw_events.add(
+        RawEvent("event_one", "profile_one", None, "synthetic", {}, now, now)
+    )
+    evidence = Evidence(
+        "evidence_bad",
+        "profile_two",
+        EvidenceTargetType.FACT,
+        "owner.region",
+        "south",
+        1.0,
+        1.0,
+        {},
+        "user_correction",
+        "event_one",
+        "synthetic-v1",
+        now,
+    )
+    with pytest.raises(ValueError, match="same profile"):
+        repositories.evidence.add(evidence)
+    database.close()
+
+
+def test_all_derived_state_types_persist_in_snapshot(tmp_path: Path) -> None:
+    database, repositories = _storage(tmp_path)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    profile = Profile("profile_model", None, now)
+    repositories.profiles.add(profile)
+    cases = (
+        (EvidenceTargetType.FACT, "owner.region", "south"),
+        (EvidenceTargetType.PREFERENCE, "work.remote", 0.8),
+        (EvidenceTargetType.GOAL, "career.leadership", "become_lead"),
+        (EvidenceTargetType.CONSTRAINT, "work.travel", "monthly_max"),
+    )
+    for index, (target_type, key, value) in enumerate(cases):
+        event = RawEvent(
+            f"event_model_{index}",
+            profile.id,
+            None,
+            "synthetic",
+            {},
+            now + timedelta(seconds=index),
+            now + timedelta(seconds=index),
+        )
+        repositories.raw_events.add(event)
+        repositories.evidence.add(
+            Evidence(
+                f"evidence_model_{index}",
+                profile.id,
+                target_type,
+                key,
+                value,
+                1.0,
+                1.0,
+                {},
+                "explicit_statement",
+                event.id,
+                "synthetic-v1",
+                event.created_at,
+            )
+        )
+
+    snapshot = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
+        profile.id, now + timedelta(minutes=1)
+    )
+    restored = repositories.personal_models.latest_snapshot(profile.id)
+
+    assert restored == snapshot
+    assert snapshot.model.facts[0].value == "south"
+    assert snapshot.model.preferences[0].value == pytest.approx(0.8)
+    assert snapshot.model.goals[0].value == "become_lead"
+    assert snapshot.model.constraints[0].value == "monthly_max"
+    database.close()
 
 
 def test_worker_reclaims_stale_job_after_restart(tmp_path: Path) -> None:

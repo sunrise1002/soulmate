@@ -4,6 +4,12 @@
 
 ### Added
 
+- Phase 2 evidence, provenance, derived Fact/Preference/Goal/Constraint records,
+  deterministic versioned aggregation, and model rebuild service.
+- SQLite migration `0002_phase_2` with evidence revision tracking, derived-state
+  tables, immutable model snapshots, and Phase 1 upgrade coverage.
+- `rebuild-model` CLI command and local API endpoints for model summaries,
+  contextual preferences, corrections, and supporting evidence.
 - Phase 1 SQLite adapter with WAL, foreign keys, six base tables, repositories, and
   packaged Alembic migration `0001_phase_1`.
 - Persistent local installation identity and default owner profile.
@@ -22,5 +28,5 @@
   hooks, Conventional Commit and branch validation, CI enforcement, issue/PR
   templates, security guidance, and documented GitHub ruleset settings.
 
-No evidence-derived Personal Model behavior, provider integrations, vector search,
-or later-phase features have been implemented.
+No conversational extraction, provider integrations, vector search, decision
+prediction, or later-phase features have been implemented.

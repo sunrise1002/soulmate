@@ -1,10 +1,20 @@
-"""Infrastructure-independent repository contracts required by Phase 1."""
+"""Infrastructure-independent repository contracts."""
 
 from collections.abc import Collection
 from datetime import datetime
 from typing import Protocol
 
-from soulmate_core.domain.models import AuditEvent, Job, Profile, RawEvent, Source
+from soulmate_core.domain.models import (
+    AuditEvent,
+    DerivedModel,
+    Evidence,
+    Job,
+    Preference,
+    Profile,
+    RawEvent,
+    Source,
+    UserModelSnapshot,
+)
 
 
 class ProfileRepository(Protocol):
@@ -23,6 +33,41 @@ class RawEventRepository(Protocol):
     def add(self, event: RawEvent) -> None: ...
 
     def get(self, event_id: str) -> RawEvent | None: ...
+
+
+class EvidenceRepository(Protocol):
+    def add(self, evidence: Evidence) -> None: ...
+
+    def get(self, evidence_id: str) -> Evidence | None: ...
+
+    def list_for_profile(self, profile_id: str) -> tuple[Evidence, ...]: ...
+
+    def list_for_profile_with_revision(
+        self, profile_id: str
+    ) -> tuple[tuple[Evidence, ...], int]: ...
+
+    def list_for_target(self, profile_id: str, target_key: str) -> tuple[Evidence, ...]: ...
+
+    def remove(self, evidence_id: str) -> bool: ...
+
+    def current_revision(self, profile_id: str) -> int: ...
+
+
+class PersonalModelRepository(Protocol):
+    def replace(
+        self,
+        profile_id: str,
+        model: DerivedModel,
+        evidence_revision: int,
+        algorithm_version: str,
+        created_at: datetime,
+    ) -> UserModelSnapshot: ...
+
+    def latest_snapshot(self, profile_id: str) -> UserModelSnapshot | None: ...
+
+    def list_preferences(self, profile_id: str) -> tuple[Preference, ...]: ...
+
+    def get_preferences(self, profile_id: str, key: str) -> tuple[Preference, ...]: ...
 
 
 class AuditEventRepository(Protocol):
