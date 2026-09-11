@@ -369,6 +369,7 @@ def test_decision_prediction_resolution_learning_and_restart(tmp_path: Path) -> 
         assert predicted["mode"] == "predict_me"
         assert predicted["predicted_option_id"] == remote_id
         assert predicted["model_snapshot_version"] == 1
+        assert predicted["algorithm_version"].startswith("decision-predictor-v2:")
         assert predicted["important_factors"] == ["work.remote"]
         assert predicted["supporting_evidence"][0]["source_type"] == "user_correction"
         assert sum(item["probability"] for item in predicted["ranking"]) == pytest.approx(1.0)
@@ -402,6 +403,7 @@ def test_decision_prediction_resolution_learning_and_restart(tmp_path: Path) -> 
         next_prediction = client.post(f"/v1/decisions/{next_decision['id']}/predict").json()
         assert next_prediction["predicted_choice"] == "Office role"
         assert next_prediction["model_snapshot_version"] == 2
+        assert "bradley-terry-online-v1" in next_prediction["algorithm_version"]
         assert next_prediction["similar_decision_ids"] == [decision["id"]]
 
 

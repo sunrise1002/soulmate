@@ -5,8 +5,9 @@ the previous phase before planning or implementing the current phase.
 
 ## Authorized scope
 
-Phase 4 — Decision MVP is complete locally. Phase 5 is not authorized. Stop at the
-Phase 4 boundary until the user explicitly requests the next phase.
+Phase 5 — Preference Learning & Evaluation is complete locally. Phase 6 is not
+authorized. Stop at the Phase 5 boundary until the user explicitly requests the
+next phase.
 
 ## Reports
 
@@ -17,20 +18,20 @@ Phase 4 boundary until the user explicitly requests the next phase.
 | Phase 2 | Complete locally | [Phase 2 report](phases/phase-2-report.md) | Remote CI unverified; extraction intentionally deferred |
 | Phase 3 | Complete locally | [Phase 3 report](phases/phase-3-report.md) | Remote CI and real provider availability unverified |
 | Phase 4 | Complete locally | [Phase 4 report](phases/phase-4-report.md) | Remote CI, real provider extraction, and calibration unverified |
+| Phase 5 | Complete locally | [Phase 5 report](phases/phase-5-report.md) | Remote CI and external-dataset calibration unverified |
 
-## Phase 4 exit criteria
+## Phase 5 exit criteria
 
-Passed locally. An owner can submit structured or natural-language A/B/C options,
-receive a persisted Predict Me ranking with probabilities, confidence, factors,
-supporting evidence, similar decisions, and the exact model snapshot version,
-resolve the actual choice into high-value Evidence, restart, and observe the next
-prediction use the updated model. The full report records limitations and the
-Phase 5 handoff.
+Passed locally. `decision-twin evaluate` runs a packaged synthetic dataset without
+network or database access and reproducibly compares five baselines across
+accuracy, Top-2 accuracy, log loss, Brier score, and confidence calibration. New
+Predict Me results combine weighted global/domain/contextual preferences with
+online pairwise learning and persist the complete V2 algorithm version.
 
 ## Next action
 
-Wait for explicit Phase 5 authorization. Before planning it, read the complete
-[Phase 4 report](phases/phase-4-report.md) and inspect current repository state.
+Wait for explicit Phase 6 authorization. Before planning it, read the complete
+[Phase 5 report](phases/phase-5-report.md) and inspect current repository state.
 
 ## Repository governance
 

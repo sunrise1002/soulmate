@@ -4,6 +4,15 @@
 
 ### Added
 
+- Phase 5 synthetic decision benchmark and offline `decision-twin evaluate`
+  command with reproducible random, frozen LLM-only, memory-only, Personal Model,
+  and Decision Model comparisons.
+- Top-1 and Top-2 accuracy, log loss, multiclass Brier score, and populated-bin
+  expected calibration error metrics.
+- Deterministic online Bradley-Terry/logistic updates over resolved choices with
+  global, domain-specific, and contextual weights.
+- Context-weighted Personal Model preference matching and a versioned V2 decision
+  algorithm recorded on every new prediction.
 - Phase 4 decision records, explicit decision/predict/resolve APIs, validated
   natural-option feature extraction, and restart-safe SQLite persistence.
 - Provider-independent preference matching, V1 utility scoring, softmax ranking,
@@ -47,5 +56,5 @@
   hooks, Conventional Commit and branch validation, CI enforcement, issue/PR
   templates, security guidance, and documented GitHub ruleset settings.
 
-No embeddings, evaluation/calibration learning, Advise Me, desktop/mobile clients,
-MCP integration, or later-phase features have been implemented.
+No embeddings, real-provider evaluation, Advise Me, desktop/mobile clients, MCP
+integration, or later-phase features have been implemented.

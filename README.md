@@ -3,9 +3,9 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 4 Decision MVP is implemented locally.
+**Current status:** Phase 5 Preference Learning & Evaluation is implemented locally.
 See the [phase status](docs/phase-status.md) and detailed
-[Phase 4 report](docs/phases/phase-4-report.md).
+[Phase 5 report](docs/phases/phase-5-report.md).
 
 ## Development setup
 
@@ -51,6 +51,7 @@ Inspect the running service or local persistence:
 uv run --locked decision-twin status
 uv run --locked decision-twin doctor
 uv run --locked decision-twin rebuild-model
+uv run --locked decision-twin evaluate
 ```
 
 `status` queries `/v1/health` and `/v1/system/info`. `doctor` checks storage
@@ -66,6 +67,13 @@ evidence and creates a new versioned snapshot. The Phase 2 API also exposes
 Corrections create a RawEvent and correction Evidence before rebuilding; they do
 not overwrite history.
 
+`evaluate` runs the packaged synthetic decision dataset without a database,
+network access, or model provider. It emits machine-readable random, frozen
+LLM-only, memory-only, Personal Model, and Decision Model results with accuracy,
+Top-2 accuracy, log loss, multiclass Brier score, and confidence-calibration
+error. Use `--dataset PATH` to evaluate another dataset with the same validated
+schema.
+
 `POST /v1/chat` persists conversations and messages, sends only lexically relevant
 Personal Model context to the configured provider, validates structured evidence
 proposals, accepts ordinary low-risk claims, and rebuilds the model when evidence
@@ -76,9 +84,11 @@ The Decision MVP exposes `POST /v1/decisions`,
 `POST /v1/decisions/{id}/predict`, and `POST /v1/decisions/{id}/resolve`.
 Options may supply normalized structured features directly or use the configured
 provider to extract them from natural descriptions. Predict Me scoring is local
-and deterministic, returns probabilities and evidence-backed factors, and records
-the exact Personal Model snapshot. Resolving the actual choice creates
-provenance-bearing `actual_choice` Evidence and rebuilds the model.
+and deterministic, combines global, domain, and matching-context preferences with
+online pairwise learning from prior resolutions, returns probabilities and
+evidence-backed factors, and records the exact Personal Model snapshot and
+learning algorithm version. Resolving the actual choice creates provenance-bearing
+`actual_choice` Evidence and rebuilds the model.
 
 Optionally copy `config.example.toml` to `config.toml` and edit it. Local config is
 ignored by Git. See [configuration](docs/contributor-guide/configuration.md) for
@@ -94,7 +104,7 @@ environment overrides, `DATA_DIR`, and path semantics.
 | `apps/{desktop,mobile,web,mcp}/` | Reserved client and integration locations |
 | `packages/llm-providers/` | Provider protocol, fake provider, egress policy, Ollama, and OpenAI-compatible adapters |
 | `packages/{sdk-python,sdk-typescript}/` | Reserved future SDK locations |
-| `tests/` | Unit, integration, and future evaluation tests with synthetic data |
+| `tests/` | Unit, integration, and evaluation tests using synthetic data |
 | `docs/architecture/decisions/` | ADR-001 through ADR-008 |
 | `docs/phases/` | Durable plans, results, issues, and handoff reports per phase |
 | `docs/contributor-guide/` | Conventions and configuration reference |

@@ -11,6 +11,7 @@ from urllib.request import ProxyHandler, build_opener
 
 import uvicorn
 from alembic.util.exc import CommandError
+from soulmate_core.evaluation import evaluate_dataset, load_dataset
 from soulmate_core.preferences import ModelRebuilder
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy.exc import SQLAlchemyError
@@ -150,6 +151,16 @@ def _rebuild_model(settings: Settings) -> int:
     return 0
 
 
+def _evaluate(dataset_path: Path | None) -> int:
+    try:
+        report = evaluate_dataset(load_dataset(dataset_path))
+    except ValueError as exc:
+        print(json.dumps({"evaluated": False, "error": str(exc)}, sort_keys=True))
+        return 1
+    print(json.dumps({"evaluated": True, **report.as_dict()}, sort_keys=True))
+    return 0
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="decision-twin", description="Soulmate local daemon")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -161,12 +172,16 @@ def _parser() -> argparse.ArgumentParser:
     ):
         subcommand = commands.add_parser(command, help=help_text)
         subcommand.add_argument("--config", type=Path, help="Path to a TOML configuration file")
+    evaluate = commands.add_parser("evaluate", help="Run reproducible decision evaluation")
+    evaluate.add_argument("--dataset", type=Path, help="Path to an evaluation JSON dataset")
     return parser
 
 
 def main() -> None:
     parser = _parser()
     args = parser.parse_args()
+    if args.command == "evaluate":
+        raise SystemExit(_evaluate(args.dataset))
     try:
         settings = load_settings(args.config)
     except ConfigurationError as exc:

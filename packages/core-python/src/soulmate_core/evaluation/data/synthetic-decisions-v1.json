@@ -1,0 +1,127 @@
+{
+  "dataset_version": "synthetic-owner-v1",
+  "preferences": [
+    {"key": "cost", "value": -0.75, "confidence": 0.9, "context": {}},
+    {"key": "quality", "value": 0.55, "confidence": 0.8, "context": {}},
+    {"key": "remote", "value": 0.85, "confidence": 0.9, "context": {"domain": "career"}},
+    {"key": "speed", "value": -0.2, "confidence": 0.6, "context": {}},
+    {"key": "speed", "value": 0.25, "confidence": 0.7, "context": {"domain": "travel"}},
+    {"key": "speed", "value": 0.95, "confidence": 0.95, "context": {"domain": "travel", "urgency": "high"}},
+    {"key": "comfort", "value": 0.8, "confidence": 0.85, "context": {"domain": "travel", "urgency": "low"}}
+  ],
+  "decisions": [
+    {
+      "id": "travel_01", "domain": "travel", "context": {"urgency": "high"},
+      "options": [
+        {"id": "travel_01_a", "features": {"cost": -0.8, "speed": -0.8, "comfort": 0.5}},
+        {"id": "travel_01_b", "features": {"cost": 0.5, "speed": 0.9, "comfort": 0.1}}
+      ],
+      "chosen_option_id": "travel_01_b",
+      "llm_only_probabilities": {"travel_01_a": 0.55, "travel_01_b": 0.45}
+    },
+    {
+      "id": "travel_02", "domain": "travel", "context": {"urgency": "low"},
+      "options": [
+        {"id": "travel_02_a", "features": {"cost": -0.7, "speed": -0.4, "comfort": 0.9}},
+        {"id": "travel_02_b", "features": {"cost": 0.3, "speed": 0.8, "comfort": 0.0}}
+      ],
+      "chosen_option_id": "travel_02_a",
+      "llm_only_probabilities": {"travel_02_a": 0.7, "travel_02_b": 0.3}
+    },
+    {
+      "id": "career_01", "domain": "career", "context": {"stage": "growth"},
+      "options": [
+        {"id": "career_01_a", "features": {"remote": -0.8, "quality": 0.7, "cost": -0.1}},
+        {"id": "career_01_b", "features": {"remote": 0.9, "quality": 0.4, "cost": 0.1}}
+      ],
+      "chosen_option_id": "career_01_b",
+      "llm_only_probabilities": {"career_01_a": 0.35, "career_01_b": 0.65}
+    },
+    {
+      "id": "software_01", "domain": "software", "context": {"use": "daily"},
+      "options": [
+        {"id": "software_01_a", "features": {"cost": -0.9, "quality": 0.2, "speed": -0.2}},
+        {"id": "software_01_b", "features": {"cost": 0.5, "quality": 0.95, "speed": 0.5}},
+        {"id": "software_01_c", "features": {"cost": -0.2, "quality": 0.6, "speed": 0.1}}
+      ],
+      "chosen_option_id": "software_01_c",
+      "llm_only_probabilities": {"software_01_a": 0.2, "software_01_b": 0.55, "software_01_c": 0.25}
+    },
+    {
+      "id": "travel_03", "domain": "travel", "context": {"urgency": "high"},
+      "options": [
+        {"id": "travel_03_a", "features": {"cost": -0.6, "speed": -0.7, "comfort": 0.7}},
+        {"id": "travel_03_b", "features": {"cost": 0.7, "speed": 1.0, "comfort": -0.1}}
+      ],
+      "chosen_option_id": "travel_03_b",
+      "llm_only_probabilities": {"travel_03_a": 0.4, "travel_03_b": 0.6}
+    },
+    {
+      "id": "travel_04", "domain": "travel", "context": {"urgency": "low"},
+      "options": [
+        {"id": "travel_04_a", "features": {"cost": -0.5, "speed": -0.3, "comfort": 0.8}},
+        {"id": "travel_04_b", "features": {"cost": 0.2, "speed": 0.9, "comfort": 0.1}}
+      ],
+      "chosen_option_id": "travel_04_a",
+      "llm_only_probabilities": {"travel_04_a": 0.45, "travel_04_b": 0.55}
+    },
+    {
+      "id": "career_02", "domain": "career", "context": {"stage": "stable"},
+      "options": [
+        {"id": "career_02_a", "features": {"remote": 0.8, "quality": 0.6, "cost": 0.0}},
+        {"id": "career_02_b", "features": {"remote": -0.6, "quality": 0.9, "cost": 0.0}},
+        {"id": "career_02_c", "features": {"remote": 0.2, "quality": 0.4, "cost": -0.2}}
+      ],
+      "chosen_option_id": "career_02_a",
+      "llm_only_probabilities": {"career_02_a": 0.3, "career_02_b": 0.5, "career_02_c": 0.2}
+    },
+    {
+      "id": "software_02", "domain": "software", "context": {"use": "occasional"},
+      "options": [
+        {"id": "software_02_a", "features": {"cost": -0.9, "quality": 0.4, "speed": -0.1}},
+        {"id": "software_02_b", "features": {"cost": 0.6, "quality": 0.9, "speed": 0.6}}
+      ],
+      "chosen_option_id": "software_02_a",
+      "llm_only_probabilities": {"software_02_a": 0.65, "software_02_b": 0.35}
+    },
+    {
+      "id": "travel_05", "domain": "travel", "context": {"urgency": "high"},
+      "options": [
+        {"id": "travel_05_a", "features": {"cost": -0.4, "speed": -0.6, "comfort": 0.8}},
+        {"id": "travel_05_b", "features": {"cost": 0.8, "speed": 0.95, "comfort": 0.0}},
+        {"id": "travel_05_c", "features": {"cost": 0.1, "speed": 0.3, "comfort": 0.5}}
+      ],
+      "chosen_option_id": "travel_05_b",
+      "llm_only_probabilities": {"travel_05_a": 0.25, "travel_05_b": 0.5, "travel_05_c": 0.25}
+    },
+    {
+      "id": "travel_06", "domain": "travel", "context": {"urgency": "low"},
+      "options": [
+        {"id": "travel_06_a", "features": {"cost": -0.6, "speed": -0.5, "comfort": 0.95}},
+        {"id": "travel_06_b", "features": {"cost": 0.5, "speed": 0.9, "comfort": 0.1}},
+        {"id": "travel_06_c", "features": {"cost": -0.1, "speed": 0.2, "comfort": 0.5}}
+      ],
+      "chosen_option_id": "travel_06_a",
+      "llm_only_probabilities": {"travel_06_a": 0.3, "travel_06_b": 0.45, "travel_06_c": 0.25}
+    },
+    {
+      "id": "career_03", "domain": "career", "context": {"stage": "growth"},
+      "options": [
+        {"id": "career_03_a", "features": {"remote": -0.9, "quality": 0.8, "cost": -0.1}},
+        {"id": "career_03_b", "features": {"remote": 0.95, "quality": 0.5, "cost": 0.1}}
+      ],
+      "chosen_option_id": "career_03_b",
+      "llm_only_probabilities": {"career_03_a": 0.55, "career_03_b": 0.45}
+    },
+    {
+      "id": "software_03", "domain": "software", "context": {"use": "daily"},
+      "options": [
+        {"id": "software_03_a", "features": {"cost": -0.8, "quality": 0.3, "speed": -0.2}},
+        {"id": "software_03_b", "features": {"cost": 0.4, "quality": 0.95, "speed": 0.6}},
+        {"id": "software_03_c", "features": {"cost": -0.2, "quality": 0.7, "speed": 0.2}}
+      ],
+      "chosen_option_id": "software_03_c",
+      "llm_only_probabilities": {"software_03_a": 0.25, "software_03_b": 0.5, "software_03_c": 0.25}
+    }
+  ]
+}
