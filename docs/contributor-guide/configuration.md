@@ -1,7 +1,8 @@
 # Configuration
 
 Configuration belongs to the daemon and uses standard-library TOML parsing with
-Pydantic v2 validation. Loading settings does not create files or call providers.
+Pydantic v2 validation. Loading settings alone does not create files or call
+providers; `serve` creates and migrates the configured SQLite database.
 
 ## Sources and precedence
 
@@ -41,10 +42,10 @@ absolute `DATA_DIR` when launching from different directories.
 
 Privacy mode accepts `strict_local`, `hybrid`, and `offline`. Storage accepts
 `sqlite`; vector backend accepts `sqlite_vec` or `cosine`; provider defaults are
-Ollama and local embeddings. These are configuration declarations only: Phase 0
-does not implement storage, vector search, inference, or network egress policy.
-Selecting a privacy mode does not enable integrations. Future outbound adapters
-must enforce the central policy before they can run.
+Ollama and local embeddings. SQLite storage is implemented in Phase 1. Vector
+search, inference, and network egress policy are not yet implemented. Selecting a
+privacy mode does not enable integrations. Future outbound adapters must enforce
+the central policy before they can run.
 
 ## Tool references
 

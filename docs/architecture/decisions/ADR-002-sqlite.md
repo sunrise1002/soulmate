@@ -1,6 +1,6 @@
 # ADR-002: SQLite as default persistence
 
-Status: Accepted for architecture; persistence starts in Phase 1.
+Status: Accepted and implemented in Phase 1.
 
 ## Context
 
@@ -19,3 +19,6 @@ similarity as a fallback. Store attachments in local content-addressed files.
 No database server or dedicated vector service is required. Every schema change
 needs a migration. Future backup must handle live WAL state correctly. Optional
 PostgreSQL support is a future adapter, not a baseline dependency.
+
+The Alembic environment is packaged inside `soulmate-storage-sqlite`, allowing an
+installed daemon to apply migrations without repository-relative files.

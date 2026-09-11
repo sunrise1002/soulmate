@@ -1,6 +1,6 @@
 # ADR-008: REST and MCP external integration
 
-Status: Accepted for architecture; REST starts in Phase 1, MCP in Phase 9.
+Status: Accepted; Phase 1 health/system REST is implemented, MCP remains Phase 9.
 
 ## Context
 

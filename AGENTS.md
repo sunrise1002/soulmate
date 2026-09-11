@@ -3,8 +3,11 @@
 ## Read first
 
 Read the root technical specification, `docs/phase-status.md`, and
-`docs/contributor-guide/conventions.md` before changing the project. Significant
-architecture decisions live in `docs/architecture/decisions/`.
+`docs/contributor-guide/conventions.md` before changing the project. Before
+planning a phase, follow the phase-status link to the complete report for the
+previous phase and read its delivered work, verification results, limitations,
+and handoff notes. Significant architecture decisions live in
+`docs/architecture/decisions/`.
 
 ## Language
 
@@ -18,10 +21,10 @@ data merely to satisfy this code convention.
 
 ## Phase boundary
 
-The currently authorized scope is Phase 0: repository and architecture foundation.
-Stop and report the completed preparation to the user before starting Phase 1.
-Wait for the user's instruction to begin Phase 1; do not implement its persistence,
-endpoints, installation identity, diagnostic commands, or durable worker yet.
+Phase 1 local daemon and persistence are complete locally. Phase 2 is not
+authorized; do not implement evidence or Personal Model behavior until the user
+explicitly requests it. Remote CI verification for completed phases remains
+unconfirmed.
 For every later phase, follow specification section 74: plan only the current
 phase, implement small increments, validate, update documentation and phase status,
 then stop unless the user has authorized continuation. Explicit user instructions

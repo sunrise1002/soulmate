@@ -2,7 +2,9 @@
 
 Read the technical specification, [agent rules](AGENTS.md),
 [conventions](docs/contributor-guide/conventions.md), and
-[current phase status](docs/phase-status.md) first.
+[current phase status](docs/phase-status.md) first. Before planning a phase, also
+read the complete report linked for the immediately preceding phase so its actual
+verification, limitations, and handoff state inform the plan.
 
 ## Environment
 
@@ -45,5 +47,5 @@ significant architecture decision. Every feature requires implementation, useful
 tests, error handling, documentation, and consideration of data ownership and
 privacy; test restart persistence wherever relevant.
 
-Do not advance to the next phase automatically. Phase 1 is awaiting the user's
-instruction after the foundation report.
+Do not advance to the next phase automatically. Phase 2 requires explicit user
+authorization after the Phase 1 report.

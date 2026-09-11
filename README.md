@@ -3,8 +3,9 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 0 foundation. The daemon starts as an empty application.
-Phase 1 has not started. See [phase status](docs/phase-status.md).
+**Current status:** Phase 1 local daemon and persistence are implemented locally.
+See the [phase status](docs/phase-status.md) and detailed
+[Phase 1 report](docs/phases/phase-1-report.md).
 
 ## Development setup
 
@@ -33,16 +34,29 @@ Run all current checks:
 pnpm check
 ```
 
-Start the Phase 0 development shell:
+Start the local service:
 
 ```sh
 uv run --locked decision-twin serve
 ```
 
-The process listens on `127.0.0.1:7432`; every HTTP path returns 404 because no
-product routes exist yet. Stop it with Ctrl+C. Startup does not create storage,
-contact model providers, or launch jobs. The minimal `serve` entry point satisfies
-the Phase 0 startup criterion; health, persistence, status, and doctor are Phase 1.
+The process listens on `127.0.0.1:7432`, automatically applies packaged Alembic
+migrations, creates `DATA_DIR/decision-twin.db`, and starts the durable local job
+worker. Stop it with Ctrl+C. It does not contact model providers or enable
+telemetry.
+
+Inspect the running service or local persistence:
+
+```sh
+uv run --locked decision-twin status
+uv run --locked decision-twin doctor
+```
+
+`status` queries `/v1/health` and `/v1/system/info`. `doctor` checks storage
+permissions, database integrity, WAL, foreign keys, migration state, and whether
+the configured port is already in use. Both commands emit machine-readable JSON
+and return nonzero when their required checks fail. Provider and vector diagnostics
+remain deferred to their owning phases.
 
 Optionally copy `config.example.toml` to `config.toml` and edit it. Local config is
 ignored by Git. See [configuration](docs/contributor-guide/configuration.md) for
@@ -52,12 +66,14 @@ environment overrides, `DATA_DIR`, and path semantics.
 
 | Path | Responsibility |
 | --- | --- |
-| `packages/core-python/src/soulmate_core/` | Infrastructure-independent kernel; empty module boundaries in Phase 0 |
-| `apps/daemon/src/soulmate_daemon/` | Typed configuration, application composition, development entry point |
+| `packages/core-python/src/soulmate_core/` | Infrastructure-independent entities and repository ports |
+| `packages/storage-sqlite/` | SQLAlchemy adapter and packaged Alembic migrations |
+| `apps/daemon/src/soulmate_daemon/` | Configuration, API, worker, diagnostics, and composition root |
 | `apps/{desktop,mobile,web,mcp}/` | Reserved client and integration locations |
-| `packages/{storage-sqlite,llm-providers,sdk-python,sdk-typescript}/` | Reserved adapter and SDK locations |
+| `packages/{llm-providers,sdk-python,sdk-typescript}/` | Reserved future adapter and SDK locations |
 | `tests/` | Unit, integration, and future evaluation tests with synthetic data |
 | `docs/architecture/decisions/` | ADR-001 through ADR-008 |
+| `docs/phases/` | Durable plans, results, issues, and handoff reports per phase |
 | `docs/contributor-guide/` | Conventions and configuration reference |
 
 The root [technical specification](<Open Personal Decision Agent — Technical Product Specification & Implementation Plan.md>)

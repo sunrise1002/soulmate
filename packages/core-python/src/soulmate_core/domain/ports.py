@@ -1,0 +1,53 @@
+"""Infrastructure-independent repository contracts required by Phase 1."""
+
+from collections.abc import Collection
+from datetime import datetime
+from typing import Protocol
+
+from soulmate_core.domain.models import AuditEvent, Job, Profile, RawEvent, Source
+
+
+class ProfileRepository(Protocol):
+    def add(self, profile: Profile) -> None: ...
+
+    def get(self, profile_id: str) -> Profile | None: ...
+
+
+class SourceRepository(Protocol):
+    def add(self, source: Source) -> None: ...
+
+    def get(self, source_id: str) -> Source | None: ...
+
+
+class RawEventRepository(Protocol):
+    def add(self, event: RawEvent) -> None: ...
+
+    def get(self, event_id: str) -> RawEvent | None: ...
+
+
+class AuditEventRepository(Protocol):
+    def add(self, event: AuditEvent) -> None: ...
+
+    def get(self, event_id: str) -> AuditEvent | None: ...
+
+
+class JobRepository(Protocol):
+    def enqueue(self, job: Job) -> None: ...
+
+    def get(self, job_id: str) -> Job | None: ...
+
+    def claim_next(
+        self, now: datetime, stale_before: datetime, job_types: Collection[str]
+    ) -> Job | None: ...
+
+    def mark_succeeded(self, job_id: str, completed_at: datetime) -> None: ...
+
+    def mark_failed(self, job_id: str, error: str, failed_at: datetime) -> None: ...
+
+
+class SystemMetadataRepository(Protocol):
+    def get(self, key: str) -> str | None: ...
+
+    def set(self, key: str, value: str, updated_at: datetime) -> None: ...
+
+    def get_or_create(self, key: str, value: str, updated_at: datetime) -> str: ...

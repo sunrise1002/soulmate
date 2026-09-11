@@ -17,13 +17,14 @@ Its future evidence pipeline is `RawEvent -> Evidence -> derived Personal Model
 -> versioned snapshot`. Predictions record the version used. Conversation is an
 input channel; it is not the authoritative model.
 
-Phase 0 supplies installable `soulmate-core` and `soulmate-daemon` packages, empty
-kernel module boundaries, typed configuration, and an inert FastAPI shell. All
-other app/adapter directories are documented placeholders. SQLite, repositories,
-migrations, routes, identities, and workers begin in their specified phases.
+Phase 1 adds infrastructure-independent base records and repository ports to
+`soulmate-core`; SQLAlchemy models, repositories, and packaged Alembic migrations
+live in `soulmate-storage-sqlite`. The daemon composes that adapter with the
+FastAPI lifecycle, installation bootstrap, local diagnostics, and durable worker.
+Future app/provider/SDK directories remain documented placeholders.
 
-ADRs below record decisions from specification section 65; acceptance of a design
-does not mean its implementation has started.
+ADRs below record decisions from specification section 65. Each ADR status states
+whether the decision is architectural only or already implemented.
 
 | ADR | Decision |
 | --- | --- |

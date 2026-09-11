@@ -10,7 +10,7 @@ mode = "strict_local"
 
 [storage]
 backend = "sqlite"
-# Omit path to use DATA_DIR/decision-twin.db. No database is created in Phase 0.
+# Omit path to use DATA_DIR/decision-twin.db. `serve` creates and migrates it.
 # path = "./data/decision-twin.db"
 
 [vector]
