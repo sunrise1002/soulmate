@@ -21,7 +21,11 @@ Phase 1 adds infrastructure-independent base records and repository ports to
 `soulmate-core`; SQLAlchemy models, repositories, and packaged Alembic migrations
 live in `soulmate-storage-sqlite`. The daemon composes that adapter with the
 FastAPI lifecycle, installation bootstrap, local diagnostics, and durable worker.
-Future app/provider/SDK directories remain documented placeholders.
+Phase 3 adds conversation and message ports to the kernel, deterministic minimal
+context compilation, and concrete provider adapters outside the kernel. The daemon
+owns prompts, Pydantic proposal validation, review policy, and composition. Model
+providers can only propose Evidence; they cannot mutate derived Personal Model
+state. Future app and SDK directories remain documented placeholders.
 
 ADRs below record decisions from specification section 65. Each ADR status states
 whether the decision is architectural only or already implemented.

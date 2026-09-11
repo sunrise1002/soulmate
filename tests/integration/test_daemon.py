@@ -16,6 +16,7 @@ import pytest
 from fastapi.testclient import TestClient
 from soulmate_daemon.app import create_app
 from soulmate_daemon.config import Settings
+from soulmate_llm_providers import FakeLLMProvider
 
 pytestmark = pytest.mark.integration
 
@@ -244,3 +245,83 @@ def test_cli_reports_bad_config_without_traceback(tmp_path: Path) -> None:
     assert result.returncode == 2
     assert "Configuration file not found" in result.stderr
     assert "Traceback" not in result.stderr
+
+
+def test_chat_extracts_preferences_and_persists_context_across_restart(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path / "owner-data")
+    first_provider = FakeLLMProvider(
+        responses=["That sounds like a useful work preference."],
+        structured_responses=[
+            {
+                "facts": [],
+                "preferences": [
+                    {
+                        "target_key": "work.remote",
+                        "value": 0.9,
+                        "strength": 0.8,
+                        "confidence": 0.95,
+                        "context": {"domain": "career"},
+                    }
+                ],
+                "goals": [],
+                "constraints": [],
+            }
+        ],
+    )
+    with TestClient(create_app(settings, provider=first_provider)) as client:
+        response = client.post("/v1/chat", json={"content": "I strongly prefer remote work."})
+        assert response.status_code == 200
+        body = response.json()
+        conversation_id = body["conversation_id"]
+        evidence = body["accepted_evidence"][0]
+        assert body["snapshot_version"] == 1
+        assert evidence["target_key"] == "work.remote"
+        assert evidence["extractor_model"] == "fake-model-v1"
+        assert evidence["source_message_id"] == body["user_message_id"]
+        assert client.get("/v1/preferences").json()[0]["value"] == pytest.approx(0.9)
+
+    second_provider = FakeLLMProvider(
+        responses=["Your remote-work preference is relevant."],
+        structured_responses=[{"facts": [], "preferences": [], "goals": [], "constraints": []}],
+    )
+    with TestClient(create_app(settings, provider=second_provider)) as client:
+        response = client.post(
+            "/v1/chat",
+            json={"conversation_id": conversation_id, "content": "What about remote work?"},
+        )
+        assert response.status_code == 200
+        assert response.json()["snapshot_version"] is None
+        assert client.get("/v1/model/summary").json()["version"] == 1
+
+    chat_prompt = second_provider.requests[0]
+    assert "work.remote" in chat_prompt[0].content
+    assert [(item.role, item.content) for item in chat_prompt[1:]] == [
+        ("user", "I strongly prefer remote work."),
+        ("assistant", "That sounds like a useful work preference."),
+        ("user", "What about remote work?"),
+    ]
+
+
+def test_chat_rejects_invalid_provider_output_without_persisting_message(tmp_path: Path) -> None:
+    provider = FakeLLMProvider(
+        responses=["Synthetic response"],
+        structured_responses=[
+            {
+                "preferences": [
+                    {
+                        "target_key": "work.remote",
+                        "value": 4,
+                        "strength": 1,
+                        "confidence": 1,
+                        "context": {},
+                    }
+                ]
+            }
+        ],
+    )
+    settings = Settings(data_dir=tmp_path / "owner-data")
+    with TestClient(create_app(settings, provider=provider)) as client:
+        response = client.post("/v1/chat", json={"content": "Synthetic message"})
+        assert response.status_code == 502
+        assert response.json()["detail"] == "The model provider returned invalid structured output."
+        assert client.get("/v1/model/summary").json()["evidence_revision"] == 0

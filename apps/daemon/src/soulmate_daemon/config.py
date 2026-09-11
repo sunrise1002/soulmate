@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr, ValidationError
 
 
 class ConfigurationError(ValueError):
@@ -38,13 +38,20 @@ class VectorConfig(ConfigModel):
 
 
 class OllamaConfig(ConfigModel):
-    base_url: str = "http://127.0.0.1:11434"
+    base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:11434")
     model: str = ""
 
 
+class OpenAICompatibleConfig(ConfigModel):
+    base_url: AnyHttpUrl = AnyHttpUrl("http://127.0.0.1:8000/v1")
+    model: str = ""
+    api_key: SecretStr | None = None
+
+
 class LLMConfig(ConfigModel):
-    provider: Literal["ollama"] = "ollama"
+    provider: Literal["ollama", "openai_compatible"] = "ollama"
     ollama: OllamaConfig = Field(default_factory=OllamaConfig)
+    openai_compatible: OpenAICompatibleConfig = Field(default_factory=OpenAICompatibleConfig)
 
 
 class EmbeddingConfig(ConfigModel):

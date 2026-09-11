@@ -28,6 +28,10 @@ Examples of environment variables:
 | `SOULMATE_PRIVACY__MODE` | `privacy.mode` | `strict_local` |
 | `SOULMATE_STORAGE__PATH` | `storage.path` | unset |
 | `SOULMATE_LLM__OLLAMA__MODEL` | `llm.ollama.model` | empty |
+| `SOULMATE_LLM__PROVIDER` | `llm.provider` | `ollama` |
+| `SOULMATE_LLM__OPENAI_COMPATIBLE__BASE_URL` | compatible endpoint | loopback `/v1` |
+| `SOULMATE_LLM__OPENAI_COMPATIBLE__MODEL` | compatible model | empty |
+| `SOULMATE_LLM__OPENAI_COMPATIBLE__API_KEY` | provider secret | unset |
 
 Only `127.0.0.1` and `::1` are accepted as bind addresses in the foundation. Ports
 must be between 1 and 65535. LAN activation and secure pairing belong to Phase 7.
@@ -42,10 +46,16 @@ absolute `DATA_DIR` when launching from different directories.
 
 Privacy mode accepts `strict_local`, `hybrid`, and `offline`. Storage accepts
 `sqlite`; vector backend accepts `sqlite_vec` or `cosine`; provider defaults are
-Ollama and local embeddings. SQLite storage is implemented in Phase 1. Vector
-search, inference, and network egress policy are not yet implemented. Selecting a
-privacy mode does not enable integrations. Future outbound adapters must enforce
-the central policy before they can run.
+Ollama and local embeddings. `strict_local` and `offline` restrict model requests
+to literal loopback endpoints. `hybrid` also allows external HTTPS endpoints, but
+never plaintext external HTTP. The egress policy is enforced inside both HTTP
+adapters immediately before every request.
+
+Provider secrets should be supplied through the process environment and never
+committed to TOML. The OpenAI-compatible adapter is generic and does not require a
+specific vendor SDK. Provider configuration is lazy: the daemon can start without
+a model, while `/v1/chat` returns a provider-unavailable response until a model is
+configured. Vector search remains deferred.
 
 ## Tool references
 

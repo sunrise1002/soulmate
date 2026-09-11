@@ -9,6 +9,7 @@ from typing import cast
 from soulmate_core.domain.models import (
     AuditEvent,
     Constraint,
+    Conversation,
     DerivedModel,
     Evidence,
     EvidenceTargetType,
@@ -16,6 +17,8 @@ from soulmate_core.domain.models import (
     Goal,
     Job,
     JobStatus,
+    Message,
+    MessageRole,
     Preference,
     Profile,
     RawEvent,
@@ -29,11 +32,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from soulmate_storage_sqlite.schema import (
     AuditEventRow,
     ConstraintRow,
+    ConversationRow,
     EvidenceRevisionRow,
     EvidenceRow,
     FactRow,
     GoalRow,
     JobRow,
+    MessageRow,
     PreferenceRow,
     ProfileRow,
     RawEventRow,
@@ -135,6 +140,83 @@ class SqliteRawEventRepository:
             )
 
 
+class SqliteConversationRepository:
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def add(self, conversation: Conversation) -> None:
+        with self._sessions.begin() as session:
+            session.add(
+                ConversationRow(
+                    id=conversation.id,
+                    profile_id=conversation.profile_id,
+                    created_at=conversation.created_at,
+                    updated_at=conversation.updated_at,
+                )
+            )
+
+    def get(self, conversation_id: str) -> Conversation | None:
+        with self._sessions() as session:
+            row = session.get(ConversationRow, conversation_id)
+            if row is None:
+                return None
+            return Conversation(row.id, row.profile_id, _utc(row.created_at), _utc(row.updated_at))
+
+    def touch(self, conversation_id: str, updated_at: datetime) -> None:
+        with self._sessions.begin() as session:
+            updated_id = session.execute(
+                update(ConversationRow)
+                .where(ConversationRow.id == conversation_id)
+                .values(updated_at=updated_at)
+                .returning(ConversationRow.id)
+            ).scalar_one_or_none()
+            if updated_id is None:
+                raise KeyError(conversation_id)
+
+
+class SqliteMessageRepository:
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def add(self, message: Message) -> None:
+        with self._sessions.begin() as session:
+            session.add(
+                MessageRow(
+                    id=message.id,
+                    conversation_id=message.conversation_id,
+                    role=message.role.value,
+                    content=message.content,
+                    provider_model=message.provider_model,
+                    created_at=message.created_at,
+                )
+            )
+
+    def get(self, message_id: str) -> Message | None:
+        with self._sessions() as session:
+            row = session.get(MessageRow, message_id)
+            return None if row is None else self._to_domain(row)
+
+    def list_for_conversation(self, conversation_id: str) -> tuple[Message, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(MessageRow)
+                .where(MessageRow.conversation_id == conversation_id)
+                .order_by(MessageRow.created_at, MessageRow.id)
+            )
+            return tuple(self._to_domain(row) for row in rows)
+
+    @staticmethod
+    def _to_domain(row: MessageRow) -> Message:
+        return Message(
+            id=row.id,
+            conversation_id=row.conversation_id,
+            role=MessageRole(row.role),
+            content=row.content,
+            provider_model=row.provider_model,
+            created_at=_utc(row.created_at),
+        )
+
+
 class SqliteEvidenceRepository:
     def __init__(self, sessions: sessionmaker[Session]) -> None:
         self._sessions = sessions
@@ -154,6 +236,15 @@ class SqliteEvidenceRepository:
             source_event = session.get(RawEventRow, evidence.source_event_id)
             if source_event is None or source_event.profile_id != evidence.profile_id:
                 raise ValueError("Evidence source event must belong to the same profile.")
+            if evidence.source_message_id is not None:
+                source_message = session.get(MessageRow, evidence.source_message_id)
+                conversation = (
+                    None
+                    if source_message is None
+                    else session.get(ConversationRow, source_message.conversation_id)
+                )
+                if conversation is None or conversation.profile_id != evidence.profile_id:
+                    raise ValueError("Evidence source message must belong to the same profile.")
             session.add(
                 EvidenceRow(
                     id=evidence.id,
@@ -167,6 +258,8 @@ class SqliteEvidenceRepository:
                     source_type=evidence.source_type,
                     source_event_id=evidence.source_event_id,
                     extractor_version=evidence.extractor_version,
+                    extractor_model=evidence.extractor_model,
+                    source_message_id=evidence.source_message_id,
                     created_at=evidence.created_at,
                 )
             )
@@ -233,6 +326,8 @@ class SqliteEvidenceRepository:
             source_event_id=row.source_event_id,
             extractor_version=row.extractor_version,
             created_at=_utc(row.created_at),
+            extractor_model=row.extractor_model,
+            source_message_id=row.source_message_id,
         )
 
 
@@ -643,6 +738,8 @@ class Repositories:
         self.profiles = SqliteProfileRepository(sessions)
         self.sources = SqliteSourceRepository(sessions)
         self.raw_events = SqliteRawEventRepository(sessions)
+        self.conversations = SqliteConversationRepository(sessions)
+        self.messages = SqliteMessageRepository(sessions)
         self.evidence = SqliteEvidenceRepository(sessions)
         self.personal_models = SqlitePersonalModelRepository(sessions)
         self.audit_events = SqliteAuditEventRepository(sessions)

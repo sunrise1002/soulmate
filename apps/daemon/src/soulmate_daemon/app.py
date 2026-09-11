@@ -8,16 +8,19 @@ from typing import TypedDict, cast
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError, field_validator
 from soulmate_core.domain import Evidence, EvidenceTargetType, Preference, RawEvent
 from soulmate_core.preferences import ModelRebuilder
+from soulmate_llm_providers import EgressDeniedError, LLMProvider, ProviderError
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from soulmate_daemon import __version__
 from soulmate_daemon.config import Settings
+from soulmate_daemon.conversation import ConversationService
 from soulmate_daemon.jobs import DurableJobWorker
+from soulmate_daemon.providers import build_provider
 from soulmate_daemon.system import DEFAULT_PROFILE_ID, ensure_installation
 
 
@@ -26,6 +29,7 @@ class AppState(TypedDict):
     database: Database
     repositories: Repositories
     installation_id: str
+    provider: LLMProvider | None
 
 
 class HealthResponse(BaseModel):
@@ -53,6 +57,8 @@ class EvidenceResponse(BaseModel):
     source_type: str
     source_event_id: str
     extractor_version: str
+    extractor_model: str | None
+    source_message_id: str | None
     created_at: datetime
 
 
@@ -88,6 +94,35 @@ class PreferenceCorrectionResponse(BaseModel):
     snapshot_version: int
 
 
+class ChatRequest(BaseModel):
+    content: str = Field(min_length=1, max_length=50_000)
+    conversation_id: str | None = Field(default=None, min_length=1, max_length=200)
+
+    @field_validator("content")
+    @classmethod
+    def content_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("Message content must not be blank.")
+        return value
+
+
+class MessageResponse(BaseModel):
+    id: str
+    role: str
+    content: str
+    provider_model: str | None
+    created_at: datetime
+
+
+class ChatResponse(BaseModel):
+    conversation_id: str
+    user_message_id: str
+    message: MessageResponse
+    accepted_evidence: list[EvidenceResponse]
+    rejected_evidence_count: int
+    snapshot_version: int | None
+
+
 def _state(app: FastAPI) -> AppState:
     return cast(AppState, app.state.runtime)
 
@@ -104,6 +139,8 @@ def _evidence_response(evidence: Evidence) -> EvidenceResponse:
         source_type=evidence.source_type,
         source_event_id=evidence.source_event_id,
         extractor_version=evidence.extractor_version,
+        extractor_model=evidence.extractor_model,
+        source_message_id=evidence.source_message_id,
         created_at=evidence.created_at,
     )
 
@@ -121,7 +158,7 @@ def _preference_response(preference: Preference) -> PreferenceResponse:
     )
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(settings: Settings | None = None, *, provider: LLMProvider | None = None) -> FastAPI:
     resolved_settings = settings if settings is not None else Settings()
 
     @asynccontextmanager
@@ -137,6 +174,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             database=database,
             repositories=repositories,
             installation_id=installation_id,
+            provider=provider,
         )
         stop = asyncio.Event()
         worker = DurableJobWorker(repositories.jobs, {})
@@ -268,6 +306,60 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         return PreferenceCorrectionResponse(
             evidence=_evidence_response(evidence), snapshot_version=snapshot.version
+        )
+
+    @app.post("/v1/chat", response_model=ChatResponse)
+    async def chat(request: ChatRequest) -> ChatResponse:
+        runtime = _state(app)
+        resolved_provider = runtime["provider"]
+        if resolved_provider is None:
+            try:
+                resolved_provider = build_provider(runtime["settings"])
+            except ValueError as exc:
+                raise HTTPException(
+                    status_code=503, detail="The configured model provider is unavailable."
+                ) from exc
+            runtime["provider"] = resolved_provider
+        repositories = runtime["repositories"]
+        service = ConversationService(
+            conversations=repositories.conversations,
+            messages=repositories.messages,
+            raw_events=repositories.raw_events,
+            evidence=repositories.evidence,
+            models=repositories.personal_models,
+            provider=resolved_provider,
+        )
+        try:
+            result = await service.chat(
+                DEFAULT_PROFILE_ID, request.content, request.conversation_id
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Conversation was not found.") from exc
+        except EgressDeniedError as exc:
+            raise HTTPException(
+                status_code=403, detail="The configured privacy mode denied model egress."
+            ) from exc
+        except ProviderError as exc:
+            raise HTTPException(
+                status_code=502, detail="The model provider request failed."
+            ) from exc
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=502, detail="The model provider returned invalid structured output."
+            ) from exc
+        return ChatResponse(
+            conversation_id=result.conversation_id,
+            user_message_id=result.user_message_id,
+            message=MessageResponse(
+                id=result.assistant_message.id,
+                role=result.assistant_message.role.value,
+                content=result.assistant_message.content,
+                provider_model=result.assistant_message.provider_model,
+                created_at=result.assistant_message.created_at,
+            ),
+            accepted_evidence=[_evidence_response(item) for item in result.accepted_evidence],
+            rejected_evidence_count=result.rejected_evidence_count,
+            snapshot_version=result.snapshot_version,
         )
 
     return app

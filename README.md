@@ -3,9 +3,9 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 2 evidence and Personal Model foundations are implemented locally.
+**Current status:** Phase 3 conversation and evidence extraction are implemented locally.
 See the [phase status](docs/phase-status.md) and detailed
-[Phase 2 report](docs/phases/phase-2-report.md).
+[Phase 3 report](docs/phases/phase-3-report.md).
 
 ## Development setup
 
@@ -42,8 +42,8 @@ uv run --locked decision-twin serve
 
 The process listens on `127.0.0.1:7432`, automatically applies packaged Alembic
 migrations, creates `DATA_DIR/decision-twin.db`, and starts the durable local job
-worker. Stop it with Ctrl+C. It does not contact model providers or enable
-telemetry.
+worker. Stop it with Ctrl+C. It does not enable telemetry. Model calls occur only
+when `/v1/chat` is used and must pass the configured local egress policy.
 
 Inspect the running service or local persistence:
 
@@ -55,9 +55,9 @@ uv run --locked decision-twin rebuild-model
 
 `status` queries `/v1/health` and `/v1/system/info`. `doctor` checks storage
 permissions, database integrity, WAL, foreign keys, migration state, and whether
-the configured port is already in use. Both commands emit machine-readable JSON
-and return nonzero when their required checks fail. Provider and vector diagnostics
-remain deferred to their owning phases.
+the configured port is already in use. It also reports whether the selected model
+provider has a configured model. Both commands emit machine-readable JSON and
+return nonzero when their required checks fail. Vector diagnostics remain deferred.
 
 `rebuild-model` deterministically replaces derived model state from all stored
 evidence and creates a new versioned snapshot. The Phase 2 API also exposes
@@ -65,6 +65,12 @@ evidence and creates a new versioned snapshot. The Phase 2 API also exposes
 `GET /v1/preferences/{key}/evidence`, and `POST /v1/preferences/corrections`.
 Corrections create a RawEvent and correction Evidence before rebuilding; they do
 not overwrite history.
+
+`POST /v1/chat` persists conversations and messages, sends only lexically relevant
+Personal Model context to the configured provider, validates structured evidence
+proposals, accepts ordinary low-risk claims, and rebuilds the model when evidence
+is accepted. Ollama is the default local adapter. A generic OpenAI-compatible
+adapter is available in `hybrid` mode; configure its secret through the environment.
 
 Optionally copy `config.example.toml` to `config.toml` and edit it. Local config is
 ignored by Git. See [configuration](docs/contributor-guide/configuration.md) for
@@ -78,7 +84,8 @@ environment overrides, `DATA_DIR`, and path semantics.
 | `packages/storage-sqlite/` | SQLAlchemy adapter and packaged Alembic migrations |
 | `apps/daemon/src/soulmate_daemon/` | Configuration, API, worker, diagnostics, and composition root |
 | `apps/{desktop,mobile,web,mcp}/` | Reserved client and integration locations |
-| `packages/{llm-providers,sdk-python,sdk-typescript}/` | Reserved future adapter and SDK locations |
+| `packages/llm-providers/` | Provider protocol, fake provider, egress policy, Ollama, and OpenAI-compatible adapters |
+| `packages/{sdk-python,sdk-typescript}/` | Reserved future SDK locations |
 | `tests/` | Unit, integration, and future evaluation tests with synthetic data |
 | `docs/architecture/decisions/` | ADR-001 through ADR-008 |
 | `docs/phases/` | Durable plans, results, issues, and handoff reports per phase |

@@ -1,6 +1,6 @@
 # ADR-005: LLM provider abstraction
 
-Status: Accepted for architecture; provider adapters start in Phase 3.
+Status: Accepted and implemented in Phase 3.
 
 ## Context
 
@@ -9,10 +9,14 @@ extraction and reasoning tools, not the authoritative model (sections 28–32, 3
 
 ## Decision
 
-Introduce core-facing provider ports for generation, structured output, and
-embeddings when required. Place provider SDK calls in adapters. Validate structured
-output before accepting evidence. Use deterministic fake providers in tests and
-route outbound calls through a central egress policy respecting privacy mode.
+Keep generation and structured-output protocols in the infrastructure-side
+`soulmate-llm-providers` package so the kernel has no LLM dependency. Add embedding
+support only when a phase requires it. Place HTTP calls in adapters, validate
+structured output before accepting evidence, use deterministic fake providers in
+tests, and route every outbound call through a central egress policy.
+
+`strict_local` and `offline` permit literal loopback endpoints. `hybrid` also
+permits external HTTPS endpoints. Non-loopback plaintext HTTP is always denied.
 
 ## Consequences
 

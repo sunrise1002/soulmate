@@ -52,6 +52,37 @@ class RawEventRow(Base):
     )
 
 
+class ConversationRow(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (Index("ix_conversations_profile_updated", "profile_id", "updated_at"),)
+
+
+class MessageRow(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    conversation_id: Mapped[str] = mapped_column(
+        ForeignKey("conversations.id", ondelete="CASCADE"), nullable=False
+    )
+    role: Mapped[str] = mapped_column(String, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    provider_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("role IN ('user', 'assistant')", name="ck_messages_role"),
+        Index("ix_messages_conversation_created", "conversation_id", "created_at", "id"),
+    )
+
+
 class EvidenceRow(Base):
     __tablename__ = "evidence"
 
@@ -70,6 +101,10 @@ class EvidenceRow(Base):
         ForeignKey("raw_events.id", ondelete="CASCADE"), nullable=False
     )
     extractor_version: Mapped[str] = mapped_column(String, nullable=False)
+    extractor_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_message_id: Mapped[str | None] = mapped_column(
+        ForeignKey("messages.id", ondelete="CASCADE"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     __table_args__ = (
@@ -81,6 +116,7 @@ class EvidenceRow(Base):
         CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_evidence_confidence_range"),
         Index("ix_evidence_profile_target", "profile_id", "target_key"),
         Index("ix_evidence_source_event", "source_event_id"),
+        Index("ix_evidence_source_message", "source_message_id"),
     )
 
 

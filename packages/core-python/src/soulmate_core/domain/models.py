@@ -32,6 +32,13 @@ class EvidenceTargetType(StrEnum):
     CONSTRAINT = "constraint"
 
 
+class MessageRole(StrEnum):
+    """Conversation roles persisted by the provider-neutral kernel."""
+
+    USER = "user"
+    ASSISTANT = "assistant"
+
+
 @dataclass(frozen=True, slots=True)
 class Profile:
     id: str
@@ -72,6 +79,32 @@ class RawEvent:
 
 
 @dataclass(frozen=True, slots=True)
+class Conversation:
+    id: str
+    profile_id: str
+    created_at: datetime
+    updated_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at, self.updated_at)
+
+
+@dataclass(frozen=True, slots=True)
+class Message:
+    id: str
+    conversation_id: str
+    role: MessageRole
+    content: str
+    created_at: datetime
+    provider_model: str | None = None
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at)
+        if not self.content:
+            raise ValueError("Message content must not be empty.")
+
+
+@dataclass(frozen=True, slots=True)
 class Evidence:
     """Immutable, provenance-bearing claim used to derive Personal Model state."""
 
@@ -87,6 +120,8 @@ class Evidence:
     source_event_id: str
     extractor_version: str
     created_at: datetime
+    extractor_model: str | None = None
+    source_message_id: str | None = None
 
     def __post_init__(self) -> None:
         _require_utc_aware(self.created_at)

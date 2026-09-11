@@ -1,1 +1,5 @@
-"""Minimal personal context compilation boundary; implementation starts in Phase 3."""
+"""Personal context compilation."""
+
+from soulmate_core.context.compiler import ContextCompiler, PersonalContext
+
+__all__ = ["ContextCompiler", "PersonalContext"]

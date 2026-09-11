@@ -19,7 +19,7 @@ from soulmate_core.domain import (
 from soulmate_core.preferences import ModelRebuilder
 from soulmate_daemon.jobs import DurableJobWorker
 from soulmate_storage_sqlite import Database, Repositories
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 
 pytestmark = pytest.mark.integration
@@ -51,12 +51,14 @@ def test_initial_migration_creates_base_tables_and_required_pragmas(tmp_path: Pa
         "jobs",
         "system_metadata",
         "alembic_version",
+        "conversations",
+        "messages",
     } == tables
     check = database.check()
     assert check.integrity == "ok"
     assert check.journal_mode == "wal"
     assert check.foreign_keys is True
-    assert check.current_revision == check.head_revision == "0002_phase_2"
+    assert check.current_revision == check.head_revision == "0003_phase_3"
     database.close()
 
 
@@ -127,7 +129,79 @@ def test_phase_1_database_upgrades_without_losing_base_records(tmp_path: Path) -
     database.migrate()
 
     assert repositories.profiles.get(profile.id) == profile
-    assert database.current_revision() == "0002_phase_2"
+    assert database.current_revision() == "0003_phase_3"
+    database.close()
+
+
+def test_phase_2_database_upgrades_without_losing_evidence_or_model_state(tmp_path: Path) -> None:
+    path = tmp_path / "decision-twin.db"
+    database = Database(path)
+    database.connect()
+    command.upgrade(database.migration_config, "0002_phase_2")
+    assert database.engine is not None
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    with database.engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO profiles (id, display_name, created_at) "
+                "VALUES (:id, NULL, :created_at)"
+            ),
+            {"id": "profile_preserved", "created_at": now.isoformat()},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO raw_events "
+                "(id, profile_id, source_id, event_type, content_json, created_at, "
+                "ingested_at, sensitivity) VALUES "
+                "(:id, :profile_id, NULL, 'synthetic', '{}', :created_at, :created_at, 'normal')"
+            ),
+            {
+                "id": "event_preserved",
+                "profile_id": "profile_preserved",
+                "created_at": now.isoformat(),
+            },
+        )
+        connection.execute(
+            text(
+                "INSERT INTO evidence "
+                "(id, profile_id, target_type, target_key, value_json, strength, confidence, "
+                "context_json, source_type, source_event_id, extractor_version, created_at) "
+                "VALUES (:id, :profile_id, 'preference', 'work.remote', '0.8', 1, 1, '{}', "
+                "'explicit_statement', :event_id, 'phase-2-test', :created_at)"
+            ),
+            {
+                "id": "evidence_preserved",
+                "profile_id": "profile_preserved",
+                "event_id": "event_preserved",
+                "created_at": now.isoformat(),
+            },
+        )
+        connection.execute(
+            text(
+                "INSERT INTO preferences "
+                "(profile_id, key, context_key, value, uncertainty, confidence, context_json, "
+                "supporting_evidence_ids_json, updated_at, model_version) VALUES "
+                "(:profile_id, 'work.remote', '{}', 0.8, 0.2, 0.8, '{}', "
+                "'[\"evidence_preserved\"]', :updated_at, 1)"
+            ),
+            {"profile_id": "profile_preserved", "updated_at": now.isoformat()},
+        )
+
+    database.migrate()
+
+    with database.engine.connect() as connection:
+        evidence = connection.execute(
+            text(
+                "SELECT extractor_version, extractor_model, source_message_id "
+                "FROM evidence WHERE id = 'evidence_preserved'"
+            )
+        ).one()
+        preference_count = connection.execute(
+            text("SELECT count(*) FROM preferences WHERE profile_id = 'profile_preserved'")
+        ).scalar_one()
+    assert evidence == ("phase-2-test", None, None)
+    assert preference_count == 1
+    assert database.current_revision() == "0003_phase_3"
     database.close()
 
 

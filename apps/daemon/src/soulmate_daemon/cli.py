@@ -17,6 +17,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from soulmate_daemon.app import create_app
 from soulmate_daemon.config import ConfigurationError, Settings, load_settings
+from soulmate_daemon.providers import build_provider
 from soulmate_daemon.system import DEFAULT_PROFILE_ID, ensure_installation
 
 
@@ -71,7 +72,7 @@ def _doctor(settings: Settings) -> int:
         "storage_location_writable": _writable_location(database_path),
         "database_exists": database_path.is_file(),
         "port_available": _port_available(settings),
-        "provider_check": "deferred_until_phase_3",
+        "provider_check": _provider_check(settings),
         "vector_backend_check": "deferred_until_vector_storage_is_implemented",
     }
     if database_path.is_file():
@@ -105,6 +106,14 @@ def _doctor(settings: Settings) -> int:
     )
     print(json.dumps({"healthy": healthy, "checks": checks}, sort_keys=True))
     return 0 if healthy else 1
+
+
+def _provider_check(settings: Settings) -> str:
+    try:
+        provider = build_provider(settings)
+    except ValueError:
+        return "not_configured"
+    return f"configured:{provider.model_name}"
 
 
 def _rebuild_model(settings: Settings) -> int:

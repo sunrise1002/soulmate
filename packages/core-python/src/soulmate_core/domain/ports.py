@@ -6,9 +6,11 @@ from typing import Protocol
 
 from soulmate_core.domain.models import (
     AuditEvent,
+    Conversation,
     DerivedModel,
     Evidence,
     Job,
+    Message,
     Preference,
     Profile,
     RawEvent,
@@ -33,6 +35,22 @@ class RawEventRepository(Protocol):
     def add(self, event: RawEvent) -> None: ...
 
     def get(self, event_id: str) -> RawEvent | None: ...
+
+
+class ConversationRepository(Protocol):
+    def add(self, conversation: Conversation) -> None: ...
+
+    def get(self, conversation_id: str) -> Conversation | None: ...
+
+    def touch(self, conversation_id: str, updated_at: datetime) -> None: ...
+
+
+class MessageRepository(Protocol):
+    def add(self, message: Message) -> None: ...
+
+    def get(self, message_id: str) -> Message | None: ...
+
+    def list_for_conversation(self, conversation_id: str) -> tuple[Message, ...]: ...
 
 
 class EvidenceRepository(Protocol):

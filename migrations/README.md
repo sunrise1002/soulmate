@@ -5,8 +5,9 @@ SQLite migrations are packaged with the adapter under
 daemon wheels can migrate without a source checkout. Phase 1 migration
 `0001_phase_1` creates the six base tables. Phase 2 migration `0002_phase_2` adds
 evidence, revision tracking, derived model state, and versioned snapshots. The
-daemon applies migrations automatically before serving requests or starting its
-worker.
+Phase 3 migration `0003_phase_3` adds conversations, messages, and explicit model
+and source-message provenance for extracted evidence. The daemon applies
+migrations automatically before serving requests or starting its worker.
 
 Every subsequent persistent schema change requires a new versioned migration and
 upgrade/restart tests. Never edit an already released migration to represent a new

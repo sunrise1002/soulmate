@@ -4,6 +4,15 @@
 
 ### Added
 
+- Phase 3 persistent conversations, `/v1/chat`, deterministic minimal context
+  compilation, and restart-safe conversational history.
+- Provider-neutral generation interfaces, deterministic fake provider, Ollama and
+  OpenAI-compatible HTTP adapters, and centrally enforced privacy-mode egress.
+- Pydantic-validated fact, preference, goal, and constraint proposals with
+  low-risk review, extractor model/version provenance, source-message links, and
+  automatic model rebuilds.
+- SQLite migration `0003_phase_3` for conversations, messages, and extraction
+  provenance.
 - Phase 2 evidence, provenance, derived Fact/Preference/Goal/Constraint records,
   deterministic versioned aggregation, and model rebuild service.
 - SQLite migration `0002_phase_2` with evidence revision tracking, derived-state
@@ -28,5 +37,5 @@
   hooks, Conventional Commit and branch validation, CI enforcement, issue/PR
   templates, security guidance, and documented GitHub ruleset settings.
 
-No conversational extraction, provider integrations, vector search, decision
-prediction, or later-phase features have been implemented.
+No embeddings, decision prediction, desktop/mobile clients, MCP integration, or
+later-phase features have been implemented.
