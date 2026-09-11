@@ -1,0 +1,54 @@
+name: Bug report
+description: Report reproducible behavior that differs from the documented contract.
+title: "fix: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        Remove personal data, credentials, raw prompts, database contents, and other
+        sensitive material before submitting.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Observed behavior
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide deterministic steps using synthetic data where possible.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.1.0 or commit SHA
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Operating system, architecture, Python, uv, Node.js, and pnpm versions.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Sanitized diagnostics
+      description: Include relevant errors or doctor output after removing private values.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Safety checks
+      options:
+        - label: I searched for an existing issue.
+          required: true
+        - label: I removed personal data and credentials from this report.
+          required: true
+        - label: I can reproduce this on the stated version.
+          required: true

@@ -1,0 +1,54 @@
+name: Feature request
+description: Propose a scoped capability that follows the roadmap and privacy model.
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem and user value
+      description: Describe the user need without prescribing an implementation.
+    validations:
+      required: true
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Roadmap phase
+      description: Select the earliest phase that appears to own this capability.
+      options:
+        - Phase-neutral repository maintenance
+        - Phase 2 — Evidence and Personal Model
+        - Phase 3 — Conversation and extraction
+        - Phase 4 — Decision MVP
+        - Phase 5 — Learning and evaluation
+        - Later roadmap phase
+        - Unsure
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include inputs, outputs, failure behavior, and acceptance criteria.
+    validations:
+      required: true
+  - type: textarea
+    id: privacy
+    attributes:
+      label: Privacy and data ownership
+      description: What data is read, stored, sent, deleted, or exposed to other components?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Scope checks
+      options:
+        - label: I searched for an existing issue or ADR.
+          required: true
+        - label: This request does not assume a centralized Soulmate cloud service.
+          required: true

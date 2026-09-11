@@ -1,5 +1,10 @@
 # Engineering conventions
 
+This document defines the rules for implementation. The
+[contributor guide index](README.md) links the Git workflow, executable quality
+gates, repository settings, and configuration reference. Humans and AI agents
+must use those documents together rather than infer conventions from nearby code.
+
 ## Language and naming
 
 Communicate with AI agents in any language chosen by the user. All code uses
@@ -35,6 +40,12 @@ Pydantic v2 to validate external inputs; keep provider output validation at adap
 boundaries. Catch specific expected exceptions and expose clear errors without
 private values. Do not suppress type/lint errors without explaining why.
 
+Prefer small functions with one responsibility and explicit dependencies. Public
+APIs require concise docstrings when names and types do not fully communicate the
+contract. Use immutable values for domain records where practical. Avoid boolean
+parameters that obscure intent, wildcard imports, hidden I/O, bare `except`, and
+mutable default arguments.
+
 Use the strict `tsconfig.base.json` when client packages are introduced. Add their
 compiler, linter, formatter, and tests with actual TypeScript source. Phase 0 has
 no TypeScript implementation to compile.
@@ -48,6 +59,11 @@ snapshots; make rebuild and scoring deterministic for fixed inputs and versions.
 Keep prediction separate from advice. Every persisted schema change has a
 migration. Do not store credentials in plaintext persistence or source control.
 
+Treat logs, exceptions, fixtures, screenshots, and test snapshots as possible data
+egress. Log identifiers and operational metadata only when required; do not log
+raw conversations, prompts, credentials, tokens, or Personal Model payloads by
+default. Redact at the boundary rather than relying on callers to remember.
+
 ## Tests and dependencies
 
 Name tests after observable behavior. Test invalid inputs and failure behavior as
@@ -55,3 +71,21 @@ well as the success path. Keep unit tests offline and provider-independent. Use
 temporary storage and deterministic fakes in integration tests. Keep fixtures
 synthetic or pseudonymous. Add dependencies only for a current requirement and
 keep `uv.lock` and `pnpm-lock.yaml` synchronized.
+
+Follow Arrange–Act–Assert when it improves readability, and assert observable
+behavior instead of private implementation details. A bug fix includes a regression
+test. Tests must be deterministic across supported platforms and must clean up
+processes, ports, files, and environment changes they create.
+
+## Changes and documentation
+
+Use the branch, commit, PR, review, and release rules in [workflow.md](workflow.md).
+Use the exact local and CI commands in [quality-gates.md](quality-gates.md). Do not
+mix refactoring, formatting, generated output, or dependency updates into an
+unrelated functional change.
+
+Update public documentation when behavior, configuration, commands, APIs, or
+limitations change. Update `CHANGELOG.md` and `docs/phase-status.md` with factual
+results; create an ADR for a significant or difficult-to-reverse architecture
+decision. Documentation, examples, and error messages must not contain personal
+data, local absolute paths, credentials, or machine-specific assumptions.

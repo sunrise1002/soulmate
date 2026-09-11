@@ -66,3 +66,11 @@ after the user instructs the agent to begin.
 Phase 0's `serve` command only hosts an empty app to meet the foundation startup
 criterion. It returns 404 on all paths and does not create the database. Reserved
 folders do not represent implementation of future phases.
+
+## Repository governance
+
+Phase-neutral contribution governance was standardized on 2026-09-11. Local
+quality gates, Git metadata policy, CI enforcement, templates, security guidance,
+and maintainer repository settings are documented under the
+[contributor guide](contributor-guide/README.md). This does not alter the authorized
+phase boundary above. Remote CI and GitHub ruleset activation remain unverified.

@@ -29,7 +29,49 @@ target-version = "py312"
 line-length = 100
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM"]
+select = [
+  "A",
+  "ANN",
+  "ARG",
+  "ASYNC",
+  "B",
+  "C4",
+  "E",
+  "ERA",
+  "EXE",
+  "F",
+  "FA",
+  "FLY",
+  "G",
+  "I",
+  "ICN",
+  "ISC",
+  "LOG",
+  "N",
+  "PIE",
+  "PTH",
+  "PYI",
+  "RET",
+  "RSE",
+  "RUF",
+  "S",
+  "SIM",
+  "SLOT",
+  "T10",
+  "TID",
+  "UP",
+  "W",
+]
+
+[tool.ruff.lint.flake8-annotations]
+mypy-init-return = true
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = [
+  "S101", # pytest uses assert to express observable expectations.
+  "S104", # tests intentionally exercise rejection of non-loopback hosts.
+  "S603", # subprocess tests use fixed commands and controlled arguments.
+]
 
 [tool.mypy]
 python_version = "3.12"
@@ -38,6 +80,7 @@ files = ["apps/daemon/src", "packages/core-python/src", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]
 addopts = "-ra --strict-config --strict-markers"
 markers = [
   "integration: checks application boundaries and local process behavior",

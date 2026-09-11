@@ -1,9 +1,33 @@
+minimum_pre_commit_version: '4.0.0'
+default_install_hook_types: [pre-commit, commit-msg, pre-push]
+
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: fix-byte-order-marker
+      - id: check-case-conflict
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-toml
+      - id: check-yaml
+      - id: destroyed-symlinks
+      - id: detect-aws-credentials
+        args: [--allow-missing-credentials]
+      - id: detect-private-key
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
   - repo: local
     hooks:
       - id: ruff-check
         name: Python lint
-        entry: uv run --locked ruff check
+        entry: uv run --locked ruff check --fix --force-exclude
         language: system
         types: [python]
       - id: ruff-format
@@ -23,3 +47,20 @@ repos:
         language: system
         pass_filenames: false
         files: '(^packages/core-python/|^tests/unit/test_architecture.py$)'
+      - id: conventional-commit
+        name: Conventional commit message
+        entry: uv run --locked python scripts/validate_contribution.py commit-message
+        language: system
+        stages: [commit-msg]
+      - id: branch-name
+        name: Branch name
+        entry: uv run --locked python scripts/validate_contribution.py branch-name
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+      - id: test-suite
+        name: Python test suite
+        entry: uv run --locked pytest
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
