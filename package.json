@@ -1,0 +1,15 @@
+{
+  "name": "soulmate-workspace",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "pnpm@11.21.0",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "lint": "uv run --locked ruff check .",
+    "format": "uv run --locked ruff format .",
+    "format:check": "uv run --locked ruff format --check .",
+    "typecheck": "uv run --locked mypy",
+    "test": "uv run --locked pytest",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test"
+  }
+}

@@ -1,0 +1,27 @@
+# Copy to config.toml. Relative paths resolve from the process working directory.
+data_dir = "./data"
+
+[server]
+host = "127.0.0.1"
+port = 7432
+
+[privacy]
+mode = "strict_local"
+
+[storage]
+backend = "sqlite"
+# Omit path to use DATA_DIR/decision-twin.db. No database is created in Phase 0.
+# path = "./data/decision-twin.db"
+
+[vector]
+backend = "sqlite_vec"
+
+[llm]
+provider = "ollama"
+
+[llm.ollama]
+base_url = "http://127.0.0.1:11434"
+model = ""
+
+[embedding]
+provider = "local"

@@ -1,0 +1,45 @@
+[project]
+name = "soulmate-workspace"
+version = "0.0.1"
+description = "Local-first personal decision model workspace"
+requires-python = ">=3.12"
+dependencies = ["soulmate-core", "soulmate-daemon"]
+
+[dependency-groups]
+dev = [
+  "httpx>=0.28,<1",
+  "mypy>=1.15,<2",
+  "pre-commit>=4,<5",
+  "pytest>=8,<10",
+  "ruff>=0.11,<1",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["apps/daemon", "packages/core-python"]
+
+[tool.uv.sources]
+soulmate-core = { workspace = true }
+soulmate-daemon = { workspace = true }
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["apps/daemon/src", "packages/core-python/src", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-config --strict-markers"
+markers = [
+  "integration: checks application boundaries and local process behavior",
+  "evaluation: reproducible decision-model evaluation",
+]
