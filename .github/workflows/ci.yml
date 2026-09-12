@@ -98,14 +98,16 @@ jobs:
       - uses: pnpm/action-setup@v4
       - name: Validate client workspace lockfile
         run: pnpm install --frozen-lockfile
-      - name: Lint desktop client
-        run: pnpm --filter @soulmate/desktop lint
-      - name: Check desktop formatting
-        run: pnpm --filter @soulmate/desktop format:check
-      - name: Type check desktop client
-        run: pnpm --filter @soulmate/desktop typecheck
-      - name: Test desktop client
-        run: pnpm --filter @soulmate/desktop test
+      - name: Lint clients and SDK
+        run: pnpm -r lint
+      - name: Check client formatting
+        run: pnpm -r format:check
+      - name: Type check clients and SDK
+        run: pnpm -r typecheck
+      - name: Test clients and SDK
+        run: pnpm -r test
+      - name: Build web client
+        run: pnpm --filter @soulmate/web build
       - name: Build desktop frontend
         run: pnpm --filter @soulmate/desktop build
 
@@ -145,6 +147,8 @@ jobs:
         run: rustup component add clippy rustfmt
       - name: Install locked workspace
         run: uv sync --locked --all-packages && pnpm install --frozen-lockfile
+      - name: Build web client for the sidecar
+        run: pnpm --filter @soulmate/web build
       - name: Build daemon sidecar
         run: pnpm --filter @soulmate/desktop sidecar:build
       - name: Check native formatting

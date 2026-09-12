@@ -356,3 +356,38 @@ class SystemMetadataRow(Base):
     key: Mapped[str] = mapped_column(String, primary_key=True)
     value: Mapped[str] = mapped_column(Text, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PairingTokenRow(Base):
+    __tablename__ = "pairing_tokens"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    token_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Provenance only: the token is claimed before the device row exists, so this
+    # column intentionally carries no foreign key.
+    device_id: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    __table_args__ = (Index("ix_pairing_tokens_expires", "expires_at"),)
+
+
+class PairedDeviceRow(Base):
+    __tablename__ = "paired_devices"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    platform: Mapped[str] = mapped_column(String, nullable=False)
+    credential_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (Index("ix_paired_devices_profile_created", "profile_id", "created_at", "id"),)

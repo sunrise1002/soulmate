@@ -21,6 +21,7 @@ apps/desktop/src-tauri/binaries/decision-twin-*
 apps/desktop/src-tauri/gen/
 apps/desktop/src-tauri/icons/android/
 apps/desktop/src-tauri/icons/ios/
+apps/daemon/src/soulmate_daemon/web_client/
 
 # Local owner data and secrets
 /config.toml

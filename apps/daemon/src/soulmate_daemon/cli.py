@@ -9,16 +9,15 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, build_opener
 
-import uvicorn
 from alembic.util.exc import CommandError
 from soulmate_core.evaluation import evaluate_dataset, load_dataset
 from soulmate_core.preferences import ModelRebuilder
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy.exc import SQLAlchemyError
 
-from soulmate_daemon.app import create_app
 from soulmate_daemon.config import ConfigurationError, Settings, load_settings
 from soulmate_daemon.providers import build_provider
+from soulmate_daemon.serve import serve
 from soulmate_daemon.system import DEFAULT_PROFILE_ID, ensure_installation
 
 
@@ -187,12 +186,7 @@ def main() -> None:
     except ConfigurationError as exc:
         parser.error(str(exc))
     if args.command == "serve":
-        uvicorn.run(
-            create_app(settings),
-            host=settings.server.host,
-            port=settings.server.port,
-            access_log=False,
-        )
+        serve(settings)
         return
     if args.command == "status":
         raise SystemExit(_status(settings))

@@ -15,6 +15,8 @@ from soulmate_core.domain.models import (
     Evidence,
     Job,
     Message,
+    PairedDevice,
+    PairingToken,
     Preference,
     Profile,
     RawEvent,
@@ -134,6 +136,28 @@ class JobRepository(Protocol):
     def mark_succeeded(self, job_id: str, completed_at: datetime) -> None: ...
 
     def mark_failed(self, job_id: str, error: str, failed_at: datetime) -> None: ...
+
+
+class PairingTokenRepository(Protocol):
+    def add(self, token: PairingToken) -> None: ...
+
+    def get_by_hash(self, token_hash: str) -> PairingToken | None: ...
+
+    def consume(self, token_id: str, device_id: str, consumed_at: datetime) -> bool: ...
+
+    def delete_expired(self, before: datetime) -> int: ...
+
+
+class PairedDeviceRepository(Protocol):
+    def add(self, device: PairedDevice) -> None: ...
+
+    def get(self, device_id: str) -> PairedDevice | None: ...
+
+    def list_for_profile(self, profile_id: str) -> tuple[PairedDevice, ...]: ...
+
+    def touch(self, device_id: str, last_seen_at: datetime) -> None: ...
+
+    def revoke(self, device_id: str, revoked_at: datetime) -> bool: ...
 
 
 class SystemMetadataRepository(Protocol):

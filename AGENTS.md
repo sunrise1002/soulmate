@@ -21,9 +21,10 @@ data merely to satisfy this code convention.
 
 ## Phase boundary
 
-Phase 6 desktop product is complete locally. Phase 7 is not authorized; do not
-implement mobile/web clients or secure pairing until the user explicitly requests
-it. Remote CI verification for completed phases remains unconfirmed.
+Phase 7 mobile/web clients and secure pairing are complete locally. Phase 8 is not
+authorized; do not implement active learning, outcome tracking, or regret analysis
+until the user explicitly requests it. Remote CI verification for completed phases
+remains unconfirmed.
 For every later phase, follow specification section 74: plan only the current
 phase, implement small increments, validate, update documentation and phase status,
 then stop unless the user has authorized continuation. Explicit user instructions
@@ -42,7 +43,10 @@ take precedence over this recorded phase gate.
 - Validate structured model output. Providers and connectors never directly
   mutate the Personal Model.
 - Default to local storage, loopback binding, strict-local privacy, and no
-  telemetry. Future external calls must pass a central egress policy.
+  telemetry. External calls must pass a central egress policy. Access from other
+  devices stays off until the owner enables it, binds an explicit address over
+  TLS, and passes the single authorization boundary; device management and
+  evidence deletion stay owner-only.
 - Never commit personal data, credentials, local configuration, databases, or
   private prompts. Use synthetic fixtures. Do not log private payloads by default.
 - Every persistent schema change requires a migration. Test restart behavior when

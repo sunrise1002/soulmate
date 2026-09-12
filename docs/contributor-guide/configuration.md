@@ -26,6 +26,13 @@ Examples of environment variables:
 | `SOULMATE_SERVER__HOST` | `server.host` | `127.0.0.1` |
 | `SOULMATE_SERVER__PORT` | `server.port` | `7432` |
 | `SOULMATE_PRIVACY__MODE` | `privacy.mode` | `strict_local` |
+| `SOULMATE_NETWORK__LAN_ENABLED` | `network.lan_enabled` | `false` |
+| `SOULMATE_NETWORK__LAN_HOST` | `network.lan_host` | empty, detected |
+| `SOULMATE_NETWORK__LAN_PORT` | `network.lan_port` | `7433` |
+| `SOULMATE_NETWORK__TLS_DIR` | `network.tls_dir` | `DATA_DIR/tls` |
+| `SOULMATE_NETWORK__PAIRING_TTL_SECONDS` | `network.pairing_ttl_seconds` | `300` |
+| `SOULMATE_WEB__ENABLED` | `web.enabled` | `true` |
+| `SOULMATE_WEB__CLIENT_DIR` | `web.client_dir` | packaged bundle |
 | `SOULMATE_STORAGE__PATH` | `storage.path` | unset |
 | `SOULMATE_LLM__OLLAMA__MODEL` | `llm.ollama.model` | empty |
 | `SOULMATE_LLM__PROVIDER` | `llm.provider` | `ollama` |
@@ -33,8 +40,29 @@ Examples of environment variables:
 | `SOULMATE_LLM__OPENAI_COMPATIBLE__MODEL` | compatible model | empty |
 | `SOULMATE_LLM__OPENAI_COMPATIBLE__API_KEY` | provider secret | unset |
 
-Only `127.0.0.1` and `::1` are accepted as bind addresses in the foundation. Ports
-must be between 1 and 65535. LAN activation and secure pairing belong to Phase 7.
+Only `127.0.0.1` and `::1` are accepted for `server.host`. Ports must be between 1
+and 65535.
+
+## Access from other devices
+
+`network.lan_enabled` is false by default. When it is true the daemon keeps its
+loopback listener and adds a TLS listener on `network.lan_host:network.lan_port`.
+An empty `lan_host` uses the address of the default route. Wildcard addresses
+(`0.0.0.0`, `::`, `[::]`, `*`) are rejected by configuration and by the resolver, as
+are loopback addresses, so LAN exposure is always explicit. If no address or
+certificate can be prepared, the daemon still serves loopback and reports the
+reason through `GET /v1/network/state`.
+
+The service certificate and its owner-only private key live in
+`network.tls_dir`, defaulting to `DATA_DIR/tls`. It is generated on first use and
+renewed within seven days of expiry or when the LAN address changes; devices pin
+the `sha256:` fingerprint reported by `GET /v1/network/state`.
+
+`network.pairing_ttl_seconds` accepts 30 to 3600 seconds. Enabling or disabling LAN
+access is a startup decision, so the service must restart to apply it.
+
+`web.enabled` controls whether the daemon serves a web client. Without
+`web.client_dir`, it serves the bundle packaged inside the daemon, when present.
 
 ## Paths and future settings
 
@@ -67,6 +95,10 @@ settings with the same privacy semantics as the daemon:
 - `strict_local` and `offline` accept only literal loopback provider URLs.
 - `hybrid` accepts loopback HTTP or remote HTTPS provider URLs.
 - Ollama is always local and therefore requires a loopback HTTP URL.
+
+The Devices screen writes `lanEnabled` into the same stored settings and restarts
+the managed daemon. Settings saved before Phase 7 keep access from other devices
+off.
 
 Non-secret desktop settings are stored as `desktop-settings.json` in the platform
 application-configuration directory. A compatible-provider API key is stored separately in

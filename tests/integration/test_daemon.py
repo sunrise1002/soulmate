@@ -13,6 +13,7 @@ from urllib.error import URLError
 from urllib.request import ProxyHandler, build_opener
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from soulmate_daemon.app import create_app
 from soulmate_daemon.config import Settings
@@ -20,6 +21,14 @@ from soulmate_llm_providers import FakeLLMProvider
 from soulmate_storage_sqlite import Database, Repositories
 
 pytestmark = pytest.mark.integration
+
+
+OWNER_CLIENT = ("127.0.0.1", 50000)
+
+
+def owner_client(app: FastAPI) -> TestClient:
+    """Call the service the way the owner's own machine does, over loopback."""
+    return TestClient(app, client=OWNER_CLIENT)
 
 
 def _free_port() -> int:
@@ -66,7 +75,7 @@ def _running_daemon(tmp_path: Path, port: int) -> Iterator[None]:
 def test_app_migrates_storage_and_exposes_minimal_local_api(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "owner-data")
     app = create_app(settings)
-    with TestClient(app) as client:
+    with owner_client(app) as client:
         health = client.get("/v1/health")
         assert health.status_code == 200
         assert health.json() == {
@@ -85,16 +94,16 @@ def test_app_migrates_storage_and_exposes_minimal_local_api(tmp_path: Path) -> N
 
 def test_installation_identity_survives_application_restart(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "owner-data")
-    with TestClient(create_app(settings)) as client:
+    with owner_client(create_app(settings)) as client:
         first_id = client.get("/v1/system/info").json()["installation_id"]
-    with TestClient(create_app(settings)) as client:
+    with owner_client(create_app(settings)) as client:
         second_id = client.get("/v1/system/info").json()["installation_id"]
     assert first_id == second_id
 
 
 def test_preference_correction_rebuilds_model_and_exposes_evidence(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "owner-data")
-    with TestClient(create_app(settings)) as client:
+    with owner_client(create_app(settings)) as client:
         empty = client.get("/v1/model/summary")
         assert empty.status_code == 200
         assert empty.json()["version"] is None
@@ -131,7 +140,7 @@ def test_preference_correction_rebuilds_model_and_exposes_evidence(tmp_path: Pat
 
 
 def test_preference_correction_validates_external_input(tmp_path: Path) -> None:
-    with TestClient(create_app(Settings(data_dir=tmp_path / "owner-data"))) as client:
+    with owner_client(create_app(Settings(data_dir=tmp_path / "owner-data"))) as client:
         response = client.post(
             "/v1/preferences/corrections",
             json={"target_key": "work.remote", "value": 2.0},
@@ -141,7 +150,7 @@ def test_preference_correction_validates_external_input(tmp_path: Path) -> None:
 
 def test_desktop_model_flow_lists_and_deletes_evidence(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "owner-data")
-    with TestClient(create_app(settings)) as client:
+    with owner_client(create_app(settings)) as client:
         correction = client.post(
             "/v1/preferences/corrections",
             json={"target_key": "work.remote", "value": 0.75},
@@ -166,7 +175,7 @@ def test_desktop_history_endpoints_return_local_owner_records(tmp_path: Path) ->
         responses=["Synthetic response"],
         structured_responses=[{"facts": [], "preferences": [], "goals": [], "constraints": []}],
     )
-    with TestClient(create_app(settings, provider=provider)) as client:
+    with owner_client(create_app(settings, provider=provider)) as client:
         chat = client.post("/v1/chat", json={"content": "Synthetic message"})
         decision = client.post("/v1/decisions", json=_decision_payload())
         decision_id = decision.json()["id"]
@@ -325,7 +334,7 @@ def test_chat_extracts_preferences_and_persists_context_across_restart(tmp_path:
             }
         ],
     )
-    with TestClient(create_app(settings, provider=first_provider)) as client:
+    with owner_client(create_app(settings, provider=first_provider)) as client:
         response = client.post("/v1/chat", json={"content": "I strongly prefer remote work."})
         assert response.status_code == 200
         body = response.json()
@@ -341,7 +350,7 @@ def test_chat_extracts_preferences_and_persists_context_across_restart(tmp_path:
         responses=["Your remote-work preference is relevant."],
         structured_responses=[{"facts": [], "preferences": [], "goals": [], "constraints": []}],
     )
-    with TestClient(create_app(settings, provider=second_provider)) as client:
+    with owner_client(create_app(settings, provider=second_provider)) as client:
         response = client.post(
             "/v1/chat",
             json={"conversation_id": conversation_id, "content": "What about remote work?"},
@@ -377,7 +386,7 @@ def test_chat_rejects_invalid_provider_output_without_persisting_message(tmp_pat
         ],
     )
     settings = Settings(data_dir=tmp_path / "owner-data")
-    with TestClient(create_app(settings, provider=provider)) as client:
+    with owner_client(create_app(settings, provider=provider)) as client:
         response = client.post("/v1/chat", json={"content": "Synthetic message"})
         assert response.status_code == 502
         assert response.json()["detail"] == "The model provider returned invalid structured output."
@@ -407,7 +416,7 @@ def _decision_payload() -> dict[str, object]:
 
 def test_decision_prediction_resolution_learning_and_restart(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "owner-data")
-    with TestClient(create_app(settings)) as client:
+    with owner_client(create_app(settings)) as client:
         correction = client.post(
             "/v1/preferences/corrections",
             json={"target_key": "work.remote", "value": 0.75, "context": {"domain": "career"}},
@@ -454,7 +463,7 @@ def test_decision_prediction_resolution_learning_and_restart(tmp_path: Path) -> 
     assert repositories.decisions.get_resolution(decision["id"]) is not None
     database.close()
 
-    with TestClient(create_app(settings)) as client:
+    with owner_client(create_app(settings)) as client:
         next_decision = client.post("/v1/decisions", json=_decision_payload()).json()
         next_prediction = client.post(f"/v1/decisions/{next_decision['id']}/predict").json()
         assert next_prediction["predicted_choice"] == "Office role"
@@ -484,7 +493,7 @@ def test_decision_extracts_natural_option_features_with_validated_provider_outpu
             {"label": "Premium", "description": "Higher monthly price"},
         ],
     }
-    with TestClient(
+    with owner_client(
         create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
     ) as client:
         response = client.post("/v1/decisions", json=payload)
@@ -497,7 +506,7 @@ def test_decision_extracts_natural_option_features_with_validated_provider_outpu
 def test_decision_prediction_without_prior_model_creates_snapshot_and_validates_input(
     tmp_path: Path,
 ) -> None:
-    with TestClient(create_app(Settings(data_dir=tmp_path / "owner-data"))) as client:
+    with owner_client(create_app(Settings(data_dir=tmp_path / "owner-data"))) as client:
         invalid = _decision_payload()
         invalid["domain"] = " "
         assert client.post("/v1/decisions", json=invalid).status_code == 422
@@ -528,7 +537,7 @@ def test_decision_rejects_invalid_natural_feature_extraction(tmp_path: Path) -> 
             {"label": "Premium", "description": "Higher monthly price"},
         ],
     }
-    with TestClient(
+    with owner_client(
         create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
     ) as client:
         response = client.post("/v1/decisions", json=payload)

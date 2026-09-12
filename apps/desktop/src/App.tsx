@@ -3,6 +3,7 @@ import {
   Clock3,
   MessageCircleMore,
   Settings as SettingsIcon,
+  Smartphone,
   Sparkles,
   Split,
 } from "lucide-react";
@@ -11,13 +12,14 @@ import { useCallback, useEffect, useState } from "react";
 import { ServiceBadge } from "./components/ServiceBadge.tsx";
 import { ChatScreen } from "./screens/ChatScreen.tsx";
 import { DecideScreen } from "./screens/DecideScreen.tsx";
+import { DevicesScreen } from "./screens/DevicesScreen.tsx";
 import { HistoryScreen } from "./screens/HistoryScreen.tsx";
 import { ModelScreen } from "./screens/ModelScreen.tsx";
 import { SettingsScreen } from "./screens/SettingsScreen.tsx";
 import { getServiceStatus } from "./runtime.ts";
 import type { ServiceStatus } from "./types.ts";
 
-type Screen = "chat" | "decide" | "model" | "history" | "settings";
+type Screen = "chat" | "decide" | "model" | "history" | "devices" | "settings";
 
 const navigation: {
   id: Screen;
@@ -28,6 +30,7 @@ const navigation: {
   { id: "decide", label: "Decide", icon: Split },
   { id: "model", label: "My Model", icon: BrainCircuit },
   { id: "history", label: "History", icon: Clock3 },
+  { id: "devices", label: "Devices", icon: Smartphone },
   { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -86,6 +89,8 @@ export function App() {
         );
       case "history":
         return <HistoryScreen />;
+      case "devices":
+        return <DevicesScreen onServiceChanged={refreshServiceStatus} />;
       case "settings":
         return (
           <SettingsScreen

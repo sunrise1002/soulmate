@@ -26,8 +26,11 @@ context compilation, and concrete provider adapters outside the kernel. The daem
 owns prompts, Pydantic proposal validation, review policy, and composition. Model
 providers can only propose Evidence; they cannot mutate derived Personal Model
 state. Phase 6 packages the daemon as a platform-specific sidecar managed by the
-Tauri desktop shell. The webview talks only through a fixed loopback native proxy;
-mobile, web, MCP, and SDK directories remain documented placeholders.
+Tauri desktop shell. The webview talks only through a fixed loopback native proxy.
+Phase 7 added device pairing ports and rules to the kernel, an opt-in TLS listener
+on an explicit LAN address, a single authorization boundary in front of every
+route, and web and React Native clients built on a shared TypeScript SDK. MCP and
+the Python SDK remain documented placeholders.
 
 ADRs below record decisions from specification section 65. Each ADR status states
 whether the decision is architectural only or already implemented.
@@ -42,3 +45,4 @@ whether the decision is architectural only or already implemented.
 | [006](decisions/ADR-006-no-default-telemetry.md) | No cloud telemetry by default |
 | [007](decisions/ADR-007-desktop-daemon.md) | Desktop daemon model |
 | [008](decisions/ADR-008-rest-and-mcp.md) | REST and MCP integration |
+| [009](decisions/ADR-009-lan-pairing.md) | LAN access through owner-approved device pairing |

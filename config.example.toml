@@ -5,6 +5,22 @@ data_dir = "./data"
 host = "127.0.0.1"
 port = 7432
 
+[network]
+# Access from other devices is off until you enable it. When enabled the daemon
+# keeps the loopback listener and adds a TLS listener on an explicit LAN address.
+lan_enabled = false
+# Leave empty to use the address of the default route. Wildcards are rejected.
+lan_host = ""
+lan_port = 7433
+# Omit tls_dir to use DATA_DIR/tls for the generated service certificate.
+# tls_dir = "./data/tls"
+pairing_ttl_seconds = 300
+
+[web]
+enabled = true
+# Omit client_dir to serve the web client bundled with the daemon, if present.
+# client_dir = "./apps/web/dist"
+
 [privacy]
 mode = "strict_local"
 

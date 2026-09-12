@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Soulmate",
+    "slug": "soulmate",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "soulmate",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.soulmate.client"
+    },
+    "android": {
+      "package": "app.soulmate.client"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Soulmate uses the camera only to scan the pairing code shown on your computer."
+        }
+      ]
+    ]
+  }
+}

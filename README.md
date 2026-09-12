@@ -3,9 +3,9 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 6 Desktop Product is implemented locally.
-See the [phase status](docs/phase-status.md) and detailed
-[Phase 6 report](docs/phases/phase-6-report.md).
+**Current status:** Phase 7 Mobile/Web Clients & Secure Pairing is implemented
+locally. See the [phase status](docs/phase-status.md) and detailed
+[Phase 7 report](docs/phases/phase-7-report.md).
 
 ## Development setup
 
@@ -111,6 +111,34 @@ The desktop history views use `GET /v1/conversations` and `GET /v1/decisions`.
 The My Model screen can inspect provenance, add correction evidence, and use
 `DELETE /v1/evidence/{id}` to remove evidence before a deterministic model rebuild.
 
+## Access from other devices
+
+Access from other devices is off until you turn it on. When enabled, the daemon
+keeps its loopback listener and adds a TLS listener on one explicit local network
+address; wildcard binds are rejected. Enable it from the desktop Devices screen, or
+set `network.lan_enabled` in `config.toml` or `SOULMATE_NETWORK__LAN_ENABLED`.
+
+The Devices screen creates a one-time pairing code that expires in five minutes.
+Scan it with the mobile client, or type it into the web client on the other device.
+The daemon stores only hashes of the pairing token and of the issued device
+credential, and the QR payload carries the certificate fingerprint so a phone pins
+the service it paired with. Revoke any device from the same screen; the next
+request from that device fails immediately.
+
+Loopback callers are the owner. Every other caller needs an active device
+credential. Pairing, device listing, revocation, network status, and evidence
+deletion are only available on the owner's machine. A paired device can chat,
+decide, resolve, read the model, and record corrections.
+
+The pairing and device endpoints are `POST /v1/pairing/start`,
+`POST /v1/pairing/complete`, `GET /v1/devices`, `DELETE /v1/devices/{id}`,
+`GET /v1/network/state`, and `GET /v1/session`. The web client is served from the
+service root when its bundle is packaged with the daemon.
+
+The service certificate is self-signed, so a browser shows a warning the first
+time. Remote internet exposure is out of scope; use a private network such as a VPN
+if you need access away from home.
+
 Optionally copy `config.example.toml` to `config.toml` and edit it. Local config is
 ignored by Git. See [configuration](docs/contributor-guide/configuration.md) for
 environment overrides, `DATA_DIR`, and path semantics.
@@ -123,11 +151,14 @@ environment overrides, `DATA_DIR`, and path semantics.
 | `packages/storage-sqlite/` | SQLAlchemy adapter and packaged Alembic migrations |
 | `apps/daemon/src/soulmate_daemon/` | Configuration, API, worker, diagnostics, and composition root |
 | `apps/desktop/` | Tauri shell, React UI, native service management, and installer configuration |
-| `apps/{mobile,web,mcp}/` | Reserved client and integration locations |
+| `apps/web/` | React browser client served by the daemon |
+| `apps/mobile/` | Expo React Native client with QR pairing and pinned service identity |
+| `apps/mcp/` | Reserved integration location |
 | `packages/llm-providers/` | Provider protocol, fake provider, egress policy, Ollama, and OpenAI-compatible adapters |
-| `packages/{sdk-python,sdk-typescript}/` | Reserved future SDK locations |
+| `packages/sdk-typescript/` | Typed REST client and pairing rules shared by clients |
+| `packages/sdk-python/` | Reserved future SDK location |
 | `tests/` | Unit, integration, and evaluation tests using synthetic data |
-| `docs/architecture/decisions/` | ADR-001 through ADR-008 |
+| `docs/architecture/decisions/` | ADR-001 through ADR-009 |
 | `docs/phases/` | Durable plans, results, issues, and handoff reports per phase |
 | `docs/contributor-guide/` | Conventions and configuration reference |
 

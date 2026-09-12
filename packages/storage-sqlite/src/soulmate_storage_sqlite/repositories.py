@@ -25,6 +25,8 @@ from soulmate_core.domain.models import (
     Message,
     MessageRole,
     OptionProbability,
+    PairedDevice,
+    PairingToken,
     Preference,
     Profile,
     RawEvent,
@@ -49,6 +51,8 @@ from soulmate_storage_sqlite.schema import (
     GoalRow,
     JobRow,
     MessageRow,
+    PairedDeviceRow,
+    PairingTokenRow,
     PreferenceRow,
     ProfileRow,
     RawEventRow,
@@ -952,6 +956,132 @@ class SqliteJobRepository:
         )
 
 
+class SqlitePairingTokenRepository:
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def add(self, token: PairingToken) -> None:
+        with self._sessions.begin() as session:
+            session.add(
+                PairingTokenRow(
+                    id=token.id,
+                    profile_id=token.profile_id,
+                    token_hash=token.token_hash,
+                    created_at=token.created_at,
+                    expires_at=token.expires_at,
+                    consumed_at=token.consumed_at,
+                    device_id=token.device_id,
+                )
+            )
+
+    def get_by_hash(self, token_hash: str) -> PairingToken | None:
+        with self._sessions() as session:
+            row = session.scalars(
+                select(PairingTokenRow).where(PairingTokenRow.token_hash == token_hash)
+            ).one_or_none()
+            return None if row is None else self._to_domain(row)
+
+    def consume(self, token_id: str, device_id: str, consumed_at: datetime) -> bool:
+        """Claim an unconsumed token atomically so a token can never be reused."""
+        with self._sessions.begin() as session:
+            claimed = session.execute(
+                update(PairingTokenRow)
+                .where(PairingTokenRow.id == token_id, PairingTokenRow.consumed_at.is_(None))
+                .values(consumed_at=consumed_at, device_id=device_id)
+                .returning(PairingTokenRow.id)
+            ).scalar_one_or_none()
+            return claimed is not None
+
+    def delete_expired(self, before: datetime) -> int:
+        with self._sessions.begin() as session:
+            removed = session.execute(
+                delete(PairingTokenRow)
+                .where(PairingTokenRow.expires_at <= before)
+                .returning(PairingTokenRow.id)
+            ).scalars()
+            return len(list(removed))
+
+    @staticmethod
+    def _to_domain(row: PairingTokenRow) -> PairingToken:
+        return PairingToken(
+            id=row.id,
+            profile_id=row.profile_id,
+            token_hash=row.token_hash,
+            created_at=_utc(row.created_at),
+            expires_at=_utc(row.expires_at),
+            consumed_at=None if row.consumed_at is None else _utc(row.consumed_at),
+            device_id=row.device_id,
+        )
+
+
+class SqlitePairedDeviceRepository:
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def add(self, device: PairedDevice) -> None:
+        with self._sessions.begin() as session:
+            session.add(
+                PairedDeviceRow(
+                    id=device.id,
+                    profile_id=device.profile_id,
+                    name=device.name,
+                    platform=device.platform,
+                    credential_hash=device.credential_hash,
+                    created_at=device.created_at,
+                    last_seen_at=device.last_seen_at,
+                    revoked_at=device.revoked_at,
+                )
+            )
+
+    def get(self, device_id: str) -> PairedDevice | None:
+        with self._sessions() as session:
+            row = session.get(PairedDeviceRow, device_id)
+            return None if row is None else self._to_domain(row)
+
+    def list_for_profile(self, profile_id: str) -> tuple[PairedDevice, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(PairedDeviceRow)
+                .where(PairedDeviceRow.profile_id == profile_id)
+                .order_by(PairedDeviceRow.created_at.desc(), PairedDeviceRow.id.desc())
+            )
+            return tuple(self._to_domain(row) for row in rows)
+
+    def touch(self, device_id: str, last_seen_at: datetime) -> None:
+        with self._sessions.begin() as session:
+            updated_id = session.execute(
+                update(PairedDeviceRow)
+                .where(PairedDeviceRow.id == device_id)
+                .values(last_seen_at=last_seen_at)
+                .returning(PairedDeviceRow.id)
+            ).scalar_one_or_none()
+            if updated_id is None:
+                raise KeyError(device_id)
+
+    def revoke(self, device_id: str, revoked_at: datetime) -> bool:
+        with self._sessions.begin() as session:
+            revoked_id = session.execute(
+                update(PairedDeviceRow)
+                .where(PairedDeviceRow.id == device_id, PairedDeviceRow.revoked_at.is_(None))
+                .values(revoked_at=revoked_at)
+                .returning(PairedDeviceRow.id)
+            ).scalar_one_or_none()
+            return revoked_id is not None
+
+    @staticmethod
+    def _to_domain(row: PairedDeviceRow) -> PairedDevice:
+        return PairedDevice(
+            id=row.id,
+            profile_id=row.profile_id,
+            name=row.name,
+            platform=row.platform,
+            credential_hash=row.credential_hash,
+            created_at=_utc(row.created_at),
+            last_seen_at=None if row.last_seen_at is None else _utc(row.last_seen_at),
+            revoked_at=None if row.revoked_at is None else _utc(row.revoked_at),
+        )
+
+
 class SqliteSystemMetadataRepository:
     def __init__(self, sessions: sessionmaker[Session]) -> None:
         self._sessions = sessions
@@ -997,4 +1127,6 @@ class Repositories:
         self.personal_models = SqlitePersonalModelRepository(sessions)
         self.audit_events = SqliteAuditEventRepository(sessions)
         self.jobs = SqliteJobRepository(sessions)
+        self.pairing_tokens = SqlitePairingTokenRepository(sessions)
+        self.paired_devices = SqlitePairedDeviceRepository(sessions)
         self.system_metadata = SqliteSystemMetadataRepository(sessions)

@@ -1,13 +1,14 @@
 """FastAPI composition root for the local Soulmate service."""
 
 import asyncio
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import TypedDict, cast
+from typing import cast
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from soulmate_core.domain import (
     Conversation,
@@ -25,22 +26,26 @@ from soulmate_llm_providers import EgressDeniedError, LLMProvider, ProviderError
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
+from starlette.concurrency import run_in_threadpool
+from starlette.responses import Response
 
 from soulmate_daemon import __version__
+from soulmate_daemon.access_api import build_access_router
 from soulmate_daemon.config import Settings
 from soulmate_daemon.conversation import ConversationService
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
 from soulmate_daemon.jobs import DurableJobWorker
+from soulmate_daemon.network import (
+    LanEndpoint,
+    NetworkConfigurationError,
+    prepare_lan_endpoint,
+)
 from soulmate_daemon.providers import build_provider
+from soulmate_daemon.runtime import AppState, build_access_service, runtime_of
+from soulmate_daemon.security import AccessDeniedError, authorize
 from soulmate_daemon.system import DEFAULT_PROFILE_ID, ensure_installation
-
-
-class AppState(TypedDict):
-    settings: Settings
-    database: Database
-    repositories: Repositories
-    installation_id: str
-    provider: LLMProvider | None
+from soulmate_daemon.tls import CertificateError
+from soulmate_daemon.web import mount_web_client
 
 
 class HealthResponse(BaseModel):
@@ -246,7 +251,21 @@ class EvidenceDeletionResponse(BaseModel):
 
 
 def _state(app: FastAPI) -> AppState:
-    return cast(AppState, app.state.runtime)
+    return runtime_of(app)
+
+
+def _resolve_lan(
+    settings: Settings, provided: LanEndpoint | None
+) -> tuple[LanEndpoint | None, str | None]:
+    """Prepare the LAN listener only when the owner explicitly enabled it."""
+    if provided is not None:
+        return provided, None
+    if not settings.network.lan_enabled:
+        return None, None
+    try:
+        return prepare_lan_endpoint(settings), None
+    except (CertificateError, NetworkConfigurationError, OSError) as exc:
+        return None, str(exc)
 
 
 def _resolve_provider(runtime: AppState) -> LLMProvider:
@@ -364,7 +383,12 @@ def _stored_resolution_response(resolution: DecisionResolution) -> ResolutionHis
     )
 
 
-def create_app(settings: Settings | None = None, *, provider: LLMProvider | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    provider: LLMProvider | None = None,
+    lan: LanEndpoint | None = None,
+) -> FastAPI:
     resolved_settings = settings if settings is not None else Settings()
 
     @asynccontextmanager
@@ -375,12 +399,15 @@ def create_app(settings: Settings | None = None, *, provider: LLMProvider | None
             raise RuntimeError("Database session factory was not initialized.")
         repositories = Repositories(database.session_factory)
         installation_id = ensure_installation(repositories.system_metadata, repositories.profiles)
+        endpoint, lan_error = _resolve_lan(resolved_settings, lan)
         app.state.runtime = AppState(
             settings=resolved_settings,
             database=database,
             repositories=repositories,
             installation_id=installation_id,
             provider=provider,
+            lan=endpoint,
+            lan_error=lan_error,
         )
         stop = asyncio.Event()
         worker = DurableJobWorker(repositories.jobs, {})
@@ -396,6 +423,30 @@ def create_app(settings: Settings | None = None, *, provider: LLMProvider | None
     app = FastAPI(
         title="Soulmate", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
     )
+
+    @app.middleware("http")
+    async def enforce_device_access(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        """Authorize every request before any handler can observe personal data."""
+        runtime = getattr(app.state, "runtime", None)
+        if runtime is None:
+            return JSONResponse({"detail": "The local service is starting."}, status_code=503)
+        state = cast(AppState, runtime)
+        try:
+            actor = await run_in_threadpool(
+                authorize,
+                method=request.method,
+                path=request.url.path,
+                client_host=None if request.client is None else request.client.host,
+                lan_enabled=state["lan"] is not None,
+                authorization=request.headers.get("authorization"),
+                authenticate=build_access_service(state).authenticate,
+            )
+        except AccessDeniedError as exc:
+            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
+        request.state.actor = actor
+        return await call_next(request)
 
     @app.get("/v1/health", response_model=HealthResponse)
     def health() -> HealthResponse:
@@ -740,4 +791,6 @@ def create_app(settings: Settings | None = None, *, provider: LLMProvider | None
             snapshot_version=result.snapshot_version,
         )
 
+    app.include_router(build_access_router(app))
+    mount_web_client(app, resolved_settings.web_client_directory)
     return app

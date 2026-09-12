@@ -342,3 +342,51 @@ class Job:
 
     def __post_init__(self) -> None:
         _require_utc_aware(self.available_at, self.created_at, self.updated_at, self.locked_at)
+
+
+@dataclass(frozen=True, slots=True)
+class PairingToken:
+    """One-time, short-lived secret that authorizes a single device enrollment."""
+
+    id: str
+    profile_id: str
+    token_hash: str
+    created_at: datetime
+    expires_at: datetime
+    consumed_at: datetime | None = None
+    device_id: str | None = None
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at, self.expires_at, self.consumed_at)
+        if not self.token_hash:
+            raise ValueError("Pairing token hash must not be empty.")
+        if self.expires_at <= self.created_at:
+            raise ValueError("Pairing token must expire after it was created.")
+
+    def is_usable_at(self, now: datetime) -> bool:
+        return self.consumed_at is None and now < self.expires_at
+
+
+@dataclass(frozen=True, slots=True)
+class PairedDevice:
+    """A revocable client credential held by another device of the same owner."""
+
+    id: str
+    profile_id: str
+    name: str
+    platform: str
+    credential_hash: str
+    created_at: datetime
+    last_seen_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at, self.last_seen_at, self.revoked_at)
+        if not self.name.strip():
+            raise ValueError("Paired device name must not be empty.")
+        if not self.credential_hash:
+            raise ValueError("Paired device credential hash must not be empty.")
+
+    @property
+    def is_active(self) -> bool:
+        return self.revoked_at is None

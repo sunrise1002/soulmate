@@ -1185,3 +1185,74 @@ select {
     transition-duration: 0.01ms !important;
   }
 }
+.device-card {
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  display: grid;
+  gap: 12px;
+}
+.device-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.device-facts {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+.device-facts div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+.device-facts dt {
+  min-width: 170px;
+  color: #8b7b61;
+  font:
+    500 10px/1.2 "DM Mono",
+    monospace;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.device-facts dd {
+  margin: 0;
+  font-size: 13px;
+}
+.device-fingerprint,
+.device-payload {
+  font:
+    400 11px/1.5 "DM Mono",
+    monospace;
+  word-break: break-all;
+}
+.device-invitation {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #faf8f3;
+}
+.device-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.device-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+}
+.device-row p {
+  margin: 4px 0 0;
+}

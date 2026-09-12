@@ -116,3 +116,80 @@ def test_example_configuration_is_valid() -> None:
     settings = load_settings(root / "config.example.toml", environ={})
     assert settings.privacy.mode == "strict_local"
     assert settings.llm.provider == "ollama"
+
+
+def test_lan_access_is_disabled_with_a_loopback_default() -> None:
+    # Given: an installation without network configuration, when settings load,
+    settings = load_settings(None, environ={})
+
+    # Then: no other device can reach the service and TLS lives under the data dir
+    assert settings.network.lan_enabled is False
+    assert settings.network.lan_host == ""
+    assert settings.network.lan_port == 7433
+    assert settings.tls_directory == (Path.cwd() / "data" / "tls").resolve()
+
+
+@pytest.mark.parametrize("host", ["0.0.0.0", "::", "[::]", "*", " 0.0.0.0 "])
+def test_wildcard_lan_hosts_are_rejected_by_configuration(tmp_path: Path, host: str) -> None:
+    # Given: a configuration file that would expose every interface
+    config = tmp_path / "config.toml"
+    config.write_text(f'[network]\nlan_host = "{host}"\n', encoding="utf-8")
+
+    # When/Then: loading fails instead of silently binding a wildcard
+    with pytest.raises(ConfigurationError, match=r"network\.lan_host"):
+        load_settings(config)
+
+
+@pytest.mark.parametrize("seconds", [29, 3601, 0, -1])
+def test_pairing_lifetime_outside_the_supported_range_is_rejected(
+    tmp_path: Path, seconds: int
+) -> None:
+    # Given: a configuration with an unusable pairing lifetime
+    config = tmp_path / "config.toml"
+    config.write_text(f"[network]\npairing_ttl_seconds = {seconds}\n", encoding="utf-8")
+
+    # When/Then: the boundary is enforced at load time
+    with pytest.raises(ConfigurationError, match="pairing_ttl_seconds"):
+        load_settings(config)
+
+
+@pytest.mark.parametrize("seconds", [30, 300, 3600])
+def test_supported_pairing_lifetimes_are_accepted(tmp_path: Path, seconds: int) -> None:
+    # Given: a configuration at the edges of the supported range
+    config = tmp_path / "config.toml"
+    config.write_text(f"[network]\npairing_ttl_seconds = {seconds}\n", encoding="utf-8")
+
+    # When/Then: the value is preserved
+    assert load_settings(config).network.pairing_ttl_seconds == seconds
+
+
+def test_lan_access_can_be_enabled_from_the_environment() -> None:
+    # Given: the desktop shell enabling LAN access for the daemon it manages
+    environ = {
+        "SOULMATE_NETWORK__LAN_ENABLED": "true",
+        "SOULMATE_NETWORK__LAN_HOST": "192.168.1.20",
+        "SOULMATE_NETWORK__LAN_PORT": "7500",
+    }
+
+    # When: settings are loaded
+    settings = load_settings(None, environ=environ)
+
+    # Then: the explicit address and port are used
+    assert settings.network.lan_enabled is True
+    assert settings.network.lan_host == "192.168.1.20"
+    assert settings.network.lan_port == 7500
+
+
+def test_web_client_directory_is_resolved_only_when_the_client_is_enabled(
+    tmp_path: Path,
+) -> None:
+    # Given: a configured web client bundle
+    bundle = tmp_path / "web"
+    enabled = load_settings(None, environ={"SOULMATE_WEB__CLIENT_DIR": str(bundle)})
+    disabled = load_settings(
+        None, environ={"SOULMATE_WEB__CLIENT_DIR": str(bundle), "SOULMATE_WEB__ENABLED": "false"}
+    )
+
+    # When/Then: disabling the web client removes it from the served surface
+    assert enabled.web_client_directory == bundle.resolve()
+    assert disabled.web_client_directory is None

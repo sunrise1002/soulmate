@@ -4,6 +4,22 @@
 
 ### Added
 
+- Phase 7 opt-in access from other devices: a second TLS listener on an explicit
+  LAN address, a self-signed service certificate with renewal, and a rejection of
+  wildcard binds in both configuration and address resolution.
+- One-time, short-lived, high-entropy QR pairing with atomically claimed tokens,
+  hashed device credentials, owner-only device listing and revocation, and audit
+  events for token issue, pairing, and revocation.
+- A single authorization boundary in front of every route: loopback callers are the
+  owner, other callers need a paired device credential, and device management, LAN
+  status, and evidence deletion stay owner-only.
+- `@soulmate/sdk` typed REST client and pairing payload rules shared by clients,
+  `@soulmate/web` browser client served from the daemon root, and `@soulmate/mobile`
+  Expo React Native client with QR scanning, secure credential storage, and pinned
+  service identity.
+- Desktop Devices screen for enabling access from other devices, creating pairing
+  codes, and revoking paired devices.
+- SQLite migration `0005_phase_7` for paired devices and pairing tokens.
 - Phase 6 installable Tauri 2 desktop product with a React/TypeScript interface for
   Chat, Decide, My Model, Decision History, and Settings.
 - Target-specific PyInstaller daemon sidecar builds, native lifecycle and health

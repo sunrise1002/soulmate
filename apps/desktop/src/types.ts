@@ -9,6 +9,7 @@ export interface DesktopSettings {
   openaiBaseUrl: string;
   openaiModel: string;
   hasApiKey: boolean;
+  lanEnabled: boolean;
 }
 
 export interface DesktopSettingsInput extends Omit<
@@ -150,4 +151,34 @@ export interface DecisionHistoryItem {
   decision: Decision;
   prediction: DecisionPrediction | null;
   resolution: Resolution | null;
+}
+
+export interface PairedDevice {
+  id: string;
+  name: string;
+  platform: string;
+  created_at: string;
+  last_seen_at: string | null;
+  revoked_at: string | null;
+  active: boolean;
+}
+
+export interface NetworkState {
+  lan_enabled: boolean;
+  lan_url: string | null;
+  fingerprint: string | null;
+  certificate_expires_at: string | null;
+  paired_device_count: number;
+  active_device_count: number;
+  web_client_available: boolean;
+  error: string | null;
+}
+
+export interface PairingInvitation {
+  token: string;
+  expires_at: string;
+  service_url: string;
+  service_id: string;
+  fingerprint: string;
+  qr_payload: string;
 }

@@ -38,6 +38,7 @@ const defaultSettings: DesktopSettings = {
   openaiBaseUrl: "http://127.0.0.1:8000/v1",
   openaiModel: "",
   hasApiKey: false,
+  lanEnabled: false,
 };
 
 export function SettingsScreen({
@@ -86,6 +87,7 @@ export function SettingsScreen({
         ollamaModel: settings.ollamaModel,
         openaiBaseUrl: settings.openaiBaseUrl,
         openaiModel: settings.openaiModel,
+        lanEnabled: settings.lanEnabled,
         ...(apiKey ? { apiKey } : {}),
         clearApiKey,
       });

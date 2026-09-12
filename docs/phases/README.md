@@ -27,3 +27,4 @@ Available reports:
 - [Phase 4](phase-4-report.md)
 - [Phase 5](phase-5-report.md)
 - [Phase 6](phase-6-report.md)
+- [Phase 7](phase-7-report.md)

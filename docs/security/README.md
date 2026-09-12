@@ -1,15 +1,32 @@
 # Privacy and security boundaries
 
-The foundation binds to loopback only, has no product routes, performs no provider
-calls, creates no personal database, and includes no telemetry. Configuration error
+The daemon binds loopback by default and includes no telemetry. Configuration error
 messages identify fields without printing their rejected values.
 
-Future work must keep persistence and audit logs local, hash API credentials,
-store provider secrets in an operating-system credential store or encrypted
-fallback, validate provider output, enforce central network egress policy, and
-minimize context sent externally. LAN access requires explicit activation and
-encrypted pairing. These are architecture requirements, not completed features.
+Persistence and audit logs stay local, provider secrets live in the operating-system
+credential store, provider output is validated, and network egress passes a central
+policy.
+
+Access from other devices is off until the owner enables it. When enabled, the
+daemon keeps its loopback listener and adds a TLS listener on one explicit address;
+wildcard binds are rejected. Every request passes one authorization boundary before
+any handler sees personal data: loopback callers are the owner, and every other
+caller needs a bearer credential issued by pairing. Health and pairing completion
+are the only public API paths. Pairing, device listing, revocation, network status,
+and evidence deletion are owner-only.
+
+Pairing tokens are 256-bit, single-use, and expire in five minutes; they are
+claimed atomically so a token can never be redeemed twice. Only hashes of pairing
+tokens and device credentials are stored, and failed authentication returns one
+generic message. Revocation takes effect on the next request. Pairing token issue,
+device pairing, and revocation are recorded as audit events.
+
+The service certificate is self-signed and generated locally with an owner-only
+private key. Browsers show a warning until the owner accepts it, and mobile
+transport pinning requires a native network configuration built from the stored
+fingerprint. There is no per-address rate limit on pairing attempts. Remote
+internet exposure is not supported.
 
 Do not put personal data or secrets into issue reports, logs, fixtures, source
 control, or CI artifacts. Use synthetic fixtures and keep runtime data outside
-tracked source. See ADR-001, ADR-005, ADR-006, and ADR-008.
+tracked source. See ADR-001, ADR-005, ADR-006, ADR-008, and ADR-009.

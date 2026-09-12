@@ -23,6 +23,8 @@ struct StoredSettings {
     ollama_model: String,
     openai_base_url: String,
     openai_model: String,
+    #[serde(default)]
+    lan_enabled: bool,
 }
 
 impl Default for StoredSettings {
@@ -34,6 +36,7 @@ impl Default for StoredSettings {
             ollama_model: String::new(),
             openai_base_url: "http://127.0.0.1:8000/v1".into(),
             openai_model: String::new(),
+            lan_enabled: false,
         }
     }
 }
@@ -48,6 +51,7 @@ struct DesktopSettings {
     openai_base_url: String,
     openai_model: String,
     has_api_key: bool,
+    lan_enabled: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -61,6 +65,8 @@ struct DesktopSettingsInput {
     openai_model: String,
     api_key: Option<String>,
     clear_api_key: bool,
+    #[serde(default)]
+    lan_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -160,6 +166,7 @@ fn desktop_settings(stored: StoredSettings) -> DesktopSettings {
         openai_base_url: stored.openai_base_url,
         openai_model: stored.openai_model,
         has_api_key: stored_api_key().is_some(),
+        lan_enabled: stored.lan_enabled,
     }
 }
 
@@ -266,6 +273,15 @@ fn start_daemon_internal(app: &AppHandle) -> Result<ServiceStatus, String> {
         .env(
             "SOULMATE_LLM__OPENAI_COMPATIBLE__MODEL",
             &settings.openai_model,
+        )
+        // LAN exposure is opt-in; the daemon still binds loopback for this shell.
+        .env(
+            "SOULMATE_NETWORK__LAN_ENABLED",
+            if settings.lan_enabled {
+                "true"
+            } else {
+                "false"
+            },
         );
     if let Some(api_key) = stored_api_key() {
         command = command.env("SOULMATE_LLM__OPENAI_COMPATIBLE__API_KEY", api_key);
@@ -413,6 +429,7 @@ fn save_desktop_settings(
         ollama_model: settings.ollama_model,
         openai_base_url: settings.openai_base_url,
         openai_model: settings.openai_model,
+        lan_enabled: settings.lan_enabled,
     };
     validate_settings(&stored)?;
     if settings.clear_api_key {
@@ -536,7 +553,7 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_loopback, validate_settings, StoredSettings};
+    use super::{desktop_settings, is_loopback, validate_settings, StoredSettings};
     use url::Url;
 
     #[test]
@@ -556,6 +573,30 @@ mod tests {
 
         settings.privacy_mode = "hybrid".into();
         assert!(validate_settings(&settings).is_ok());
+    }
+
+    #[test]
+    fn access_from_other_devices_is_off_until_the_owner_enables_it() {
+        let defaults = StoredSettings::default();
+        assert!(!defaults.lan_enabled);
+        assert!(!desktop_settings(defaults).lan_enabled);
+
+        let enabled = StoredSettings {
+            ollama_model: "model".into(),
+            lan_enabled: true,
+            ..StoredSettings::default()
+        };
+        assert!(validate_settings(&enabled).is_ok());
+        assert!(desktop_settings(enabled).lan_enabled);
+    }
+
+    #[test]
+    fn stored_settings_without_a_network_section_stay_loopback_only() {
+        let stored: StoredSettings = serde_json::from_str(
+            r#"{"privacyMode":"strict_local","provider":"ollama","ollamaBaseUrl":"http://127.0.0.1:11434","ollamaModel":"model","openaiBaseUrl":"http://127.0.0.1:8000/v1","openaiModel":""}"#,
+        )
+        .expect("settings saved before Phase 7 must still load");
+        assert!(!stored.lan_enabled);
     }
 
     #[test]

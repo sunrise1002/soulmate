@@ -1,5 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App.tsx";
 
@@ -10,6 +16,8 @@ vi.mock("@tauri-apps/api/core", () => ({
 }));
 
 describe("desktop navigation", () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
     invoke.mockImplementation((command: string) => {
       if (command === "daemon_status") {
@@ -21,6 +29,18 @@ describe("desktop navigation", () => {
       }
       if (command === "api_request") {
         return Promise.resolve({ status: 200, body: [] });
+      }
+      if (command === "get_desktop_settings") {
+        return Promise.resolve({
+          privacyMode: "strict_local",
+          provider: "ollama",
+          ollamaBaseUrl: "http://127.0.0.1:11434",
+          ollamaModel: "model",
+          openaiBaseUrl: "http://127.0.0.1:8000/v1",
+          openaiModel: "",
+          hasApiKey: false,
+          lanEnabled: false,
+        });
       }
       return Promise.reject(new Error(`Unexpected command: ${command}`));
     });
@@ -46,5 +66,32 @@ describe("desktop navigation", () => {
     expect(
       screen.getByRole("heading", { name: "Decision History" }),
     ).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Devices" }));
+    expect(screen.getByRole("heading", { name: "Devices" })).not.toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText("Enable access from other devices"),
+      ).not.toBeNull(),
+    );
+  });
+
+  it("keeps access from other devices off until the owner enables it", async () => {
+    render(<App />);
+
+    await waitFor(() =>
+      expect(screen.getByText("Private & local")).not.toBeNull(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Devices" }));
+
+    const toggle = await screen.findByLabelText(
+      "Enable access from other devices",
+    );
+    expect((toggle as HTMLInputElement).checked).toBe(false);
+    expect(
+      screen
+        .getByRole("button", { name: /Create pairing code/ })
+        .hasAttribute("disabled"),
+    ).toBe(true);
   });
 });

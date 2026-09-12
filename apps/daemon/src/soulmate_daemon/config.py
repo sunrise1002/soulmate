@@ -6,7 +6,15 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import AnyHttpUrl, BaseModel, ConfigDict, Field, SecretStr, ValidationError
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    ValidationError,
+    field_validator,
+)
 
 
 class ConfigurationError(ValueError):
@@ -22,6 +30,34 @@ class ConfigModel(BaseModel):
 class ServerConfig(ConfigModel):
     host: Literal["127.0.0.1", "::1"] = "127.0.0.1"
     port: int = Field(default=7432, ge=1, le=65535)
+
+
+UNSPECIFIED_BIND_ADDRESSES = frozenset({"0.0.0.0", "::", "[::]", "*"})  # noqa: S104
+
+
+class NetworkConfig(ConfigModel):
+    """Opt-in access from other devices on the local network."""
+
+    lan_enabled: bool = False
+    lan_host: str = ""
+    lan_port: int = Field(default=7433, ge=1, le=65535)
+    tls_dir: Path | None = None
+    pairing_ttl_seconds: int = Field(default=300, ge=30, le=3600)
+
+    @field_validator("lan_host")
+    @classmethod
+    def reject_unspecified_bind_address(cls, value: str) -> str:
+        """Refuse wildcard binding so LAN exposure is always an explicit address."""
+        if value.strip() in UNSPECIFIED_BIND_ADDRESSES:
+            raise ValueError("LAN host must be an explicit address, never a wildcard.")
+        return value.strip()
+
+
+class WebConfig(ConfigModel):
+    """Static web client served by the daemon."""
+
+    enabled: bool = True
+    client_dir: Path | None = None
 
 
 class PrivacyConfig(ConfigModel):
@@ -61,11 +97,32 @@ class EmbeddingConfig(ConfigModel):
 class Settings(ConfigModel):
     data_dir: Path = Path("data")
     server: ServerConfig = Field(default_factory=ServerConfig)
+    network: NetworkConfig = Field(default_factory=NetworkConfig)
+    web: WebConfig = Field(default_factory=WebConfig)
     privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
     vector: VectorConfig = Field(default_factory=VectorConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+
+    @property
+    def tls_directory(self) -> Path:
+        """Resolve where the local service certificate lives without creating it."""
+        directory = self.network.tls_dir
+        if directory is None:
+            directory = self.data_dir.expanduser() / "tls"
+        return directory.expanduser().resolve()
+
+    @property
+    def web_client_directory(self) -> Path | None:
+        """Resolve the configured web client bundle, or the packaged default."""
+        if not self.web.enabled:
+            return None
+        directory = self.web.client_dir
+        if directory is None:
+            packaged = Path(__file__).resolve().parent / "web_client"
+            return packaged if packaged.is_dir() else None
+        return directory.expanduser().resolve()
 
     @property
     def database_path(self) -> Path:
