@@ -57,6 +57,23 @@ specific vendor SDK. Provider configuration is lazy: the daemon can start withou
 a model, while `/v1/chat` returns a provider-unavailable response until a model is
 configured. Vector search remains deferred.
 
+## Desktop configuration
+
+The desktop shell translates its Settings screen into the daemon environment and
+always supplies an application-specific absolute data directory plus
+`127.0.0.1:7432`. The shell supports Ollama and generic OpenAI-compatible provider
+settings with the same privacy semantics as the daemon:
+
+- `strict_local` and `offline` accept only literal loopback provider URLs.
+- `hybrid` accepts loopback HTTP or remote HTTPS provider URLs.
+- Ollama is always local and therefore requires a loopback HTTP URL.
+
+Non-secret desktop settings are stored as `desktop-settings.json` in the platform
+application-configuration directory. A compatible-provider API key is stored separately in
+the operating system credential store. The UI receives only a boolean indicating
+whether a key exists. Saving an empty key preserves the existing credential;
+explicit removal deletes it. Restart the managed daemon to apply changed settings.
+
 ## Tool references
 
 - [uv workspace configuration](https://docs.astral.sh/uv/concepts/projects/workspaces/)

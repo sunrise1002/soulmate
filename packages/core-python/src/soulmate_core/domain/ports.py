@@ -46,6 +46,8 @@ class ConversationRepository(Protocol):
 
     def get(self, conversation_id: str) -> Conversation | None: ...
 
+    def list_for_profile(self, profile_id: str) -> tuple[Conversation, ...]: ...
+
     def touch(self, conversation_id: str, updated_at: datetime) -> None: ...
 
 
@@ -61,6 +63,10 @@ class DecisionRepository(Protocol):
     def add(self, decision: DecisionEvent, options: tuple[DecisionOption, ...]) -> None: ...
 
     def get(self, decision_id: str) -> tuple[DecisionEvent, tuple[DecisionOption, ...]] | None: ...
+
+    def list_for_profile(
+        self, profile_id: str
+    ) -> tuple[tuple[DecisionEvent, tuple[DecisionOption, ...]], ...]: ...
 
     def list_resolved(
         self, profile_id: str

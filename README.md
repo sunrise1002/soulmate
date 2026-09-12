@@ -3,15 +3,15 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 5 Preference Learning & Evaluation is implemented locally.
+**Current status:** Phase 6 Desktop Product is implemented locally.
 See the [phase status](docs/phase-status.md) and detailed
-[Phase 5 report](docs/phases/phase-5-report.md).
+[Phase 6 report](docs/phases/phase-6-report.md).
 
 ## Development setup
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/), Node.js 24,
-and pnpm 11.21.0. `uv` manages the Python 3.12 development interpreter; Python
-packages declare support for Python 3.12 and later.
+pnpm 11.21.0, and Rust 1.88 or later. `uv` manages the Python 3.12 development
+interpreter; Python packages declare support for Python 3.12 and later.
 
 If `uv` was installed in `~/.local/bin` and your macOS/Linux shell cannot find it,
 add that directory to the current shell before running the commands below:
@@ -33,6 +33,23 @@ Run all current checks:
 ```sh
 pnpm check
 ```
+
+Run the desktop product in development mode:
+
+```sh
+rustup component add rustfmt clippy
+pnpm --filter @soulmate/desktop tauri dev
+```
+
+Build a native installer and its bundled daemon sidecar:
+
+```sh
+pnpm --filter @soulmate/desktop tauri build
+```
+
+The installed application starts and monitors its own loopback daemon, stores
+data in the platform application-data directory, and needs no separately installed
+Python, Node.js, database, or Docker runtime.
 
 Start the local service:
 
@@ -90,6 +107,10 @@ evidence-backed factors, and records the exact Personal Model snapshot and
 learning algorithm version. Resolving the actual choice creates provenance-bearing
 `actual_choice` Evidence and rebuilds the model.
 
+The desktop history views use `GET /v1/conversations` and `GET /v1/decisions`.
+The My Model screen can inspect provenance, add correction evidence, and use
+`DELETE /v1/evidence/{id}` to remove evidence before a deterministic model rebuild.
+
 Optionally copy `config.example.toml` to `config.toml` and edit it. Local config is
 ignored by Git. See [configuration](docs/contributor-guide/configuration.md) for
 environment overrides, `DATA_DIR`, and path semantics.
@@ -101,7 +122,8 @@ environment overrides, `DATA_DIR`, and path semantics.
 | `packages/core-python/src/soulmate_core/` | Infrastructure-independent entities and repository ports |
 | `packages/storage-sqlite/` | SQLAlchemy adapter and packaged Alembic migrations |
 | `apps/daemon/src/soulmate_daemon/` | Configuration, API, worker, diagnostics, and composition root |
-| `apps/{desktop,mobile,web,mcp}/` | Reserved client and integration locations |
+| `apps/desktop/` | Tauri shell, React UI, native service management, and installer configuration |
+| `apps/{mobile,web,mcp}/` | Reserved client and integration locations |
 | `packages/llm-providers/` | Provider protocol, fake provider, egress policy, Ollama, and OpenAI-compatible adapters |
 | `packages/{sdk-python,sdk-typescript}/` | Reserved future SDK locations |
 | `tests/` | Unit, integration, and evaluation tests using synthetic data |

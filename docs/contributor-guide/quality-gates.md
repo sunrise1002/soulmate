@@ -18,9 +18,10 @@ Before requesting review, run the complete gate:
 pnpm check:all
 ```
 
-The complete gate verifies lockfiles, lint, formatting, strict types, unit and
-integration tests, all pre-commit checks, and Python package builds. It must remain
-cross-platform; do not hide repository checks in a developer-specific shell script.
+The complete gate verifies lockfiles, Python/frontend/native lint and formatting,
+strict types, unit and integration tests, all pre-commit checks, Python package
+builds, and the production frontend build. It must remain cross-platform; do not
+hide repository checks in a developer-specific shell script.
 
 Use focused commands while iterating:
 
@@ -31,7 +32,13 @@ uv run --locked mypy
 uv run --locked pytest tests/unit
 uv run --locked pytest tests/integration
 uv build --all-packages
+pnpm --filter @soulmate/desktop check
+pnpm --filter @soulmate/desktop sidecar:build
+pnpm --filter @soulmate/desktop tauri build
 ```
+
+The final Tauri command builds only the current platform's installer. CI repeats
+the sidecar and installer build natively on macOS, Windows, and Linux.
 
 Do not claim a check passed unless it ran successfully in the environment being
 reported. Local results do not imply that remote CI passed.
@@ -57,9 +64,10 @@ and make a focused tooling fix.
 ## Continuous integration
 
 GitHub Actions runs the Python gate across supported operating systems and Python
-versions, validates the pnpm lockfile, runs repository hygiene hooks, and checks PR
-branch names, titles, and every commit message. The exact required job names are
-listed in [repository settings](repository-settings.md).
+versions, validates and tests the frontend workspace, builds and tests the native
+shell plus sidecar on macOS, Windows, and Linux, runs repository hygiene hooks,
+and checks PR branch names, titles, and every commit message. The exact required
+job names are listed in [repository settings](repository-settings.md).
 
 Any new runtime, language, or generated artifact must arrive with its formatter,
 linter, type checker where applicable, tests, locked dependencies, and CI job in

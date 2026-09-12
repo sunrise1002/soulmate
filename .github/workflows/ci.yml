@@ -98,3 +98,73 @@ jobs:
       - uses: pnpm/action-setup@v4
       - name: Validate client workspace lockfile
         run: pnpm install --frozen-lockfile
+      - name: Lint desktop client
+        run: pnpm --filter @soulmate/desktop lint
+      - name: Check desktop formatting
+        run: pnpm --filter @soulmate/desktop format:check
+      - name: Type check desktop client
+        run: pnpm --filter @soulmate/desktop typecheck
+      - name: Test desktop client
+        run: pnpm --filter @soulmate/desktop test
+      - name: Build desktop frontend
+        run: pnpm --filter @soulmate/desktop build
+
+  desktop-native:
+    name: Desktop bundle / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            bundles: deb,appimage
+          - os: macos-latest
+            bundles: app,dmg
+          - os: windows-latest
+            bundles: nsis,msi
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Install Tauri Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev libxdo-dev libssl-dev patchelf
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: '0.12.13'
+          python-version: '3.12'
+          enable-cache: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - uses: pnpm/action-setup@v4
+      - name: Install Rust quality components
+        run: rustup component add clippy rustfmt
+      - name: Install locked workspace
+        run: uv sync --locked --all-packages && pnpm install --frozen-lockfile
+      - name: Build daemon sidecar
+        run: pnpm --filter @soulmate/desktop sidecar:build
+      - name: Check native formatting
+        run: pnpm --filter @soulmate/desktop rust:format:check
+      - name: Lint native shell
+        run: pnpm --filter @soulmate/desktop rust:lint
+      - name: Test native shell
+        run: pnpm --filter @soulmate/desktop rust:test
+      - name: Build platform installer
+        env:
+          CI: true
+        run: pnpm --filter @soulmate/desktop tauri build --bundles ${{ matrix.bundles }}
+      - name: Upload unsigned installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: soulmate-desktop-${{ matrix.os }}
+          path: |
+            apps/desktop/src-tauri/target/release/bundle/**/*.AppImage
+            apps/desktop/src-tauri/target/release/bundle/**/*.deb
+            apps/desktop/src-tauri/target/release/bundle/**/*.dmg
+            apps/desktop/src-tauri/target/release/bundle/**/*.msi
+            apps/desktop/src-tauri/target/release/bundle/**/*-setup.exe
+          if-no-files-found: error

@@ -10,9 +10,11 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from soulmate_core.domain import (
+    Conversation,
     DecisionEvent,
     DecisionOption,
     DecisionPrediction,
+    DecisionResolution,
     Evidence,
     EvidenceTargetType,
     Preference,
@@ -123,6 +125,13 @@ class MessageResponse(BaseModel):
     created_at: datetime
 
 
+class ConversationResponse(BaseModel):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    messages: list[MessageResponse]
+
+
 class ChatResponse(BaseModel):
     conversation_id: str
     user_message_id: str
@@ -216,6 +225,24 @@ class DecisionResolutionResponse(BaseModel):
     learned_evidence: list[EvidenceResponse]
     snapshot_version: int
     created_at: datetime
+
+
+class ResolutionHistoryResponse(BaseModel):
+    id: str
+    decision_id: str
+    chosen_option_id: str
+    created_at: datetime
+
+
+class DecisionHistoryResponse(BaseModel):
+    decision: DecisionResponse
+    prediction: DecisionPredictionResponse | None
+    resolution: ResolutionHistoryResponse | None
+
+
+class EvidenceDeletionResponse(BaseModel):
+    removed_evidence_id: str
+    snapshot_version: int
 
 
 def _state(app: FastAPI) -> AppState:
@@ -328,6 +355,15 @@ def _resolution_response(result: ResolutionResult) -> DecisionResolutionResponse
     )
 
 
+def _stored_resolution_response(resolution: DecisionResolution) -> ResolutionHistoryResponse:
+    return ResolutionHistoryResponse(
+        id=resolution.id,
+        decision_id=resolution.decision_id,
+        chosen_option_id=resolution.chosen_option_id,
+        created_at=resolution.created_at,
+    )
+
+
 def create_app(settings: Settings | None = None, *, provider: LLMProvider | None = None) -> FastAPI:
     resolved_settings = settings if settings is not None else Settings()
 
@@ -418,12 +454,81 @@ def create_app(settings: Settings | None = None, *, provider: LLMProvider | None
         records = _state(app)["repositories"].personal_models.list_preferences(DEFAULT_PROFILE_ID)
         return [_preference_response(item) for item in records]
 
+    @app.get("/v1/conversations", response_model=list[ConversationResponse])
+    def conversations() -> list[ConversationResponse]:
+        repositories = _state(app)["repositories"]
+        records: tuple[Conversation, ...] = repositories.conversations.list_for_profile(
+            DEFAULT_PROFILE_ID
+        )
+        return [
+            ConversationResponse(
+                id=conversation.id,
+                created_at=conversation.created_at,
+                updated_at=conversation.updated_at,
+                messages=[
+                    MessageResponse(
+                        id=message.id,
+                        role=message.role.value,
+                        content=message.content,
+                        provider_model=message.provider_model,
+                        created_at=message.created_at,
+                    )
+                    for message in repositories.messages.list_for_conversation(conversation.id)
+                ],
+            )
+            for conversation in records
+        ]
+
+    @app.get("/v1/decisions", response_model=list[DecisionHistoryResponse])
+    def decision_history() -> list[DecisionHistoryResponse]:
+        repositories = _state(app)["repositories"]
+        result = []
+        for decision, options in repositories.decisions.list_for_profile(DEFAULT_PROFILE_ID):
+            prediction = repositories.decisions.latest_prediction(decision.id)
+            resolution = repositories.decisions.get_resolution(decision.id)
+            support = []
+            if prediction is not None:
+                support = [
+                    item
+                    for evidence_id in prediction.supporting_evidence_ids
+                    if (item := repositories.evidence.get(evidence_id)) is not None
+                ]
+            result.append(
+                DecisionHistoryResponse(
+                    decision=_decision_response(decision, options),
+                    prediction=(
+                        None
+                        if prediction is None
+                        else _prediction_response(prediction, options, support)
+                    ),
+                    resolution=(
+                        None if resolution is None else _stored_resolution_response(resolution)
+                    ),
+                )
+            )
+        return result
+
     @app.get("/v1/evidence/{evidence_id}", response_model=EvidenceResponse)
     def evidence_by_id(evidence_id: str) -> EvidenceResponse:
         evidence = _state(app)["repositories"].evidence.get(evidence_id)
         if evidence is None or evidence.profile_id != DEFAULT_PROFILE_ID:
             raise HTTPException(status_code=404, detail="Evidence was not found.")
         return _evidence_response(evidence)
+
+    @app.delete("/v1/evidence/{evidence_id}", response_model=EvidenceDeletionResponse)
+    def delete_evidence(evidence_id: str) -> EvidenceDeletionResponse:
+        repositories = _state(app)["repositories"]
+        evidence = repositories.evidence.get(evidence_id)
+        if evidence is None or evidence.profile_id != DEFAULT_PROFILE_ID:
+            raise HTTPException(status_code=404, detail="Evidence was not found.")
+        if not repositories.evidence.remove(evidence_id):
+            raise HTTPException(status_code=404, detail="Evidence was not found.")
+        snapshot = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
+            DEFAULT_PROFILE_ID, datetime.now(UTC)
+        )
+        return EvidenceDeletionResponse(
+            removed_evidence_id=evidence_id, snapshot_version=snapshot.version
+        )
 
     @app.get("/v1/preferences/{key}/evidence", response_model=list[EvidenceResponse])
     def preference_evidence(key: str) -> list[EvidenceResponse]:

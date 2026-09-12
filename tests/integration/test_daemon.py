@@ -139,6 +139,62 @@ def test_preference_correction_validates_external_input(tmp_path: Path) -> None:
         assert response.status_code == 422
 
 
+def test_desktop_model_flow_lists_and_deletes_evidence(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path / "owner-data")
+    with TestClient(create_app(settings)) as client:
+        correction = client.post(
+            "/v1/preferences/corrections",
+            json={"target_key": "work.remote", "value": 0.75},
+        )
+        evidence_id = correction.json()["evidence"]["id"]
+
+        deleted = client.delete(f"/v1/evidence/{evidence_id}")
+
+        assert deleted.status_code == 200
+        assert deleted.json() == {
+            "removed_evidence_id": evidence_id,
+            "snapshot_version": 2,
+        }
+        assert client.get("/v1/preferences").json() == []
+        assert client.get(f"/v1/evidence/{evidence_id}").status_code == 404
+        assert client.delete(f"/v1/evidence/{evidence_id}").status_code == 404
+
+
+def test_desktop_history_endpoints_return_local_owner_records(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path / "owner-data")
+    provider = FakeLLMProvider(
+        responses=["Synthetic response"],
+        structured_responses=[{"facts": [], "preferences": [], "goals": [], "constraints": []}],
+    )
+    with TestClient(create_app(settings, provider=provider)) as client:
+        chat = client.post("/v1/chat", json={"content": "Synthetic message"})
+        decision = client.post("/v1/decisions", json=_decision_payload())
+        decision_id = decision.json()["id"]
+        prediction = client.post(f"/v1/decisions/{decision_id}/predict")
+        chosen_option_id = decision.json()["options"][0]["id"]
+        resolution = client.post(
+            f"/v1/decisions/{decision_id}/resolve",
+            json={"chosen_option_id": chosen_option_id},
+        )
+
+        conversations = client.get("/v1/conversations")
+        decisions = client.get("/v1/decisions")
+
+        assert chat.status_code == 200
+        assert decision.status_code == prediction.status_code == 201
+        assert resolution.status_code == 201
+        assert conversations.status_code == 200
+        assert [message["role"] for message in conversations.json()[0]["messages"]] == [
+            "user",
+            "assistant",
+        ]
+        assert decisions.status_code == 200
+        history = decisions.json()[0]
+        assert history["decision"]["id"] == decision_id
+        assert history["prediction"]["decision_id"] == decision_id
+        assert history["resolution"]["chosen_option_id"] == chosen_option_id
+
+
 def test_installed_cli_status_doctor_and_restart(tmp_path: Path) -> None:
     executable = shutil.which("decision-twin")
     assert executable is not None

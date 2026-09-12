@@ -4,6 +4,14 @@
 
 ### Added
 
+- Phase 6 installable Tauri 2 desktop product with a React/TypeScript interface for
+  Chat, Decide, My Model, Decision History, and Settings.
+- Target-specific PyInstaller daemon sidecar builds, native lifecycle and health
+  management, bounded logs, and macOS/Windows/Linux installer CI jobs.
+- Desktop Ollama and OpenAI-compatible provider setup, OS credential-store secret
+  handling, and strict-local, hybrid, and offline privacy controls.
+- Conversation and decision history API reads plus evidence deletion with a
+  deterministic Personal Model rebuild.
 - Phase 5 synthetic decision benchmark and offline `decision-twin evaluate`
   command with reproducible random, frozen LLM-only, memory-only, Personal Model,
   and Decision Model comparisons.
@@ -56,5 +64,6 @@
   hooks, Conventional Commit and branch validation, CI enforcement, issue/PR
   templates, security guidance, and documented GitHub ruleset settings.
 
-No embeddings, real-provider evaluation, Advise Me, desktop/mobile clients, MCP
-integration, or later-phase features have been implemented.
+No embeddings, real-provider evaluation, Advise Me, mobile/web clients, secure
+pairing, MCP integration, signing/notarization, automatic updates, or later-phase
+features have been implemented.

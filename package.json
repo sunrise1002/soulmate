@@ -5,15 +5,16 @@
   "packageManager": "pnpm@11.21.0",
   "engines": { "node": ">=24 <25" },
   "scripts": {
-    "lint": "uv run --locked ruff check .",
-    "format": "uv run --locked ruff format .",
-    "format:check": "uv run --locked ruff format --check .",
-    "typecheck": "uv run --locked mypy",
-    "test": "uv run --locked pytest",
+    "lint": "uv run --locked ruff check . && pnpm --filter @soulmate/desktop lint && pnpm --filter @soulmate/desktop rust:lint",
+    "format": "uv run --locked ruff format . && pnpm --filter @soulmate/desktop format && pnpm --filter @soulmate/desktop rust:format",
+    "format:check": "uv run --locked ruff format --check . && pnpm --filter @soulmate/desktop format:check && pnpm --filter @soulmate/desktop rust:format:check",
+    "typecheck": "uv run --locked mypy && pnpm --filter @soulmate/desktop typecheck",
+    "test": "uv run --locked pytest && pnpm --filter @soulmate/desktop test && pnpm --filter @soulmate/desktop rust:test",
     "build:python": "uv build --all-packages",
     "hooks:check": "uv run --locked pre-commit run --all-files",
     "lockfile:check": "uv lock --check && pnpm install --frozen-lockfile --lockfile-only",
     "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test",
-    "check:all": "pnpm lockfile:check && pnpm check && pnpm hooks:check && pnpm build:python"
+    "build:desktop": "pnpm --filter @soulmate/desktop build",
+    "check:all": "pnpm lockfile:check && pnpm check && pnpm hooks:check && pnpm build:python && pnpm build:desktop"
   }
 }

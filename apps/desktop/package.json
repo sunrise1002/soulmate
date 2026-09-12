@@ -1,0 +1,46 @@
+{
+  "name": "@soulmate/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
+    "build": "tsc -b && vite build",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "sidecar:build": "uv run --locked python ../../scripts/build_desktop_sidecar.py",
+    "sidecar:ensure": "uv run --locked python ../../scripts/build_desktop_sidecar.py --if-missing",
+    "rust:format": "cargo fmt --manifest-path src-tauri/Cargo.toml",
+    "rust:format:check": "cargo fmt --manifest-path src-tauri/Cargo.toml -- --check",
+    "rust:lint": "pnpm sidecar:ensure && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
+    "rust:test": "pnpm sidecar:ensure && cargo test --manifest-path src-tauri/Cargo.toml",
+    "check": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm rust:format:check && pnpm rust:lint && pnpm rust:test",
+    "tauri": "tauri"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "2.11.1",
+    "lucide-react": "1.45.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "@testing-library/react": "16.3.3",
+    "@eslint/js": "9.39.1",
+    "@types/node": "24.13.4",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "@vitest/expect": "5.0.0",
+    "eslint": "9.39.1",
+    "jsdom": "30.0.1",
+    "prettier": "3.9.6",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.70.0",
+    "vite": "8.3.0",
+    "vitest": "5.0.0"
+  }
+}

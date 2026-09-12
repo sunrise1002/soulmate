@@ -1,6 +1,6 @@
 # ADR-007: Desktop daemon model
 
-Status: Accepted for architecture; desktop implementation starts in Phase 6.
+Status: Implemented in Phase 6.
 
 ## Context
 
@@ -9,13 +9,18 @@ database service; multiple clients should share one model (sections 37–44).
 
 ## Decision
 
-Run the kernel in a local Python daemon. Eventually package it as a platform-specific
-sidecar managed by a Tauri 2 desktop shell with React/TypeScript UI. Mobile and web
-remain clients of the same service. Begin with a development CLI and loopback
-binding; secure LAN pairing arrives in Phase 7.
+Run the kernel in a local Python daemon. Package it as a platform-specific
+PyInstaller sidecar managed by a Tauri 2 desktop shell with a React/TypeScript UI.
+The shell starts and stops the daemon, polls health, retains a bounded log tail,
+stores provider secrets in the operating system credential store, and proxies a
+fixed loopback API surface to the webview. Mobile and web remain clients of the
+same service. Secure LAN pairing remains deferred to Phase 7.
 
 ## Consequences
 
-Daemon lifecycle, packaging, updates, and compatibility need platform tests in
-later phases. Client scaffolds remain placeholders until the kernel and Decision
-MVP have a working testable loop. No Tauri or mobile dependencies are needed yet.
+The release pipeline must build the sidecar and installer natively on macOS,
+Windows, and Linux because PyInstaller is not a cross-compiler. Signing,
+notarization, updates, and broad platform compatibility testing require later
+release work. The loopback proxy and provider URL validation are part of the
+desktop trust boundary and must remain narrow. Mobile dependencies are still not
+needed.

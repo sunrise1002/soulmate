@@ -8,8 +8,9 @@ verification, limitations, and handoff state inform the plan.
 
 ## Environment
 
-Use Python 3.12 via `uv`, Node.js 24, and pnpm 11.21.0. Install dependencies and the
-local Git hook using the README commands. Both lockfiles belong in Git. Prefer
+Use Python 3.12 via `uv`, Node.js 24, pnpm 11.21.0, and Rust 1.88 or later. Install
+`rustfmt` and `clippy` through rustup. Install dependencies and the local Git hook
+using the README commands. Python, pnpm, and desktop Cargo lockfiles belong in Git. Prefer
 `uv add --package <name> <dependency>` for Python changes and `pnpm --filter <name>
 add <dependency>` once client packages exist. Review lockfile changes.
 
@@ -24,16 +25,18 @@ uv run --locked mypy
 uv run --locked pytest
 uv build --all-packages
 pnpm install --frozen-lockfile
+pnpm --filter @soulmate/desktop check
 ```
 
-`pnpm check` wraps the first four checks. Format Python with
-`uv run --locked ruff format .`. The pre-commit hook uses the same locked tools;
-`uv` must be available on the PATH inherited by Git and your editor.
+Root `pnpm check` wraps Python, frontend, and native desktop checks. Format the
+workspace with `pnpm format`. The pre-commit hook uses the same locked Python
+tools; `uv` must be available on the PATH inherited by Git and your editor.
 
 Unit tests must avoid network and real LLMs. Integration tests currently start a
 temporary loopback daemon and clean it up. Use synthetic data and temporary
 directories. Add relevant migration/restart tests when persistence is introduced.
-Evaluation and client test tooling will be added with their owning phases.
+Desktop tests must mock the Tauri IPC boundary. Native platform packaging runs in
+the operating-system CI matrix because sidecars and installers are target-specific.
 
 ## Changes and review
 
@@ -47,5 +50,5 @@ significant architecture decision. Every feature requires implementation, useful
 tests, error handling, documentation, and consideration of data ownership and
 privacy; test restart persistence wherever relevant.
 
-Do not advance to the next phase automatically. Phase 3 requires explicit user
-authorization after the Phase 2 report.
+Do not advance to the next phase automatically. Phase 7 requires explicit user
+authorization after the Phase 6 report.

@@ -172,6 +172,18 @@ class SqliteConversationRepository:
                 return None
             return Conversation(row.id, row.profile_id, _utc(row.created_at), _utc(row.updated_at))
 
+    def list_for_profile(self, profile_id: str) -> tuple[Conversation, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(ConversationRow)
+                .where(ConversationRow.profile_id == profile_id)
+                .order_by(ConversationRow.updated_at.desc(), ConversationRow.id.desc())
+            )
+            return tuple(
+                Conversation(row.id, row.profile_id, _utc(row.created_at), _utc(row.updated_at))
+                for row in rows
+            )
+
     def touch(self, conversation_id: str, updated_at: datetime) -> None:
         with self._sessions.begin() as session:
             updated_id = session.execute(
@@ -271,6 +283,30 @@ class SqliteDecisionRepository:
             return self._event_to_domain(row), tuple(
                 self._option_to_domain(item) for item in options
             )
+
+    def list_for_profile(
+        self, profile_id: str
+    ) -> tuple[tuple[DecisionEvent, tuple[DecisionOption, ...]], ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(DecisionEventRow)
+                .where(DecisionEventRow.profile_id == profile_id)
+                .order_by(DecisionEventRow.created_at.desc(), DecisionEventRow.id.desc())
+            )
+            result = []
+            for row in rows:
+                options = session.scalars(
+                    select(DecisionOptionRow)
+                    .where(DecisionOptionRow.decision_id == row.id)
+                    .order_by(DecisionOptionRow.id)
+                )
+                result.append(
+                    (
+                        self._event_to_domain(row),
+                        tuple(self._option_to_domain(item) for item in options),
+                    )
+                )
+            return tuple(result)
 
     def list_resolved(
         self, profile_id: str

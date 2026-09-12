@@ -17,6 +17,10 @@ node_modules/
 .pnpm-store/
 target/
 .expo/
+apps/desktop/src-tauri/binaries/decision-twin-*
+apps/desktop/src-tauri/gen/
+apps/desktop/src-tauri/icons/android/
+apps/desktop/src-tauri/icons/ios/
 
 # Local owner data and secrets
 /config.toml

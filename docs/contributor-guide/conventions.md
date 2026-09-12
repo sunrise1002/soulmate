@@ -46,9 +46,10 @@ contract. Use immutable values for domain records where practical. Avoid boolean
 parameters that obscure intent, wildcard imports, hidden I/O, bare `except`, and
 mutable default arguments.
 
-Use the strict `tsconfig.base.json` when client packages are introduced. Add their
-compiler, linter, formatter, and tests with actual TypeScript source. Phase 0 has
-no TypeScript implementation to compile.
+Client packages use strict TypeScript configurations and include their compiler,
+linter, formatter, and tests with actual source. Native desktop code uses Rust
+formatting, Clippy with warnings denied, and offline unit tests. Keep webview IPC
+typed and narrow; never expose arbitrary filesystem, shell, or network access.
 
 ## Data and algorithms
 

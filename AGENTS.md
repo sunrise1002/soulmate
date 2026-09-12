@@ -21,10 +21,9 @@ data merely to satisfy this code convention.
 
 ## Phase boundary
 
-Phase 2 evidence and Personal Model foundation is complete locally. Phase 3 is not
-authorized; do not implement conversation or evidence extraction until the user
-explicitly requests it. Remote CI verification for completed phases remains
-unconfirmed.
+Phase 6 desktop product is complete locally. Phase 7 is not authorized; do not
+implement mobile/web clients or secure pairing until the user explicitly requests
+it. Remote CI verification for completed phases remains unconfirmed.
 For every later phase, follow specification section 74: plan only the current
 phase, implement small increments, validate, update documentation and phase status,
 then stop unless the user has authorized continuation. Explicit user instructions

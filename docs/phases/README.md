@@ -17,3 +17,13 @@ Before starting a phase, contributors and AI agents must:
 
 Never mark remote CI as passed based on local checks. Never start the next phase
 without explicit authorization.
+
+Available reports:
+
+- [Phase 0](phase-0-report.md)
+- [Phase 1](phase-1-report.md)
+- [Phase 2](phase-2-report.md)
+- [Phase 3](phase-3-report.md)
+- [Phase 4](phase-4-report.md)
+- [Phase 5](phase-5-report.md)
+- [Phase 6](phase-6-report.md)
