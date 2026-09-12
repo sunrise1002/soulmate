@@ -24,11 +24,15 @@ from soulmate_core.domain.models import (
     Conversation,
     DecisionAdvice,
     DecisionEvent,
+    DecisionImpact,
     DecisionOption,
     DecisionOutcome,
     DecisionPrediction,
     DecisionResolution,
     DecisionStatus,
+    DelegationPolicy,
+    DelegationRequest,
+    DelegationStatus,
     DerivedModel,
     Evidence,
     EvidenceTargetType,
@@ -68,6 +72,8 @@ from soulmate_storage_sqlite.schema import (
     DecisionOutcomeRow,
     DecisionPredictionRow,
     DecisionResolutionRow,
+    DelegationPolicyRow,
+    DelegationRequestRow,
     EvidenceRevisionRow,
     EvidenceRow,
     FactRow,
@@ -1662,6 +1668,208 @@ class SqliteApiCredentialRepository:
         )
 
 
+class SqliteDelegationPolicyRepository:
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def upsert(self, policy: DelegationPolicy) -> DelegationPolicy:
+        with self._sessions.begin() as session:
+            row = session.scalar(
+                select(DelegationPolicyRow).where(
+                    DelegationPolicyRow.profile_id == policy.profile_id,
+                    DelegationPolicyRow.service_identity_id == policy.service_identity_id,
+                    DelegationPolicyRow.action_type == policy.action_type,
+                )
+            )
+            if row is None:
+                row = DelegationPolicyRow(
+                    id=policy.id,
+                    profile_id=policy.profile_id,
+                    service_identity_id=policy.service_identity_id,
+                    action_type=policy.action_type,
+                    impact=policy.impact.value,
+                    minimum_confidence=policy.minimum_confidence,
+                    allow_automatic=policy.allow_automatic,
+                    created_at=policy.created_at,
+                    updated_at=policy.updated_at,
+                )
+                session.add(row)
+            else:
+                row.impact = policy.impact.value
+                row.minimum_confidence = policy.minimum_confidence
+                row.allow_automatic = policy.allow_automatic
+                row.updated_at = policy.updated_at
+            session.flush()
+            return self._to_domain(row)
+
+    def get(self, policy_id: str) -> DelegationPolicy | None:
+        with self._sessions() as session:
+            row = session.get(DelegationPolicyRow, policy_id)
+            return None if row is None else self._to_domain(row)
+
+    def get_for_action(
+        self, profile_id: str, service_identity_id: str, action_type: str
+    ) -> DelegationPolicy | None:
+        with self._sessions() as session:
+            row = session.scalar(
+                select(DelegationPolicyRow).where(
+                    DelegationPolicyRow.profile_id == profile_id,
+                    DelegationPolicyRow.service_identity_id == service_identity_id,
+                    DelegationPolicyRow.action_type == action_type,
+                )
+            )
+            return None if row is None else self._to_domain(row)
+
+    def list_for_profile(self, profile_id: str) -> tuple[DelegationPolicy, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(DelegationPolicyRow)
+                .where(DelegationPolicyRow.profile_id == profile_id)
+                .order_by(DelegationPolicyRow.created_at.desc(), DelegationPolicyRow.id.desc())
+            )
+            return tuple(self._to_domain(row) for row in rows)
+
+    def remove(self, profile_id: str, policy_id: str) -> bool:
+        with self._sessions.begin() as session:
+            removed_id = session.execute(
+                delete(DelegationPolicyRow)
+                .where(
+                    DelegationPolicyRow.id == policy_id,
+                    DelegationPolicyRow.profile_id == profile_id,
+                )
+                .returning(DelegationPolicyRow.id)
+            ).scalar_one_or_none()
+            return removed_id is not None
+
+    @staticmethod
+    def _to_domain(row: DelegationPolicyRow) -> DelegationPolicy:
+        return DelegationPolicy(
+            id=row.id,
+            profile_id=row.profile_id,
+            service_identity_id=row.service_identity_id,
+            action_type=row.action_type,
+            impact=DecisionImpact(row.impact),
+            minimum_confidence=row.minimum_confidence,
+            allow_automatic=row.allow_automatic,
+            created_at=_utc(row.created_at),
+            updated_at=_utc(row.updated_at),
+        )
+
+
+class SqliteDelegationRequestRepository:
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def add(self, request: DelegationRequest) -> None:
+        with self._sessions.begin() as session:
+            session.add(
+                DelegationRequestRow(
+                    id=request.id,
+                    profile_id=request.profile_id,
+                    service_identity_id=request.service_identity_id,
+                    policy_id=request.policy_id,
+                    decision_id=request.decision_id,
+                    prediction_id=request.prediction_id,
+                    external_request_id=request.external_request_id,
+                    action_type=request.action_type,
+                    action_label=request.action_label,
+                    impact=request.impact.value,
+                    predicted_option_id=request.predicted_option_id,
+                    prediction_confidence=request.prediction_confidence,
+                    status=request.status.value,
+                    reason_code=request.reason_code,
+                    requested_at=request.requested_at,
+                    expires_at=request.expires_at,
+                    reviewed_at=request.reviewed_at,
+                    completed_at=request.completed_at,
+                    expired_at=request.expired_at,
+                )
+            )
+
+    def get(self, request_id: str) -> DelegationRequest | None:
+        with self._sessions() as session:
+            row = session.get(DelegationRequestRow, request_id)
+            return None if row is None else self._to_domain(row)
+
+    def get_by_external_request(
+        self, service_identity_id: str, external_request_id: str
+    ) -> DelegationRequest | None:
+        with self._sessions() as session:
+            row = session.scalar(
+                select(DelegationRequestRow).where(
+                    DelegationRequestRow.service_identity_id == service_identity_id,
+                    DelegationRequestRow.external_request_id == external_request_id,
+                )
+            )
+            return None if row is None else self._to_domain(row)
+
+    def list_for_profile(self, profile_id: str) -> tuple[DelegationRequest, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(DelegationRequestRow)
+                .where(DelegationRequestRow.profile_id == profile_id)
+                .order_by(
+                    DelegationRequestRow.requested_at.desc(),
+                    DelegationRequestRow.id.desc(),
+                )
+            )
+            return tuple(self._to_domain(row) for row in rows)
+
+    def transition(
+        self,
+        request_id: str,
+        expected_status: DelegationStatus,
+        status: DelegationStatus,
+        reason_code: str,
+        changed_at: datetime,
+    ) -> bool:
+        values: dict[str, object] = {
+            "status": status.value,
+            "reason_code": reason_code,
+        }
+        if status in (DelegationStatus.APPROVED, DelegationStatus.REJECTED):
+            values["reviewed_at"] = changed_at
+        if status is DelegationStatus.COMPLETED:
+            values["completed_at"] = changed_at
+        if status is DelegationStatus.EXPIRED:
+            values["expired_at"] = changed_at
+        with self._sessions.begin() as session:
+            changed = session.execute(
+                update(DelegationRequestRow)
+                .where(
+                    DelegationRequestRow.id == request_id,
+                    DelegationRequestRow.status == expected_status.value,
+                )
+                .values(**values)
+                .returning(DelegationRequestRow.id)
+            ).scalar_one_or_none()
+            return changed is not None
+
+    @staticmethod
+    def _to_domain(row: DelegationRequestRow) -> DelegationRequest:
+        return DelegationRequest(
+            id=row.id,
+            profile_id=row.profile_id,
+            service_identity_id=row.service_identity_id,
+            policy_id=row.policy_id,
+            decision_id=row.decision_id,
+            prediction_id=row.prediction_id,
+            external_request_id=row.external_request_id,
+            action_type=row.action_type,
+            action_label=row.action_label,
+            impact=DecisionImpact(row.impact),
+            predicted_option_id=row.predicted_option_id,
+            prediction_confidence=row.prediction_confidence,
+            status=DelegationStatus(row.status),
+            reason_code=row.reason_code,
+            requested_at=_utc(row.requested_at),
+            expires_at=_utc(row.expires_at),
+            reviewed_at=None if row.reviewed_at is None else _utc(row.reviewed_at),
+            completed_at=None if row.completed_at is None else _utc(row.completed_at),
+            expired_at=None if row.expired_at is None else _utc(row.expired_at),
+        )
+
+
 class SqliteConnectorRegistrationRepository:
     """Persist connector consent, cursors, idempotency keys, and source provenance."""
 
@@ -1963,5 +2171,7 @@ class Repositories:
         self.paired_devices = SqlitePairedDeviceRepository(sessions)
         self.service_identities = SqliteServiceIdentityRepository(sessions)
         self.api_credentials = SqliteApiCredentialRepository(sessions)
+        self.delegation_policies = SqliteDelegationPolicyRepository(sessions)
+        self.delegation_requests = SqliteDelegationRequestRepository(sessions)
         self.connector_registrations = SqliteConnectorRegistrationRepository(sessions)
         self.system_metadata = SqliteSystemMetadataRepository(sessions)

@@ -3,9 +3,9 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 11 Connector Ecosystem is implemented locally.
+**Current status:** Phase 12 Delegated Decision Agent is implemented locally.
 See the [phase status](docs/phase-status.md) and detailed
-[Phase 11 report](docs/phases/phase-11-report.md).
+[Phase 12 report](docs/phases/phase-12-report.md).
 
 ## Development setup
 
@@ -175,6 +175,23 @@ derivative Evidence before rebuilding the Personal Model. Installed connector
 packages are trusted owner-selected code; see ADR-012 before installing third-party
 plugins.
 
+Phase 12 adds a separate deterministic Policy Engine. The owner grants an external
+identity the `agent:delegate` scope and creates a policy for one exact action type.
+The policy assigns impact and a confidence threshold; impact is never accepted
+from the agent. Low-impact automatic approval requires at least 0.90 confidence,
+medium impact requires at least 0.95, and high or safety-critical actions always
+require confirmation. Every request uses the latest persisted prediction from the
+current Personal Model snapshot, has a per-agent idempotency key, expires after 24
+hours, and survives restart.
+
+Owner routes are `GET/POST /v1/delegation-policies`,
+`DELETE /v1/delegation-policies/{id}`, `GET /v1/delegation-requests`, and
+`POST /v1/delegation-requests/{id}/approve|reject`. Scoped agents use
+`POST /v1/external/delegation-requests`,
+`GET /v1/external/delegation-requests/{id}`, and
+`POST /v1/external/delegation-requests/{id}/complete`. Soulmate returns authority
+and the predicted option but never performs the external side effect.
+
 Run the stdio MCP adapter through the daemon executable:
 
 ```sh
@@ -182,10 +199,11 @@ SOULMATE_API_KEY='<key-shown-once>' uv run --locked decision-twin mcp
 ```
 
 Set `SOULMATE_BASE_URL` only when the daemon does not use the default
-`http://127.0.0.1:7432`. The six tools are `predict_choice`, `rank_options`,
+`http://127.0.0.1:7432`. The nine tools are `predict_choice`, `rank_options`,
 `get_preference_summary`, `find_similar_decisions`, `record_decision`, and
-`record_outcome`. Grant the corresponding scopes in the desktop UI. Every tool
-call passes the same authorization boundary and application services as REST.
+`record_outcome`, plus `request_delegation`, `get_delegation`, and
+`complete_delegation`. Grant the corresponding scopes in the desktop UI. Every
+tool call passes the same authorization boundary and application services as REST.
 
 Phase 10 owner-only routes are `GET /v1/data/sources`,
 `POST /v1/data/imports`, `DELETE /v1/data/sources/{id}`,

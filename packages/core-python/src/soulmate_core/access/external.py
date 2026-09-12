@@ -18,6 +18,7 @@ API_KEY_PREFIX = "sk_soulmate"
 API_KEY_SEPARATOR = "."
 API_KEY_SECRET_BYTES = 32
 
+AGENT_DELEGATE = "agent:delegate"
 MODEL_SUMMARY_READ = "model:summary:read"
 DECISION_PREDICT = "decision:predict"
 DECISION_RECORD = "decision:record"
@@ -25,6 +26,7 @@ OUTCOME_RECORD = "outcome:record"
 PREFERENCE_SUMMARY_READ = "preference:summary:read"
 
 SERVICE_SCOPES = (
+    AGENT_DELEGATE,
     DECISION_PREDICT,
     DECISION_RECORD,
     MODEL_SUMMARY_READ,

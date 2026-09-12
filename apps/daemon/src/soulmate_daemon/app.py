@@ -44,6 +44,7 @@ from soulmate_daemon.connectors import CONNECTOR_SYNC_JOB, ConnectorService
 from soulmate_daemon.conversation import ConversationService
 from soulmate_daemon.data_api import build_data_router
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
+from soulmate_daemon.delegation_api import build_delegation_router
 from soulmate_daemon.external_api import build_external_router
 from soulmate_daemon.jobs import DurableJobWorker
 from soulmate_daemon.network import (
@@ -1208,5 +1209,6 @@ def create_app(
     app.include_router(build_external_router(app))
     app.include_router(build_data_router(app))
     app.include_router(build_connector_router(app))
+    app.include_router(build_delegation_router(app))
     mount_web_client(app, resolved_settings.web_client_directory)
     return app

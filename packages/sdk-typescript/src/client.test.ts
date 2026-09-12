@@ -181,6 +181,14 @@ describe("SoulmateClient", () => {
     await client.findSimilarDecisions(decision);
     await client.recordExternalDecision(decision);
     await client.recordExternalOutcome("decision/1", 0.8, false);
+    await client.requestDelegation({
+      decision_id: "decision/1",
+      action_type: "calendar.respond",
+      action_label: "Respond to invitation",
+      external_request_id: "event-1",
+    });
+    await client.getDelegation("request/1");
+    await client.completeDelegation("request/1");
     await client.updateServiceIdentityScopes("service/1", ["decision:predict"]);
     await client.revokeApiCredential("service/1", "credential/1");
 
@@ -191,11 +199,53 @@ describe("SoulmateClient", () => {
       "http://127.0.0.1:7432/v1/external/find-similar-decisions",
       "http://127.0.0.1:7432/v1/external/record-decision",
       "http://127.0.0.1:7432/v1/external/record-outcome",
+      "http://127.0.0.1:7432/v1/external/delegation-requests",
+      "http://127.0.0.1:7432/v1/external/delegation-requests/request%2F1",
+      "http://127.0.0.1:7432/v1/external/delegation-requests/request%2F1/complete",
       "http://127.0.0.1:7432/v1/service-identities/service%2F1/scopes",
       "http://127.0.0.1:7432/v1/service-identities/service%2F1/credentials/credential%2F1",
     ]);
     expect(headersOf(calls[0] as Call).Authorization).toBe(
       "Bearer sk_soulmate.credential_1.secret",
+    );
+  });
+
+  it("exposes owner delegation policy and approval operations", async () => {
+    const { fetch, calls } = stub(200, {});
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      fetch,
+    });
+
+    await client.delegationPolicies();
+    await client.setDelegationPolicy(
+      "service/1",
+      "calendar.respond",
+      "low",
+      0.9,
+      true,
+    );
+    await client.removeDelegationPolicy("policy/1");
+    await client.delegationRequests();
+    await client.approveDelegation("request/1");
+    await client.rejectDelegation("request/2");
+
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://127.0.0.1:7432/v1/delegation-policies",
+      "http://127.0.0.1:7432/v1/delegation-policies",
+      "http://127.0.0.1:7432/v1/delegation-policies/policy%2F1",
+      "http://127.0.0.1:7432/v1/delegation-requests",
+      "http://127.0.0.1:7432/v1/delegation-requests/request%2F1/approve",
+      "http://127.0.0.1:7432/v1/delegation-requests/request%2F2/reject",
+    ]);
+    expect(calls[1]?.init?.body).toBe(
+      JSON.stringify({
+        service_identity_id: "service/1",
+        action_type: "calendar.respond",
+        impact: "low",
+        minimum_confidence: 0.9,
+        allow_automatic: true,
+      }),
     );
   });
 

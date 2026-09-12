@@ -1,4 +1,12 @@
-import { Bot, KeyRound, RefreshCw, ShieldCheck, Trash2 } from "lucide-react";
+import {
+  Bot,
+  Check,
+  KeyRound,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { SyntheticEvent } from "react";
 
@@ -7,6 +15,9 @@ import { apiRequest } from "../runtime.ts";
 import type {
   ApiCredential,
   AuditEvent,
+  DecisionImpact,
+  DelegationPolicy,
+  DelegationRequest,
   IssuedCredential,
   IssuedServiceIdentity,
   ServiceIdentity,
@@ -14,6 +25,7 @@ import type {
 import { formatDate } from "../utils.ts";
 
 const scopeLabels: Record<string, string> = {
+  "agent:delegate": "Request delegated actions",
   "decision:predict": "Predict and rank decisions",
   "decision:record": "Record decisions",
   "model:summary:read": "Read model summary",
@@ -27,22 +39,48 @@ export function ExternalAgentsScreen() {
   const [identities, setIdentities] = useState<ServiceIdentity[]>([]);
   const [scopes, setScopes] = useState<string[]>([]);
   const [audit, setAudit] = useState<AuditEvent[]>([]);
+  const [policies, setPolicies] = useState<DelegationPolicy[]>([]);
+  const [delegations, setDelegations] = useState<DelegationRequest[]>([]);
   const [name, setName] = useState("");
   const [selectedScopes, setSelectedScopes] = useState(defaultScopes);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [policyIdentity, setPolicyIdentity] = useState("");
+  const [actionType, setActionType] = useState("");
+  const [impact, setImpact] = useState<DecisionImpact>("low");
+  const [minimumConfidence, setMinimumConfidence] = useState(0.9);
+  const [allowAutomatic, setAllowAutomatic] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
-      const [availableScopes, currentIdentities, events] = await Promise.all([
+      const [
+        availableScopes,
+        currentIdentities,
+        events,
+        currentPolicies,
+        currentDelegations,
+      ] = await Promise.all([
         apiRequest<string[]>("GET", "/v1/service-identities/scopes"),
         apiRequest<ServiceIdentity[]>("GET", "/v1/service-identities"),
         apiRequest<AuditEvent[]>("GET", "/v1/audit/events"),
+        apiRequest<DelegationPolicy[]>("GET", "/v1/delegation-policies"),
+        apiRequest<DelegationRequest[]>("GET", "/v1/delegation-requests"),
       ]);
       setScopes(availableScopes);
       setIdentities(currentIdentities);
       setAudit(events);
+      setPolicies(currentPolicies);
+      setDelegations(currentDelegations);
+      setPolicyIdentity((current) => {
+        if (currentIdentities.some((item) => item.id === current))
+          return current;
+        return (
+          currentIdentities.find(
+            (item) => item.active && item.scopes.includes("agent:delegate"),
+          )?.id ?? ""
+        );
+      });
       setError(null);
     } catch (reason) {
       setError(
@@ -170,6 +208,72 @@ export function ExternalAgentsScreen() {
         reason instanceof Error
           ? reason.message
           : "The identity could not be revoked.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function savePolicy(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy || !policyIdentity || !actionType.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await apiRequest<DelegationPolicy>("POST", "/v1/delegation-policies", {
+        service_identity_id: policyIdentity,
+        action_type: actionType,
+        impact,
+        minimum_confidence: minimumConfidence,
+        allow_automatic: allowAutomatic,
+      });
+      setActionType("");
+      await load();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "The delegation policy could not be saved.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removePolicy(policyId: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await apiRequest<null>(
+        "DELETE",
+        `/v1/delegation-policies/${encodeURIComponent(policyId)}`,
+      );
+      await load();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "The delegation policy could not be removed.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reviewDelegation(requestId: string, approved: boolean) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await apiRequest<DelegationRequest>(
+        "POST",
+        `/v1/delegation-requests/${encodeURIComponent(requestId)}/${approved ? "approve" : "reject"}`,
+      );
+      await load();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "The delegation request could not be reviewed.",
       );
     } finally {
       setBusy(false);
@@ -335,6 +439,168 @@ export function ExternalAgentsScreen() {
           description="Create a separate, least-privilege identity for each MCP client or application."
         />
       )}
+
+      <form
+        className="card agent-create"
+        onSubmit={(event) => void savePolicy(event)}
+      >
+        <div>
+          <p className="section-label">Delegated actions</p>
+          <h2>Set an action policy</h2>
+          <p className="muted">
+            Impact is assigned here by the owner. High and safety-critical
+            actions always wait for confirmation.
+          </p>
+        </div>
+        <label>
+          <span>Agent</span>
+          <select
+            required
+            value={policyIdentity}
+            onChange={(event) => setPolicyIdentity(event.target.value)}
+          >
+            <option value="">Choose an agent</option>
+            {identities
+              .filter(
+                (identity) =>
+                  identity.active && identity.scopes.includes("agent:delegate"),
+              )
+              .map((identity) => (
+                <option key={identity.id} value={identity.id}>
+                  {identity.name}
+                </option>
+              ))}
+          </select>
+        </label>
+        <label>
+          <span>Action type</span>
+          <input
+            maxLength={200}
+            placeholder="calendar.invitation.respond"
+            required
+            value={actionType}
+            onChange={(event) => setActionType(event.target.value)}
+          />
+        </label>
+        <div className="policy-fields">
+          <label>
+            <span>Impact</span>
+            <select
+              value={impact}
+              onChange={(event) => {
+                const next = event.target.value as DecisionImpact;
+                setImpact(next);
+                setMinimumConfidence(
+                  next === "low" ? 0.9 : next === "medium" ? 0.95 : 1,
+                );
+                if (next === "high" || next === "safety_critical") {
+                  setAllowAutomatic(false);
+                }
+              }}
+            >
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+              <option value="safety_critical">Safety-critical</option>
+            </select>
+          </label>
+          <label>
+            <span>Minimum confidence</span>
+            <input
+              max={1}
+              min={impact === "low" ? 0.9 : impact === "medium" ? 0.95 : 1}
+              step={0.01}
+              type="number"
+              value={minimumConfidence}
+              onChange={(event) =>
+                setMinimumConfidence(Number(event.target.value))
+              }
+            />
+          </label>
+          <label className="scope-choice">
+            <input
+              checked={allowAutomatic}
+              disabled={impact === "high" || impact === "safety_critical"}
+              type="checkbox"
+              onChange={(event) => setAllowAutomatic(event.target.checked)}
+            />
+            <span>Allow automatic approval</span>
+          </label>
+        </div>
+        <button
+          className="primary-button"
+          disabled={busy || !policyIdentity || !actionType.trim()}
+          type="submit"
+        >
+          <ShieldCheck size={15} /> Save policy
+        </button>
+        {policies.length ? (
+          <div className="policy-list">
+            {policies.map((policy) => (
+              <div key={policy.id}>
+                <span>
+                  <strong>{policy.action_type}</strong> · {policy.impact} ·{" "}
+                  {Math.round(policy.minimum_confidence * 100)}%
+                </span>
+                <button
+                  className="text-button"
+                  disabled={busy}
+                  type="button"
+                  onClick={() => void removePolicy(policy.id)}
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </form>
+
+      <div className="card audit-card">
+        <p className="section-label">Approval workflow</p>
+        <h2>Delegation requests</h2>
+        {delegations.length ? (
+          <ul>
+            {delegations.map((delegation) => (
+              <li key={delegation.id}>
+                <span>
+                  <strong>{delegation.action_label}</strong> ·{" "}
+                  {delegation.impact} · {delegation.status}
+                </span>
+                {delegation.status === "pending" ? (
+                  <span className="approval-actions">
+                    <button
+                      className="text-button"
+                      disabled={busy}
+                      type="button"
+                      onClick={() => void reviewDelegation(delegation.id, true)}
+                    >
+                      <Check size={14} /> Approve
+                    </button>
+                    <button
+                      className="text-button danger"
+                      disabled={busy}
+                      type="button"
+                      onClick={() =>
+                        void reviewDelegation(delegation.id, false)
+                      }
+                    >
+                      <X size={14} /> Reject
+                    </button>
+                  </span>
+                ) : (
+                  <small>
+                    {Math.round(delegation.prediction_confidence * 100)}%
+                    confidence
+                  </small>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted">No delegated actions have been requested.</p>
+        )}
+      </div>
 
       <div className="card audit-card">
         <p className="section-label">Local audit log</p>

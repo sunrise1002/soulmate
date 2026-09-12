@@ -270,6 +270,47 @@ export interface ServiceIdentity {
   credentials: ApiCredential[];
 }
 
+export type DecisionImpact = "low" | "medium" | "high" | "safety_critical";
+
+export interface DelegationPolicy {
+  id: string;
+  service_identity_id: string;
+  action_type: string;
+  impact: DecisionImpact;
+  minimum_confidence: number;
+  allow_automatic: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DelegationRequest {
+  id: string;
+  service_identity_id: string;
+  policy_id: string | null;
+  decision_id: string;
+  prediction_id: string;
+  external_request_id: string;
+  action_type: string;
+  action_label: string;
+  impact: DecisionImpact;
+  predicted_option_id: string;
+  prediction_confidence: number;
+  status: "pending" | "approved" | "rejected" | "completed" | "expired";
+  reason_code: string;
+  requested_at: string;
+  expires_at: string;
+  reviewed_at: string | null;
+  completed_at: string | null;
+  expired_at: string | null;
+}
+
+export interface DelegationRequestInput {
+  decision_id: string;
+  action_type: string;
+  action_label: string;
+  external_request_id: string;
+}
+
 export interface IssuedServiceIdentity {
   identity: ServiceIdentity;
   api_key: string;

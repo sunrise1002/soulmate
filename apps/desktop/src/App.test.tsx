@@ -82,6 +82,12 @@ describe("desktop navigation", () => {
     expect(
       screen.getByRole("heading", { name: "External Agents" }),
     ).not.toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Set an action policy" }),
+    ).not.toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Delegation requests" }),
+    ).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Connections" }));
     expect(screen.getByRole("heading", { name: "Connections" })).not.toBeNull();

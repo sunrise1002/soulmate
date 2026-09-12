@@ -4,7 +4,7 @@ import io
 import json
 from collections.abc import Mapping
 
-from soulmate_mcp.server import McpServer, run_stdio
+from soulmate_mcp.server import McpServer, resolve_tool_request, run_stdio
 
 
 class FakeBackend:
@@ -16,7 +16,7 @@ class FakeBackend:
         return {"predicted_choice": "Quiet laptop", "model_snapshot_version": 4}
 
 
-def test_mcp_lists_the_six_scoped_tools() -> None:
+def test_mcp_lists_the_scoped_intelligence_and_delegation_tools() -> None:
     server = McpServer(FakeBackend())
 
     response = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
@@ -33,6 +33,9 @@ def test_mcp_lists_the_six_scoped_tools() -> None:
         "find_similar_decisions",
         "record_decision",
         "record_outcome",
+        "request_delegation",
+        "get_delegation",
+        "complete_delegation",
     }
 
 
@@ -57,6 +60,14 @@ def test_mcp_tool_call_returns_privacy_minimal_daemon_result() -> None:
     content = result["content"]
     assert isinstance(content, list)
     assert json.loads(content[0]["text"])["predicted_choice"] == "Quiet laptop"
+
+
+def test_delegation_tool_routes_encode_identifiers_without_forwarding_them() -> None:
+    method, path, body = resolve_tool_request("complete_delegation", {"request_id": "delegation/1"})
+
+    assert method == "POST"
+    assert path == "/v1/external/delegation-requests/delegation%2F1/complete"
+    assert body == {}
 
 
 def test_stdio_handles_initialize_notifications_and_parse_errors() -> None:

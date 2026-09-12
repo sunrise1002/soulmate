@@ -5,9 +5,9 @@ the previous phase before planning or implementing the current phase.
 
 ## Authorized scope
 
-Phase 11 — Connector Ecosystem is complete locally. Phase 12 is not authorized.
-Stop at the Phase 11 boundary until the user explicitly requests the
-next phase.
+Phase 12 — Delegated Decision Agent is complete locally. No later product phase is
+defined or authorized. Stop at the Phase 12 boundary until the user explicitly
+defines and authorizes further scope.
 
 ## Reports
 
@@ -25,18 +25,21 @@ next phase.
 | Phase 9 | Complete locally | [Phase 9 report](phases/phase-9-report.md) | Remote CI, remote MCP transport, cross-platform packaged MCP smoke tests, and native mobile builds unverified |
 | Phase 10 | Complete locally | [Phase 10 report](phases/phase-10-report.md) | Remote CI, cross-platform restore, large archives, and native mobile builds unverified |
 | Phase 11 | Complete locally | [Phase 11 report](phases/phase-11-report.md) | Remote CI, plugin sandboxing/signing, scheduled sync, real service connectors, and cross-platform packaged discovery unverified |
+| Phase 12 | Complete locally | [Phase 12 report](phases/phase-12-report.md) | Remote CI, broad real-world confidence calibration, external action verification, notifications, and cross-platform packaged behavior unverified |
 
-## Phase 11 exit criteria
+## Phase 12 exit criteria
 
-Passed locally on macOS arm64. An independently packaged connector can be
-discovered, declare capabilities, receive explicit owner consent, synchronize
-idempotent source-linked RawEvents through a durable job, survive restart, and be
-removed together with derivative Evidence before a deterministic model rebuild.
+Passed locally on macOS arm64. An approved external identity can request a fresh
+prediction-bound action, receive automatic authority only inside exact owner-set
+low/medium impact and confidence limits, wait for owner confirmation otherwise,
+and complete one durable authorization without receiving raw Personal Model data.
 
 ## Next action
 
-Wait for explicit Phase 12 authorization. Before planning it, read the complete
-[Phase 11 report](phases/phase-11-report.md) and inspect current repository state.
+Do not infer a Phase 13. Any further autonomous execution, notifications, policy
+language, or safety-critical behavior requires newly specified and explicitly
+authorized scope. Before planning it, read the complete
+[Phase 12 report](phases/phase-12-report.md) and inspect current repository state.
 
 ## Repository governance
 

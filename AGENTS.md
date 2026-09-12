@@ -21,10 +21,10 @@ data merely to satisfy this code convention.
 
 ## Phase boundary
 
-Phase 11 connector SDK, permissioned discovery, durable synchronization, local
-reference connector, and provenance deletion are complete locally. Phase 12 is not
-authorized; do not implement delegated decisions or a Policy Engine until the user
-explicitly requests it. Remote CI verification for completed phases remains
+Phase 12 delegated-action Policy Engine, owner impact classification, confidence
+thresholds, agent permissions, and durable approval workflow are complete locally.
+No later product phase is defined or authorized; require explicit user scope before
+continuing beyond Phase 12. Remote CI verification for completed phases remains
 unconfirmed.
 For every later phase, follow specification section 74: plan only the current
 phase, implement small increments, validate, update documentation and phase status,

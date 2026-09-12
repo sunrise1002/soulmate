@@ -15,6 +15,9 @@ from soulmate_core.domain.models import (
     DecisionOutcome,
     DecisionPrediction,
     DecisionResolution,
+    DelegationPolicy,
+    DelegationRequest,
+    DelegationStatus,
     DerivedModel,
     Evidence,
     Job,
@@ -229,6 +232,41 @@ class ApiCredentialRepository(Protocol):
     def touch(self, credential_id: str, last_used_at: datetime) -> None: ...
 
     def revoke(self, credential_id: str, revoked_at: datetime) -> bool: ...
+
+
+class DelegationPolicyRepository(Protocol):
+    def upsert(self, policy: DelegationPolicy) -> DelegationPolicy: ...
+
+    def get(self, policy_id: str) -> DelegationPolicy | None: ...
+
+    def get_for_action(
+        self, profile_id: str, service_identity_id: str, action_type: str
+    ) -> DelegationPolicy | None: ...
+
+    def list_for_profile(self, profile_id: str) -> tuple[DelegationPolicy, ...]: ...
+
+    def remove(self, profile_id: str, policy_id: str) -> bool: ...
+
+
+class DelegationRequestRepository(Protocol):
+    def add(self, request: DelegationRequest) -> None: ...
+
+    def get(self, request_id: str) -> DelegationRequest | None: ...
+
+    def get_by_external_request(
+        self, service_identity_id: str, external_request_id: str
+    ) -> DelegationRequest | None: ...
+
+    def list_for_profile(self, profile_id: str) -> tuple[DelegationRequest, ...]: ...
+
+    def transition(
+        self,
+        request_id: str,
+        expected_status: DelegationStatus,
+        status: DelegationStatus,
+        reason_code: str,
+        changed_at: datetime,
+    ) -> bool: ...
 
 
 class SystemMetadataRepository(Protocol):

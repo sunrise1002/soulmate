@@ -22,6 +22,9 @@ so neither can drift from the daemon contract.
 - Phase 11 connector methods expose installed permission manifests, registration,
   durable synchronization status, enable/disable controls, and provenance-safe
   removal. Connector management remains owner-only.
+- Phase 12 methods cover owner policy configuration and approval plus scoped agent
+  request, status, and completion operations. Impact comes from the stored owner
+  policy rather than external input.
 
 The transport is injectable, so callers can wrap it. The mobile client uses that
 to refuse any request that leaves the paired origin.

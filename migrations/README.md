@@ -16,7 +16,8 @@ normalized permission scopes, and hash-only API credentials. Phase 10 migration
 deletion. Phase 11 migration `0009_phase_11` adds connector registrations,
 permission/configuration snapshots, durable cursor and status state, and
 external-item idempotency keys. The daemon applies migrations automatically before
-serving requests or starting its worker.
+serving requests or starting its worker. Phase 12 migration `0010_phase_12` adds
+owner-defined delegation policies and durable, idempotent approval requests.
 
 Every subsequent persistent schema change requires a new versioned migration and
 upgrade/restart tests. Never edit an already released migration to represent a new

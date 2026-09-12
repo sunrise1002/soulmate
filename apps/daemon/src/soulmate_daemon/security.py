@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from soulmate_core.access import (
+    AGENT_DELEGATE,
     DECISION_PREDICT,
     DECISION_RECORD,
     MODEL_SUMMARY_READ,
@@ -49,6 +50,8 @@ OWNER_ONLY_RULES: tuple[tuple[str | None, str], ...] = (
     (None, "/v1/audit/events"),
     (None, "/v1/data"),
     (None, "/v1/connectors"),
+    (None, "/v1/delegation-policies"),
+    (None, "/v1/delegation-requests"),
 )
 
 PUBLIC_RULES: tuple[tuple[str | None, str], ...] = (
@@ -122,6 +125,11 @@ def path_requirement(method: str, path: str) -> Requirement:
 
 def external_scope(method: str, path: str) -> str | None:
     """Return the exact least-privilege scope for an external API operation."""
+    delegation_path = "/v1/external/delegation-requests"
+    if (method == "POST" and path == delegation_path) or (
+        method in ("GET", "POST") and path.startswith(f"{delegation_path}/")
+    ):
+        return AGENT_DELEGATE
     return next(
         (
             scope

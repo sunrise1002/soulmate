@@ -4,6 +4,15 @@
 
 ### Added
 
+- Phase 12 deterministic Policy Engine with owner-assigned low, medium, high, and
+  safety-critical impact classes, enforced confidence floors, current-snapshot
+  prediction binding, and 24-hour authorization expiry.
+- Separate `agent:delegate` permissions, per-agent and per-action policies,
+  idempotent durable delegation requests, mandatory owner confirmation for high
+  and safety-critical actions, and approve/reject/complete lifecycle auditing.
+- Owner and external delegation REST APIs, three MCP delegation tools, typed
+  TypeScript SDK methods, desktop policy and approval workflows, migration
+  `0010_phase_12`, and ADR-013.
 - Phase 11 dependency-free Python connector SDK with immutable manifests,
   validated RawEvent output, declared data/network/credential/learning
   permissions, and independently installable `soulmate.connectors` entry points.
@@ -123,7 +132,8 @@
   templates, security guidance, and documented GitHub ruleset settings.
 
 No embeddings, real-provider evaluation, remote MCP transport,
-signing/notarization, automatic updates, delegated decisions, plugin sandbox, or
-live third-party service connector has been implemented. Imported and connector
-sources are normalized locally but do not automatically invoke an LLM or create
-derived Evidence.
+signing/notarization, automatic updates, plugin sandbox, or live third-party
+service connector has been implemented. Delegation grants authorization but does
+not execute or verify third-party side effects. Imported and connector sources are
+normalized locally but do not automatically invoke an LLM or create derived
+Evidence.

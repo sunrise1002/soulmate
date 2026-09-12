@@ -53,6 +53,25 @@ class ActiveQuestionStatus(StrEnum):
     ANSWERED = "answered"
 
 
+class DecisionImpact(StrEnum):
+    """Owner-assigned impact class for a delegated action type."""
+
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
+    SAFETY_CRITICAL = "safety_critical"
+
+
+class DelegationStatus(StrEnum):
+    """Durable approval lifecycle for one external action request."""
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    COMPLETED = "completed"
+    EXPIRED = "expired"
+
+
 @dataclass(frozen=True, slots=True)
 class Profile:
     id: str
@@ -567,3 +586,74 @@ class ApiCredential:
     @property
     def is_active(self) -> bool:
         return self.revoked_at is None
+
+
+@dataclass(frozen=True, slots=True)
+class DelegationPolicy:
+    """Owner-approved boundary for one agent and action type."""
+
+    id: str
+    profile_id: str
+    service_identity_id: str
+    action_type: str
+    impact: DecisionImpact
+    minimum_confidence: float
+    allow_automatic: bool
+    created_at: datetime
+    updated_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at, self.updated_at)
+        if not self.action_type.strip():
+            raise ValueError("Delegation action type must not be empty.")
+        if not 0.0 <= self.minimum_confidence <= 1.0:
+            raise ValueError("Delegation confidence threshold must be between 0 and 1.")
+        if self.allow_automatic and self.impact in (
+            DecisionImpact.HIGH,
+            DecisionImpact.SAFETY_CRITICAL,
+        ):
+            raise ValueError(
+                "High-impact and safety-critical actions always require owner approval."
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class DelegationRequest:
+    """A prediction-bound authorization request from an external agent."""
+
+    id: str
+    profile_id: str
+    service_identity_id: str
+    policy_id: str | None
+    decision_id: str
+    prediction_id: str
+    external_request_id: str
+    action_type: str
+    action_label: str
+    impact: DecisionImpact
+    predicted_option_id: str
+    prediction_confidence: float
+    status: DelegationStatus
+    reason_code: str
+    requested_at: datetime
+    expires_at: datetime
+    reviewed_at: datetime | None = None
+    completed_at: datetime | None = None
+    expired_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(
+            self.requested_at,
+            self.expires_at,
+            self.reviewed_at,
+            self.completed_at,
+            self.expired_at,
+        )
+        if not self.external_request_id.strip() or not self.action_type.strip():
+            raise ValueError("Delegation request identifiers must not be empty.")
+        if not self.action_label.strip():
+            raise ValueError("Delegation action label must not be empty.")
+        if not 0.0 <= self.prediction_confidence <= 1.0:
+            raise ValueError("Delegation prediction confidence must be between 0 and 1.")
+        if self.expires_at <= self.requested_at:
+            raise ValueError("Delegation request must expire after it was created.")

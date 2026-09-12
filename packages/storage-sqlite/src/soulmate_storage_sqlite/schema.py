@@ -551,6 +551,94 @@ class ApiCredentialRow(Base):
     )
 
 
+class DelegationPolicyRow(Base):
+    __tablename__ = "delegation_policies"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    service_identity_id: Mapped[str] = mapped_column(
+        ForeignKey("service_identities.id", ondelete="CASCADE"), nullable=False
+    )
+    action_type: Mapped[str] = mapped_column(String, nullable=False)
+    impact: Mapped[str] = mapped_column(String, nullable=False)
+    minimum_confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    allow_automatic: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "impact IN ('low', 'medium', 'high', 'safety_critical')",
+            name="ck_delegation_policies_impact",
+        ),
+        CheckConstraint(
+            "minimum_confidence >= 0 AND minimum_confidence <= 1",
+            name="ck_delegation_policies_confidence",
+        ),
+        Index(
+            "ux_delegation_policies_identity_action",
+            "service_identity_id",
+            "action_type",
+            unique=True,
+        ),
+        Index("ix_delegation_policies_profile", "profile_id", "created_at", "id"),
+    )
+
+
+class DelegationRequestRow(Base):
+    __tablename__ = "delegation_requests"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    service_identity_id: Mapped[str] = mapped_column(
+        ForeignKey("service_identities.id", ondelete="CASCADE"), nullable=False
+    )
+    policy_id: Mapped[str | None] = mapped_column(
+        ForeignKey("delegation_policies.id", ondelete="SET NULL"), nullable=True
+    )
+    decision_id: Mapped[str] = mapped_column(String, nullable=False)
+    prediction_id: Mapped[str] = mapped_column(String, nullable=False)
+    external_request_id: Mapped[str] = mapped_column(String, nullable=False)
+    action_type: Mapped[str] = mapped_column(String, nullable=False)
+    action_label: Mapped[str] = mapped_column(Text, nullable=False)
+    impact: Mapped[str] = mapped_column(String, nullable=False)
+    predicted_option_id: Mapped[str] = mapped_column(String, nullable=False)
+    prediction_confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    reason_code: Mapped[str] = mapped_column(String, nullable=False)
+    requested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    expired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "impact IN ('low', 'medium', 'high', 'safety_critical')",
+            name="ck_delegation_requests_impact",
+        ),
+        CheckConstraint(
+            "prediction_confidence >= 0 AND prediction_confidence <= 1",
+            name="ck_delegation_requests_confidence",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected', 'completed', 'expired')",
+            name="ck_delegation_requests_status",
+        ),
+        Index(
+            "ux_delegation_requests_identity_external",
+            "service_identity_id",
+            "external_request_id",
+            unique=True,
+        ),
+        Index("ix_delegation_requests_profile_status", "profile_id", "status", "requested_at"),
+    )
+
+
 class ConnectorRegistrationRow(Base):
     __tablename__ = "connector_registrations"
 

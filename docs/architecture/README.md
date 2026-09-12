@@ -44,6 +44,10 @@ Phase 11 adds a separate dependency-free connector SDK, independently installed
 Python entry-point discovery, explicit owner consent, durable sync orchestration,
 and source-linked RawEvent ingestion. The SQLite adapter persists connector state,
 but the Personalization Kernel does not import the SDK or any plugin. See ADR-012.
+Phase 12 adds a deterministic Policy Engine to the kernel, owner-classified action
+policies, confidence floors, durable approval requests, and a separate
+`agent:delegate` scope. The daemon and desktop expose approval workflows while
+external side effects remain outside Soulmate. See ADR-013.
 
 ADRs below record decisions from specification section 65. Each ADR status states
 whether the decision is architectural only or already implemented.
@@ -62,3 +66,4 @@ whether the decision is architectural only or already implemented.
 | [010](decisions/ADR-010-behavioral-wellbeing.md) | Separate behavioral prediction from wellbeing advice |
 | [011](decisions/ADR-011-portable-archives.md) | Credential-free authenticated portable archives |
 | [012](decisions/ADR-012-connector-plugins.md) | Permissioned connector plugins outside the kernel |
+| [013](decisions/ADR-013-delegated-action-policy.md) | Prediction-bound delegated action policy |

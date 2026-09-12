@@ -169,7 +169,7 @@ def test_backup_restores_data_but_not_credentials_or_installation_identity(
     restored_repositories = Repositories(restored_database.sessions())
 
     assert created.encrypted is False
-    assert restored.schema_revision_after == "0009_phase_11"
+    assert restored.schema_revision_after == "0010_phase_12"
     assert restored.installation_id != original_installation
     assert restored_repositories.raw_events.get(event.id) == event
     assert restored_repositories.evidence.get("evidence_manual") is not None
@@ -228,7 +228,7 @@ def test_encrypted_export_authenticates_and_migrates_an_older_model(
     restored = restore_archive(target_settings, archive, "correct horse battery")
 
     assert restored.schema_revision_before == "0007_phase_9"
-    assert restored.schema_revision_after == "0009_phase_11"
+    assert restored.schema_revision_after == "0010_phase_12"
     with sqlite3.connect(target_settings.database_path) as connection:
         columns = {
             row[1] for row in connection.execute("PRAGMA table_info(conversations)").fetchall()

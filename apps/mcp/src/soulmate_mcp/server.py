@@ -6,6 +6,7 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Protocol, TextIO
+from urllib.parse import quote
 
 import httpx
 
@@ -46,6 +47,25 @@ DECISION_SCHEMA: dict[str, object] = {
             },
         },
     },
+}
+
+DELEGATION_REQUEST_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["decision_id", "action_type", "action_label", "external_request_id"],
+    "properties": {
+        "decision_id": {"type": "string", "minLength": 1},
+        "action_type": {"type": "string", "minLength": 1},
+        "action_label": {"type": "string", "minLength": 1},
+        "external_request_id": {"type": "string", "minLength": 1},
+    },
+}
+
+DELEGATION_ID_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["request_id"],
+    "properties": {"request_id": {"type": "string", "minLength": 1}},
 }
 
 TOOLS: tuple[dict[str, object], ...] = (
@@ -100,6 +120,24 @@ TOOLS: tuple[dict[str, object], ...] = (
             },
         },
     },
+    {
+        "name": "request_delegation",
+        "description": (
+            "Ask the owner-controlled Policy Engine whether a predicted action may proceed. "
+            "The result may be approved automatically or left pending owner confirmation."
+        ),
+        "inputSchema": DELEGATION_REQUEST_SCHEMA,
+    },
+    {
+        "name": "get_delegation",
+        "description": "Check the current approval state of this agent's delegation request.",
+        "inputSchema": DELEGATION_ID_SCHEMA,
+    },
+    {
+        "name": "complete_delegation",
+        "description": "Mark an approved delegated action as completed exactly once.",
+        "inputSchema": DELEGATION_ID_SCHEMA,
+    },
 )
 
 TOOL_ROUTES = {
@@ -109,6 +147,12 @@ TOOL_ROUTES = {
     "find_similar_decisions": ("POST", "/v1/external/find-similar-decisions"),
     "record_decision": ("POST", "/v1/external/record-decision"),
     "record_outcome": ("POST", "/v1/external/record-outcome"),
+    "request_delegation": ("POST", "/v1/external/delegation-requests"),
+    "get_delegation": ("GET", "/v1/external/delegation-requests/{request_id}"),
+    "complete_delegation": (
+        "POST",
+        "/v1/external/delegation-requests/{request_id}/complete",
+    ),
 }
 
 
@@ -124,6 +168,22 @@ class ToolBackend(Protocol):
     def call(self, tool_name: str, arguments: Mapping[str, object]) -> object: ...
 
 
+def resolve_tool_request(
+    tool_name: str, arguments: Mapping[str, object]
+) -> tuple[str, str, dict[str, object]]:
+    route = TOOL_ROUTES.get(tool_name)
+    if route is None:
+        raise McpProtocolError(-32602, f"Unknown tool: {tool_name}")
+    method, path = route
+    request_body = dict(arguments)
+    if "{request_id}" in path:
+        request_id = request_body.pop("request_id", None)
+        if not isinstance(request_id, str) or not request_id:
+            raise McpProtocolError(-32602, "A delegation request ID is required.")
+        path = path.format(request_id=quote(request_id, safe=""))
+    return method, path, request_body
+
+
 @dataclass(slots=True)
 class SoulmateApiClient:
     base_url: str
@@ -131,16 +191,13 @@ class SoulmateApiClient:
     timeout: float = 30.0
 
     def call(self, tool_name: str, arguments: Mapping[str, object]) -> object:
-        route = TOOL_ROUTES.get(tool_name)
-        if route is None:
-            raise McpProtocolError(-32602, f"Unknown tool: {tool_name}")
-        method, path = route
+        method, path, request_body = resolve_tool_request(tool_name, arguments)
         headers = {"Authorization": f"Bearer {self.api_key}", "Accept": "application/json"}
         with httpx.Client(base_url=self.base_url, headers=headers, timeout=self.timeout) as client:
             response = client.request(
                 method,
                 path,
-                json=dict(arguments) if method != "GET" else None,
+                json=request_body if method != "GET" and request_body else None,
             )
         try:
             payload: object = response.json()

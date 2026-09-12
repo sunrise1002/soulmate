@@ -1277,8 +1277,42 @@ select {
   font-weight: 600;
 }
 .agent-create input[type="text"],
-.agent-create > label input {
+.agent-create > label input,
+.agent-create select,
+.policy-fields input {
   padding: 10px 11px;
+}
+.policy-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.policy-fields > label:not(.scope-choice) {
+  display: grid;
+  gap: 7px;
+  color: #716d63;
+  font-size: 11px;
+  font-weight: 600;
+}
+.policy-list {
+  display: grid;
+  gap: 7px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.policy-list > div,
+.approval-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.approval-actions .text-button {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
 }
 .scope-grid {
   display: grid;

@@ -1,6 +1,7 @@
 """Device access control for owner-approved clients on other devices."""
 
 from soulmate_core.access.external import (
+    AGENT_DELEGATE,
     API_KEY_PREFIX,
     DECISION_PREDICT,
     DECISION_RECORD,
@@ -31,6 +32,7 @@ from soulmate_core.access.pairing import (
 )
 
 __all__ = [
+    "AGENT_DELEGATE",
     "API_KEY_PREFIX",
     "DECISION_PREDICT",
     "DECISION_RECORD",

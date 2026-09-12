@@ -13,6 +13,7 @@ import type {
   ConnectorSyncStatus,
   Conversation,
   Decision,
+  DecisionImpact,
   DataArchive,
   DataSource,
   DecisionAdvice,
@@ -20,6 +21,9 @@ import type {
   DecisionOptionInput,
   DecisionPrediction,
   DecisionOutcome,
+  DelegationPolicy,
+  DelegationRequest,
+  DelegationRequestInput,
   Evidence,
   ExternalDecision,
   ExternalDecisionInput,
@@ -370,6 +374,51 @@ export class SoulmateClient {
     );
   }
 
+  delegationPolicies(): Promise<DelegationPolicy[]> {
+    return this.request<DelegationPolicy[]>("GET", "/v1/delegation-policies");
+  }
+
+  setDelegationPolicy(
+    serviceIdentityId: string,
+    actionType: string,
+    impact: DecisionImpact,
+    minimumConfidence: number,
+    allowAutomatic: boolean,
+  ): Promise<DelegationPolicy> {
+    return this.request<DelegationPolicy>("POST", "/v1/delegation-policies", {
+      service_identity_id: serviceIdentityId,
+      action_type: actionType,
+      impact,
+      minimum_confidence: minimumConfidence,
+      allow_automatic: allowAutomatic,
+    });
+  }
+
+  removeDelegationPolicy(policyId: string): Promise<null> {
+    return this.request<null>(
+      "DELETE",
+      `/v1/delegation-policies/${encodeURIComponent(policyId)}`,
+    );
+  }
+
+  delegationRequests(): Promise<DelegationRequest[]> {
+    return this.request<DelegationRequest[]>("GET", "/v1/delegation-requests");
+  }
+
+  approveDelegation(requestId: string): Promise<DelegationRequest> {
+    return this.request<DelegationRequest>(
+      "POST",
+      `/v1/delegation-requests/${encodeURIComponent(requestId)}/approve`,
+    );
+  }
+
+  rejectDelegation(requestId: string): Promise<DelegationRequest> {
+    return this.request<DelegationRequest>(
+      "POST",
+      `/v1/delegation-requests/${encodeURIComponent(requestId)}/reject`,
+    );
+  }
+
   dataSources(): Promise<DataSource[]> {
     return this.request<DataSource[]>("GET", "/v1/data/sources");
   }
@@ -529,6 +578,28 @@ export class SoulmateClient {
         regret,
         notes: notes ?? null,
       },
+    );
+  }
+
+  requestDelegation(input: DelegationRequestInput): Promise<DelegationRequest> {
+    return this.request<DelegationRequest>(
+      "POST",
+      "/v1/external/delegation-requests",
+      input,
+    );
+  }
+
+  getDelegation(requestId: string): Promise<DelegationRequest> {
+    return this.request<DelegationRequest>(
+      "GET",
+      `/v1/external/delegation-requests/${encodeURIComponent(requestId)}`,
+    );
+  }
+
+  completeDelegation(requestId: string): Promise<DelegationRequest> {
+    return this.request<DelegationRequest>(
+      "POST",
+      `/v1/external/delegation-requests/${encodeURIComponent(requestId)}/complete`,
     );
   }
 }
