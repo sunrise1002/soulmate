@@ -3,7 +3,7 @@
 Soulmate is a local-first modular monolith with inward dependencies:
 
 ```text
-Clients / REST / future MCP
+Clients / REST / MCP
              |
 Daemon composition root + adapters
              |
@@ -29,10 +29,13 @@ state. Phase 6 packages the daemon as a platform-specific sidecar managed by the
 Tauri desktop shell. The webview talks only through a fixed loopback native proxy.
 Phase 7 added device pairing ports and rules to the kernel, an opt-in TLS listener
 on an explicit LAN address, a single authorization boundary in front of every
-route, and web and React Native clients built on a shared TypeScript SDK. MCP and
-the Python SDK remain documented placeholders. Phase 8 added deterministic active
-learning plus outcome-aware advice while keeping behavioral prediction and
-wellbeing recommendation as separate versioned models.
+route, and web and React Native clients built on a shared TypeScript SDK. Phase 8
+added deterministic active learning plus outcome-aware advice while keeping
+behavioral prediction and wellbeing recommendation as separate versioned models.
+Phase 9 added service identity and API-credential ports, SQLite adapters, scoped
+external REST operations, metadata-only request auditing, and a stdio MCP adapter
+that consults the daemon without reading local persistence directly. The Python
+SDK remains a documented placeholder.
 
 ADRs below record decisions from specification section 65. Each ADR status states
 whether the decision is architectural only or already implemented.

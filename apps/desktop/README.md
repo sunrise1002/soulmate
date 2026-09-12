@@ -28,8 +28,12 @@ pnpm --filter @soulmate/desktop tauri dev
 
 The Tauri command builds a target-suffixed daemon sidecar before starting. Data is
 stored in the operating system's application-data directory. Provider settings
-are stored in a local JSON file; API keys are stored separately in the operating
-system credential store and are never returned to the webview.
+are stored in a local JSON file; model-provider API keys are stored separately in
+the operating system credential store and are never returned to the webview.
+
+The External Agents screen creates scoped service identities, shows each new API
+key once, manages key rotation and revocation, and displays the local audit trail.
+The packaged sidecar also exposes the MCP stdio adapter as `decision-twin mcp`.
 
 ## Verification and packaging
 

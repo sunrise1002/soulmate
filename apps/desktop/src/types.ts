@@ -233,3 +233,41 @@ export interface PairingInvitation {
   fingerprint: string;
   qr_payload: string;
 }
+
+export interface ApiCredential {
+  id: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  active: boolean;
+}
+
+export interface ServiceIdentity {
+  id: string;
+  name: string;
+  description: string | null;
+  scopes: string[];
+  created_at: string;
+  revoked_at: string | null;
+  active: boolean;
+  credentials: ApiCredential[];
+}
+
+export interface IssuedServiceIdentity {
+  identity: ServiceIdentity;
+  api_key: string;
+}
+
+export interface IssuedCredential {
+  credential: ApiCredential;
+  api_key: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  action: string;
+  actor_type: string;
+  actor_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}

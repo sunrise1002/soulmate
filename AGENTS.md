@@ -21,10 +21,10 @@ data merely to satisfy this code convention.
 
 ## Phase boundary
 
-Phase 8 active learning and outcome intelligence are complete locally. Phase 9 is
-not authorized; do not implement MCP, external service credentials, or permission
-scopes until the user explicitly requests it. Remote CI verification for completed
-phases remains unconfirmed.
+Phase 9 MCP and external personal intelligence access are complete locally. Phase
+10 is not authorized; do not implement import, backup, restore, portable export,
+or model migration until the user explicitly requests it. Remote CI verification
+for completed phases remains unconfirmed.
 For every later phase, follow specification section 74: plan only the current
 phase, implement small increments, validate, update documentation and phase status,
 then stop unless the user has authorized continuation. Explicit user instructions

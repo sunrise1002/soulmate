@@ -37,6 +37,13 @@ class ResolvedDecision:
     resolution: DecisionResolution
 
 
+@dataclass(frozen=True, slots=True)
+class SimilarDecision:
+    decision_id: str
+    domain: str
+    similarity: float
+
+
 def _tokens(value: str) -> set[str]:
     return set(_TOKEN_PATTERN.findall(value.casefold().replace("_", " ").replace(".", " ")))
 
@@ -69,6 +76,31 @@ def _decision_similarity(
     historical_keys = set().union(*(option.features.keys() for option in historical.options))
     features = _jaccard(current_keys, historical_keys)
     return 0.5 * domain + 0.2 * question + 0.3 * features
+
+
+def find_similar_decisions(
+    decision: DecisionEvent,
+    options: Sequence[DecisionOption],
+    history: Sequence[ResolvedDecision],
+    *,
+    limit: int = 5,
+) -> tuple[SimilarDecision, ...]:
+    """Return privacy-minimal identifiers and scores for comparable past decisions."""
+    if limit < 1:
+        raise ValueError("Similar-decision limit must be positive.")
+    ranked = sorted(
+        (
+            (_decision_similarity(decision, options, item), item)
+            for item in history
+            if item.decision.id != decision.id
+        ),
+        key=lambda item: (-item[0], item[1].decision.id),
+    )
+    return tuple(
+        SimilarDecision(item.decision.id, item.decision.domain, score)
+        for score, item in ranked
+        if score > 0.0
+    )[:limit]
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,15 +195,9 @@ class DecisionPredictor:
             if preference is not None:
                 matched[feature] = preference
 
-        similar = sorted(
-            (
-                (_decision_similarity(decision, options, item), item)
-                for item in history
-                if item.decision.id != decision.id
-            ),
-            key=lambda item: (-item[0], item[1].decision.id),
-        )
-        similar = [item for item in similar if item[0] > 0.0][:5]
+        similar_records = find_similar_decisions(decision, options, history)
+        history_by_id = {item.decision.id: item for item in history}
+        similar = [(item.similarity, history_by_id[item.decision_id]) for item in similar_records]
         comparisons: list[PairwiseComparison] = []
         for item in sorted(
             history, key=lambda value: (value.decision.created_at, value.decision.id)

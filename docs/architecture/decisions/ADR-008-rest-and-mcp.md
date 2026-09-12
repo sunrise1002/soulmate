@@ -1,6 +1,6 @@
 # ADR-008: REST and MCP external integration
 
-Status: Accepted; Phase 1 health/system REST is implemented, MCP remains Phase 9.
+Status: Implemented in Phase 9.
 
 ## Context
 
@@ -9,13 +9,17 @@ receiving the owner's full database (specification sections 33, 45–50).
 
 ## Decision
 
-Expose versioned REST under `/v1` and a later MCP adapter backed by the same
-application services. Give external services separate identities, revocable
-credentials, minimal permission scopes, and local auditing. Raw-memory access and
-delegated actions require distinct permissions.
+Expose versioned REST under `/v1` and a stdio MCP adapter backed by the same daemon
+application services. Give external services separate identities, independently
+revocable hash-only credentials, explicit minimal permission scopes, and local
+metadata-only auditing. External intelligence responses omit raw evidence,
+memories, outcome notes, and stored credentials. Raw-memory access and delegated
+actions require future, distinct permissions.
 
 ## Consequences
 
-Transports remain replaceable without changing the kernel. API/MCP schemas require
-versioning and validation. Delegated action policies belong to Phase 12 after
-prediction and calibration are reliable; protocol access alone grants no autonomy.
+Transports remain replaceable without changing the kernel. MCP runs over local
+stdio and uses a scoped API key to call the daemon, so the adapter never opens the
+database. API/MCP schemas require versioning and validation. Remote MCP transport
+is deferred. Delegated action policies belong to Phase 12 after prediction and
+calibration are reliable; protocol access alone grants no autonomy.

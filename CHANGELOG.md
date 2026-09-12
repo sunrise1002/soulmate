@@ -4,6 +4,18 @@
 
 ### Added
 
+- Phase 9 external service identities with independent revocable credentials,
+  five least-privilege scopes, hash-only API-key persistence, and owner-controlled
+  credential rotation and permission changes.
+- Privacy-minimal external intelligence endpoints for model and preference
+  summaries, prediction, ranking, similar decisions, decision recording, and
+  outcome recording, with local metadata-only auditing for every request.
+- A stdio MCP adapter with `predict_choice`, `rank_options`,
+  `get_preference_summary`, `find_similar_decisions`, `record_decision`, and
+  `record_outcome`, available through `decision-twin mcp` and the packaged daemon
+  sidecar.
+- Desktop External Agents permission UI, typed TypeScript external-access SDK,
+  and SQLite migration `0007_phase_9` for identities, scopes, and API-key hashes.
 - Phase 8 deterministic uncertainty ranking, heuristic information-gain question
   selection, persistent pairwise questions, and evidence-backed answers.
 - Restart-safe decision outcomes with satisfaction, regret, optional notes, and a
@@ -89,5 +101,6 @@
   hooks, Conventional Commit and branch validation, CI enforcement, issue/PR
   templates, security guidance, and documented GitHub ruleset settings.
 
-No embeddings, real-provider evaluation, MCP integration, signing/notarization,
-automatic updates, or later-phase features have been implemented.
+No embeddings, real-provider evaluation, remote MCP transport,
+signing/notarization, automatic updates, import/backup, live connectors, or
+delegated decisions have been implemented.

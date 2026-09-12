@@ -1,5 +1,22 @@
 """Device access control for owner-approved clients on other devices."""
 
+from soulmate_core.access.external import (
+    API_KEY_PREFIX,
+    DECISION_PREDICT,
+    DECISION_RECORD,
+    MODEL_SUMMARY_READ,
+    OUTCOME_RECORD,
+    PREFERENCE_SUMMARY_READ,
+    SERVICE_SCOPES,
+    ExternalAccessError,
+    ExternalIdentityService,
+    ExternalPrincipal,
+    IssuedApiCredential,
+    format_api_key,
+    hash_api_secret,
+    parse_api_key,
+    validate_scopes,
+)
 from soulmate_core.access.pairing import (
     DEFAULT_PAIRING_TOKEN_TTL,
     DevicePairingService,
@@ -14,14 +31,29 @@ from soulmate_core.access.pairing import (
 )
 
 __all__ = [
+    "API_KEY_PREFIX",
+    "DECISION_PREDICT",
+    "DECISION_RECORD",
     "DEFAULT_PAIRING_TOKEN_TTL",
+    "MODEL_SUMMARY_READ",
+    "OUTCOME_RECORD",
+    "PREFERENCE_SUMMARY_READ",
+    "SERVICE_SCOPES",
     "DevicePairingService",
+    "ExternalAccessError",
+    "ExternalIdentityService",
+    "ExternalPrincipal",
+    "IssuedApiCredential",
     "IssuedDeviceCredential",
     "IssuedPairingToken",
     "PairingError",
+    "format_api_key",
     "format_credential",
     "generate_secret",
+    "hash_api_secret",
     "hash_secret",
+    "parse_api_key",
     "parse_credential",
+    "validate_scopes",
     "verify_secret",
 ]

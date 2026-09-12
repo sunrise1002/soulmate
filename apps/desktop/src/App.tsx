@@ -1,5 +1,6 @@
 import {
   BrainCircuit,
+  Bot,
   Clock3,
   MessageCircleMore,
   Settings as SettingsIcon,
@@ -13,13 +14,15 @@ import { ServiceBadge } from "./components/ServiceBadge.tsx";
 import { ChatScreen } from "./screens/ChatScreen.tsx";
 import { DecideScreen } from "./screens/DecideScreen.tsx";
 import { DevicesScreen } from "./screens/DevicesScreen.tsx";
+import { ExternalAgentsScreen } from "./screens/ExternalAgentsScreen.tsx";
 import { HistoryScreen } from "./screens/HistoryScreen.tsx";
 import { ModelScreen } from "./screens/ModelScreen.tsx";
 import { SettingsScreen } from "./screens/SettingsScreen.tsx";
 import { getServiceStatus } from "./runtime.ts";
 import type { ServiceStatus } from "./types.ts";
 
-type Screen = "chat" | "decide" | "model" | "history" | "devices" | "settings";
+type Screen =
+  "chat" | "decide" | "model" | "history" | "devices" | "agents" | "settings";
 
 const navigation: {
   id: Screen;
@@ -31,6 +34,7 @@ const navigation: {
   { id: "model", label: "My Model", icon: BrainCircuit },
   { id: "history", label: "History", icon: Clock3 },
   { id: "devices", label: "Devices", icon: Smartphone },
+  { id: "agents", label: "External Agents", icon: Bot },
   { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -91,6 +95,8 @@ export function App() {
         return <HistoryScreen />;
       case "devices":
         return <DevicesScreen onServiceChanged={refreshServiceStatus} />;
+      case "agents":
+        return <ExternalAgentsScreen />;
       case "settings":
         return (
           <SettingsScreen

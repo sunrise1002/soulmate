@@ -5,9 +5,9 @@ the previous phase before planning or implementing the current phase.
 
 ## Authorized scope
 
-Phase 8 — Active Learning & Outcome Intelligence is complete locally. Phase 9 is
-not authorized. Stop at the Phase 8 boundary until the user explicitly requests
-the next phase.
+Phase 9 — MCP & External Personal Intelligence API is complete locally. Phase 10
+is not authorized. Stop at the Phase 9 boundary until the user explicitly
+requests the next phase.
 
 ## Reports
 
@@ -22,19 +22,20 @@ the next phase.
 | Phase 6 | Complete locally | [Phase 6 report](phases/phase-6-report.md) | Remote cross-platform installers, signing, and real providers unverified |
 | Phase 7 | Complete locally | [Phase 7 report](phases/phase-7-report.md) | Remote CI, native mobile builds, and browser trust of the self-signed certificate unverified |
 | Phase 8 | Complete locally | [Phase 8 report](phases/phase-8-report.md) | Remote CI, richer question generation, native mobile builds, and external outcome calibration unverified |
+| Phase 9 | Complete locally | [Phase 9 report](phases/phase-9-report.md) | Remote CI, remote MCP transport, cross-platform packaged MCP smoke tests, and native mobile builds unverified |
 
-## Phase 8 exit criteria
+## Phase 9 exit criteria
 
-Passed locally on macOS arm64. Soulmate ranks uncertain preferences, asks
-context-preserving trade-off questions, learns from answers, records decision
-outcomes and regret, and can recommend a different option from its behavioral
-prediction without changing Predict Me semantics. Phase 8 records and source data
-survive restart; the owner can delete an outcome and its derived advice.
+Passed locally on macOS arm64. An owner can create separately scoped external
+service identities, rotate or revoke hash-only API credentials, inspect a local
+audit trail, and use six MCP tools through the packaged daemon without exposing
+raw evidence, memories, outcome history, or notes. Scope changes and revocation take
+effect on the next request, and identity state survives restart.
 
 ## Next action
 
-Wait for explicit Phase 9 authorization. Before planning it, read the complete
-[Phase 8 report](phases/phase-8-report.md) and inspect current repository state.
+Wait for explicit Phase 10 authorization. Before planning it, read the complete
+[Phase 9 report](phases/phase-9-report.md) and inspect current repository state.
 
 ## Repository governance
 

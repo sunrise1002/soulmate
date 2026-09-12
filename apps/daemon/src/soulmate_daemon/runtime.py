@@ -3,7 +3,7 @@
 from typing import TypedDict, cast
 
 from fastapi import FastAPI
-from soulmate_core.access import DevicePairingService
+from soulmate_core.access import DevicePairingService, ExternalIdentityService
 from soulmate_llm_providers import LLMProvider
 from soulmate_storage_sqlite import Database, Repositories
 
@@ -37,4 +37,13 @@ def build_access_service(runtime: AppState) -> DeviceAccessService:
         ),
         repositories.audit_events,
         service_id=runtime["installation_id"],
+    )
+
+
+def build_external_identity_service(runtime: AppState) -> ExternalIdentityService:
+    """Compose external identity rules over the local SQLite adapters."""
+    repositories = runtime["repositories"]
+    return ExternalIdentityService(
+        repositories.service_identities,
+        repositories.api_credentials,
     )

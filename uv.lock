@@ -11,6 +11,7 @@ members = [
     "soulmate-core",
     "soulmate-daemon",
     "soulmate-llm-providers",
+    "soulmate-mcp",
     "soulmate-storage-sqlite",
     "soulmate-workspace",
 ]
@@ -986,6 +987,7 @@ dependencies = [
     { name = "pydantic" },
     { name = "soulmate-core" },
     { name = "soulmate-llm-providers" },
+    { name = "soulmate-mcp" },
     { name = "soulmate-storage-sqlite" },
     { name = "uvicorn" },
 ]
@@ -997,6 +999,7 @@ requires-dist = [
     { name = "pydantic", specifier = ">=2.10,<3" },
     { name = "soulmate-core", editable = "packages/core-python" },
     { name = "soulmate-llm-providers", editable = "packages/llm-providers" },
+    { name = "soulmate-mcp", editable = "apps/mcp" },
     { name = "soulmate-storage-sqlite", editable = "packages/storage-sqlite" },
     { name = "uvicorn", specifier = ">=0.34,<1" },
 ]
@@ -1005,6 +1008,17 @@ requires-dist = [
 name = "soulmate-llm-providers"
 version = "0.1.0"
 source = { editable = "packages/llm-providers" }
+dependencies = [
+    { name = "httpx" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "httpx", specifier = ">=0.28,<1" }]
+
+[[package]]
+name = "soulmate-mcp"
+version = "0.1.0"
+source = { editable = "apps/mcp" }
 dependencies = [
     { name = "httpx" },
 ]
@@ -1037,6 +1051,7 @@ dependencies = [
     { name = "soulmate-core" },
     { name = "soulmate-daemon" },
     { name = "soulmate-llm-providers" },
+    { name = "soulmate-mcp" },
     { name = "soulmate-storage-sqlite" },
 ]
 
@@ -1055,6 +1070,7 @@ requires-dist = [
     { name = "soulmate-core", editable = "packages/core-python" },
     { name = "soulmate-daemon", editable = "apps/daemon" },
     { name = "soulmate-llm-providers", editable = "packages/llm-providers" },
+    { name = "soulmate-mcp", editable = "apps/mcp" },
     { name = "soulmate-storage-sqlite", editable = "packages/storage-sqlite" },
 ]
 

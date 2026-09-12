@@ -50,5 +50,5 @@ significant architecture decision. Every feature requires implementation, useful
 tests, error handling, documentation, and consideration of data ownership and
 privacy; test restart persistence wherever relevant.
 
-Do not advance to the next phase automatically. Phase 7 requires explicit user
-authorization after the Phase 6 report.
+Do not advance to the next phase automatically. Every phase requires explicit user
+authorization after the preceding phase report.

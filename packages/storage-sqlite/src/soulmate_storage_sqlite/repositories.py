@@ -10,6 +10,7 @@ from soulmate_core.domain.models import (
     ActiveQuestion,
     ActiveQuestionStatus,
     AdviceRankingItem,
+    ApiCredential,
     AuditEvent,
     Constraint,
     Conversation,
@@ -36,6 +37,7 @@ from soulmate_core.domain.models import (
     Profile,
     QuestionAnswer,
     RawEvent,
+    ServiceIdentity,
     Source,
     UserModelSnapshot,
 )
@@ -45,6 +47,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from soulmate_storage_sqlite.schema import (
     ActiveQuestionRow,
+    ApiCredentialRow,
     AuditEventRow,
     ConstraintRow,
     ConversationRow,
@@ -66,6 +69,8 @@ from soulmate_storage_sqlite.schema import (
     ProfileRow,
     QuestionAnswerRow,
     RawEventRow,
+    ServiceIdentityRow,
+    ServiceIdentityScopeRow,
     SourceRow,
     SystemMetadataRow,
     UserModelSnapshotRow,
@@ -1065,6 +1070,27 @@ class SqliteAuditEventRepository:
                 metadata=metadata,
             )
 
+    def list_for_profile(self, profile_id: str, limit: int = 100) -> tuple[AuditEvent, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(AuditEventRow)
+                .where(AuditEventRow.profile_id == profile_id)
+                .order_by(AuditEventRow.created_at.desc(), AuditEventRow.id.desc())
+                .limit(limit)
+            )
+            return tuple(
+                AuditEvent(
+                    id=row.id,
+                    action=row.action,
+                    actor_type=row.actor_type,
+                    actor_id=row.actor_id,
+                    metadata=(None if row.metadata_json is None else json.loads(row.metadata_json)),
+                    created_at=_utc(row.created_at),
+                    profile_id=row.profile_id,
+                )
+                for row in rows
+            )
+
 
 class SqliteJobRepository:
     def __init__(self, sessions: sessionmaker[Session]) -> None:
@@ -1318,6 +1344,154 @@ class SqlitePairedDeviceRepository:
         )
 
 
+class SqliteServiceIdentityRepository:
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def add(self, identity: ServiceIdentity) -> None:
+        with self._sessions.begin() as session:
+            session.add(
+                ServiceIdentityRow(
+                    id=identity.id,
+                    profile_id=identity.profile_id,
+                    name=identity.name,
+                    description=identity.description,
+                    created_at=identity.created_at,
+                    revoked_at=identity.revoked_at,
+                )
+            )
+            session.add_all(
+                ServiceIdentityScopeRow(service_identity_id=identity.id, scope=scope)
+                for scope in identity.scopes
+            )
+
+    def get(self, identity_id: str) -> ServiceIdentity | None:
+        with self._sessions() as session:
+            row = session.get(ServiceIdentityRow, identity_id)
+            return None if row is None else self._to_domain(session, row)
+
+    def list_for_profile(self, profile_id: str) -> tuple[ServiceIdentity, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(ServiceIdentityRow)
+                .where(ServiceIdentityRow.profile_id == profile_id)
+                .order_by(ServiceIdentityRow.created_at.desc(), ServiceIdentityRow.id.desc())
+            )
+            return tuple(self._to_domain(session, row) for row in rows)
+
+    def replace_scopes(self, identity_id: str, scopes: tuple[str, ...]) -> bool:
+        with self._sessions.begin() as session:
+            if session.get(ServiceIdentityRow, identity_id) is None:
+                return False
+            session.execute(
+                delete(ServiceIdentityScopeRow).where(
+                    ServiceIdentityScopeRow.service_identity_id == identity_id
+                )
+            )
+            session.add_all(
+                ServiceIdentityScopeRow(service_identity_id=identity_id, scope=scope)
+                for scope in scopes
+            )
+            return True
+
+    def revoke(self, identity_id: str, revoked_at: datetime) -> bool:
+        with self._sessions.begin() as session:
+            revoked_id = session.execute(
+                update(ServiceIdentityRow)
+                .where(
+                    ServiceIdentityRow.id == identity_id,
+                    ServiceIdentityRow.revoked_at.is_(None),
+                )
+                .values(revoked_at=revoked_at)
+                .returning(ServiceIdentityRow.id)
+            ).scalar_one_or_none()
+            return revoked_id is not None
+
+    @staticmethod
+    def _to_domain(session: Session, row: ServiceIdentityRow) -> ServiceIdentity:
+        scopes = session.scalars(
+            select(ServiceIdentityScopeRow.scope)
+            .where(ServiceIdentityScopeRow.service_identity_id == row.id)
+            .order_by(ServiceIdentityScopeRow.scope)
+        )
+        return ServiceIdentity(
+            id=row.id,
+            profile_id=row.profile_id,
+            name=row.name,
+            description=row.description,
+            scopes=tuple(scopes),
+            created_at=_utc(row.created_at),
+            revoked_at=None if row.revoked_at is None else _utc(row.revoked_at),
+        )
+
+
+class SqliteApiCredentialRepository:
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def add(self, credential: ApiCredential) -> None:
+        with self._sessions.begin() as session:
+            session.add(
+                ApiCredentialRow(
+                    id=credential.id,
+                    service_identity_id=credential.service_identity_id,
+                    secret_hash=credential.secret_hash,
+                    created_at=credential.created_at,
+                    last_used_at=credential.last_used_at,
+                    revoked_at=credential.revoked_at,
+                )
+            )
+
+    def get(self, credential_id: str) -> ApiCredential | None:
+        with self._sessions() as session:
+            row = session.get(ApiCredentialRow, credential_id)
+            return None if row is None else self._to_domain(row)
+
+    def list_for_identity(self, identity_id: str) -> tuple[ApiCredential, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(ApiCredentialRow)
+                .where(ApiCredentialRow.service_identity_id == identity_id)
+                .order_by(ApiCredentialRow.created_at.desc(), ApiCredentialRow.id.desc())
+            )
+            return tuple(self._to_domain(row) for row in rows)
+
+    def touch(self, credential_id: str, last_used_at: datetime) -> None:
+        with self._sessions.begin() as session:
+            updated_id = session.execute(
+                update(ApiCredentialRow)
+                .where(ApiCredentialRow.id == credential_id)
+                .values(last_used_at=last_used_at)
+                .returning(ApiCredentialRow.id)
+            ).scalar_one_or_none()
+            if updated_id is None:
+                raise KeyError(credential_id)
+
+    def revoke(self, credential_id: str, revoked_at: datetime) -> bool:
+        with self._sessions.begin() as session:
+            revoked_id = session.execute(
+                update(ApiCredentialRow)
+                .where(
+                    ApiCredentialRow.id == credential_id,
+                    ApiCredentialRow.revoked_at.is_(None),
+                )
+                .values(revoked_at=revoked_at)
+                .returning(ApiCredentialRow.id)
+            ).scalar_one_or_none()
+            return revoked_id is not None
+
+    @staticmethod
+    def _to_domain(row: ApiCredentialRow) -> ApiCredential:
+        return ApiCredential(
+            id=row.id,
+            service_identity_id=row.service_identity_id,
+            secret_hash=row.secret_hash,
+            created_at=_utc(row.created_at),
+            last_used_at=None if row.last_used_at is None else _utc(row.last_used_at),
+            revoked_at=None if row.revoked_at is None else _utc(row.revoked_at),
+        )
+
+
 class SqliteSystemMetadataRepository:
     def __init__(self, sessions: sessionmaker[Session]) -> None:
         self._sessions = sessions
@@ -1367,4 +1541,6 @@ class Repositories:
         self.jobs = SqliteJobRepository(sessions)
         self.pairing_tokens = SqlitePairingTokenRepository(sessions)
         self.paired_devices = SqlitePairedDeviceRepository(sessions)
+        self.service_identities = SqliteServiceIdentityRepository(sessions)
+        self.api_credentials = SqliteApiCredentialRepository(sessions)
         self.system_metadata = SqliteSystemMetadataRepository(sessions)

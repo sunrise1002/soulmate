@@ -7,6 +7,7 @@ dependencies = [
   "soulmate-core",
   "soulmate-daemon",
   "soulmate-llm-providers",
+  "soulmate-mcp",
   "soulmate-storage-sqlite",
 ]
 
@@ -26,6 +27,7 @@ package = false
 [tool.uv.workspace]
 members = [
   "apps/daemon",
+  "apps/mcp",
   "packages/core-python",
   "packages/llm-providers",
   "packages/storage-sqlite",
@@ -35,6 +37,7 @@ members = [
 soulmate-core = { workspace = true }
 soulmate-daemon = { workspace = true }
 soulmate-llm-providers = { workspace = true }
+soulmate-mcp = { workspace = true }
 soulmate-storage-sqlite = { workspace = true }
 
 [tool.ruff]
@@ -91,6 +94,7 @@ python_version = "3.12"
 strict = true
 files = [
   "apps/daemon/src",
+  "apps/mcp/src",
   "packages/core-python/src",
   "packages/llm-providers/src",
   "packages/storage-sqlite/src",

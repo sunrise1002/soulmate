@@ -250,3 +250,99 @@ export interface DecisionOptionInput {
   description: string;
   features?: Record<string, number>;
 }
+
+export interface ApiCredential {
+  id: string;
+  created_at: string;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  active: boolean;
+}
+
+export interface ServiceIdentity {
+  id: string;
+  name: string;
+  description: string | null;
+  scopes: string[];
+  created_at: string;
+  revoked_at: string | null;
+  active: boolean;
+  credentials: ApiCredential[];
+}
+
+export interface IssuedServiceIdentity {
+  identity: ServiceIdentity;
+  api_key: string;
+}
+
+export interface IssuedApiCredential {
+  credential: ApiCredential;
+  api_key: string;
+}
+
+export interface AuditEvent {
+  id: string;
+  action: string;
+  actor_type: string;
+  actor_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface ExternalDecisionOptionInput {
+  label: string;
+  description: string;
+  features: Record<string, number>;
+}
+
+export interface ExternalDecisionInput {
+  domain: string;
+  question: string;
+  context?: Record<string, unknown>;
+  options: ExternalDecisionOptionInput[];
+}
+
+export interface ExternalDecision {
+  id: string;
+  domain: string;
+  question: string;
+  status: "open" | "resolved";
+  option_ids: string[];
+  created_at: string;
+}
+
+export interface ExternalPrediction {
+  decision_id: string;
+  predicted_option_id: string;
+  predicted_choice: string;
+  ranking: Ranking[];
+  confidence: number;
+  important_factors: string[];
+  uncertain_factors: string[];
+  similar_decision_ids: string[];
+  model_snapshot_version: number;
+  algorithm_version: string;
+}
+
+export interface PreferenceSummary {
+  key: string;
+  value: number;
+  uncertainty: number;
+  confidence: number;
+  context: Record<string, unknown>;
+  model_version: number;
+}
+
+export interface SimilarDecision {
+  decision_id: string;
+  domain: string;
+  similarity: number;
+}
+
+export interface ExternalOutcome {
+  id: string;
+  decision_id: string;
+  satisfaction: number;
+  regret: boolean;
+  created_at: string;
+}

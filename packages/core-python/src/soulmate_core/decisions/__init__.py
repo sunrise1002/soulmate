@@ -9,6 +9,8 @@ from soulmate_core.decisions.predictor import (
     DECISION_ALGORITHM_VERSION,
     DecisionPredictor,
     ResolvedDecision,
+    SimilarDecision,
+    find_similar_decisions,
     resolution_evidence,
 )
 
@@ -19,5 +21,7 @@ __all__ = [
     "DecisionPredictor",
     "OutcomeHistory",
     "ResolvedDecision",
+    "SimilarDecision",
+    "find_similar_decisions",
     "resolution_evidence",
 ]

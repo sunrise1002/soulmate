@@ -13,6 +13,9 @@ so neither can drift from the daemon contract.
   identity and certificate fingerprint that were pinned during pairing.
 - Active-learning, outcome, and advice methods keep the Phase 8 REST contracts
   identical across the web and mobile clients.
+- External identity management and privacy-minimal Phase 9 intelligence methods
+  use the same typed transport. External clients pass their service API key as the
+  bearer credential and receive no raw evidence or memory payloads.
 
 The transport is injectable, so callers can wrap it. The mobile client uses that
 to refuse any request that leaves the paired origin.

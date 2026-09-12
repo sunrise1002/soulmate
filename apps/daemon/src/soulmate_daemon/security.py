@@ -4,7 +4,16 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
 
-from soulmate_core.access import PairingError
+from soulmate_core.access import (
+    DECISION_PREDICT,
+    DECISION_RECORD,
+    MODEL_SUMMARY_READ,
+    OUTCOME_RECORD,
+    PREFERENCE_SUMMARY_READ,
+    ExternalAccessError,
+    ExternalPrincipal,
+    PairingError,
+)
 from soulmate_core.domain import PairedDevice
 
 from soulmate_daemon.network import is_loopback_client
@@ -26,6 +35,7 @@ class ActorKind(StrEnum):
 
     OWNER = "owner"
     DEVICE = "device"
+    SERVICE = "service"
     ANONYMOUS = "anonymous"
 
 
@@ -35,11 +45,23 @@ OWNER_ONLY_RULES: tuple[tuple[str | None, str], ...] = (
     (None, "/v1/network"),
     ("DELETE", "/v1/evidence"),
     ("DELETE", "/v1/decisions"),
+    (None, "/v1/service-identities"),
+    (None, "/v1/audit/events"),
 )
 
 PUBLIC_RULES: tuple[tuple[str | None, str], ...] = (
     ("GET", "/v1/health"),
     ("POST", "/v1/pairing/complete"),
+)
+
+EXTERNAL_SCOPE_RULES: tuple[tuple[str, str, str], ...] = (
+    ("POST", "/v1/external/predict-choice", DECISION_PREDICT),
+    ("POST", "/v1/external/rank-options", DECISION_PREDICT),
+    ("GET", "/v1/external/preference-summary", PREFERENCE_SUMMARY_READ),
+    ("GET", "/v1/external/model-summary", MODEL_SUMMARY_READ),
+    ("POST", "/v1/external/find-similar-decisions", DECISION_PREDICT),
+    ("POST", "/v1/external/record-decision", DECISION_RECORD),
+    ("POST", "/v1/external/record-outcome", OUTCOME_RECORD),
 )
 
 
@@ -50,6 +72,9 @@ class Actor:
     kind: ActorKind
     device_id: str | None = None
     device_name: str | None = None
+    service_identity_id: str | None = None
+    service_identity_name: str | None = None
+    credential_id: str | None = None
 
     @property
     def is_owner(self) -> bool:
@@ -59,10 +84,19 @@ class Actor:
 class AccessDeniedError(Exception):
     """A request failed the authorization boundary."""
 
-    def __init__(self, status_code: int, detail: str) -> None:
+    def __init__(
+        self,
+        status_code: int,
+        detail: str,
+        *,
+        service_identity_id: str | None = None,
+        credential_id: str | None = None,
+    ) -> None:
         super().__init__(detail)
         self.status_code = status_code
         self.detail = detail
+        self.service_identity_id = service_identity_id
+        self.credential_id = credential_id
 
 
 def _matches(rules: tuple[tuple[str | None, str], ...], method: str, path: str) -> bool:
@@ -84,6 +118,18 @@ def path_requirement(method: str, path: str) -> Requirement:
     return Requirement.DEVICE
 
 
+def external_scope(method: str, path: str) -> str | None:
+    """Return the exact least-privilege scope for an external API operation."""
+    return next(
+        (
+            scope
+            for rule_method, rule_path, scope in EXTERNAL_SCOPE_RULES
+            if method == rule_method and path == rule_path
+        ),
+        None,
+    )
+
+
 def bearer_credential(header: str | None) -> str | None:
     if header is None or not header.startswith(BEARER_PREFIX):
         return None
@@ -99,12 +145,44 @@ def authorize(
     lan_enabled: bool,
     authorization: str | None,
     authenticate: Callable[[str], PairedDevice],
+    authenticate_service: Callable[[str], ExternalPrincipal] | None = None,
 ) -> Actor:
     """Authorize one request and return the actor the handlers may trust.
 
     Loopback callers are the owner. Every other caller needs LAN access enabled
     and a valid device credential, and can never reach owner-only paths.
     """
+    required_scope = external_scope(method, path)
+    if path.startswith("/v1/external/"):
+        if not is_loopback_client(client_host) and not lan_enabled:
+            raise AccessDeniedError(403, "Access from other devices is disabled.")
+        credential = bearer_credential(authorization)
+        if credential is None or authenticate_service is None:
+            raise AccessDeniedError(401, "An external service API key is required.")
+        try:
+            principal = authenticate_service(credential)
+        except ExternalAccessError as exc:
+            raise AccessDeniedError(401, "An external service API key is required.") from exc
+        if required_scope is None:
+            raise AccessDeniedError(
+                404,
+                "The external API operation was not found.",
+                service_identity_id=principal.identity.id,
+                credential_id=principal.credential.id,
+            )
+        if required_scope not in principal.identity.scopes:
+            raise AccessDeniedError(
+                403,
+                f"The service identity lacks the '{required_scope}' scope.",
+                service_identity_id=principal.identity.id,
+                credential_id=principal.credential.id,
+            )
+        return Actor(
+            kind=ActorKind.SERVICE,
+            service_identity_id=principal.identity.id,
+            service_identity_name=principal.identity.name,
+            credential_id=principal.credential.id,
+        )
     if is_loopback_client(client_host):
         return Actor(kind=ActorKind.OWNER)
     if not lan_enabled:

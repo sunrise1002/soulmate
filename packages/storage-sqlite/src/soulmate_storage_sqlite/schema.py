@@ -494,3 +494,51 @@ class PairedDeviceRow(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     __table_args__ = (Index("ix_paired_devices_profile_created", "profile_id", "created_at", "id"),)
+
+
+class ServiceIdentityRow(Base):
+    __tablename__ = "service_identities"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("ix_service_identities_profile_created", "profile_id", "created_at", "id"),
+    )
+
+
+class ServiceIdentityScopeRow(Base):
+    __tablename__ = "service_identity_scopes"
+
+    service_identity_id: Mapped[str] = mapped_column(
+        ForeignKey("service_identities.id", ondelete="CASCADE"), primary_key=True
+    )
+    scope: Mapped[str] = mapped_column(String, primary_key=True)
+
+
+class ApiCredentialRow(Base):
+    __tablename__ = "api_credentials"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    service_identity_id: Mapped[str] = mapped_column(
+        ForeignKey("service_identities.id", ondelete="CASCADE"), nullable=False
+    )
+    secret_hash: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index(
+            "ix_api_credentials_identity_created",
+            "service_identity_id",
+            "created_at",
+            "id",
+        ),
+    )

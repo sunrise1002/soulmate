@@ -4,8 +4,8 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 
 import pytest
-from soulmate_core.access import PairingError
-from soulmate_core.domain import PairedDevice
+from soulmate_core.access import ExternalAccessError, ExternalPrincipal, PairingError
+from soulmate_core.domain import ApiCredential, PairedDevice, ServiceIdentity
 from soulmate_daemon.network import (
     NetworkConfigurationError,
     is_loopback_client,
@@ -30,6 +30,20 @@ DEVICE = PairedDevice(
     credential_hash="a" * 64,
     created_at=NOW,
 )
+SERVICE_IDENTITY = ServiceIdentity(
+    id="service_1",
+    profile_id="profile_default",
+    name="Shopping agent",
+    description=None,
+    scopes=("decision:predict",),
+    created_at=NOW,
+)
+API_CREDENTIAL = ApiCredential(
+    id="credential_1",
+    service_identity_id=SERVICE_IDENTITY.id,
+    secret_hash="b" * 64,
+    created_at=NOW,
+)
 REMOTE = "192.168.1.50"
 
 
@@ -39,6 +53,14 @@ def _accept(_credential: str) -> PairedDevice:
 
 def _reject(_credential: str) -> PairedDevice:
     raise PairingError("Device credential is not recognized.")
+
+
+def _accept_service(_credential: str) -> ExternalPrincipal:
+    return ExternalPrincipal(SERVICE_IDENTITY, API_CREDENTIAL)
+
+
+def _reject_service(_credential: str) -> ExternalPrincipal:
+    raise ExternalAccessError("API credential is not recognized.")
 
 
 def _authorize(
@@ -85,6 +107,8 @@ def test_non_loopback_hosts_are_not_the_owner(host: str | None) -> None:
         ("GET", "/v1/devices", Requirement.OWNER),
         ("DELETE", "/v1/devices/device_1", Requirement.OWNER),
         ("GET", "/v1/network/state", Requirement.OWNER),
+        ("GET", "/v1/service-identities", Requirement.OWNER),
+        ("GET", "/v1/audit/events", Requirement.OWNER),
         ("DELETE", "/v1/evidence/evidence_1", Requirement.OWNER),
         ("DELETE", "/v1/decisions/decision_1/outcome", Requirement.OWNER),
         ("GET", "/v1/evidence/evidence_1", Requirement.DEVICE),
@@ -130,6 +154,8 @@ def test_remote_requests_are_refused_while_lan_access_is_disabled() -> None:
         ("GET", "/v1/devices"),
         ("DELETE", "/v1/evidence/e1"),
         ("DELETE", "/v1/decisions/d1/outcome"),
+        ("GET", "/v1/service-identities"),
+        ("GET", "/v1/audit/events"),
     ],
 )
 def test_paired_devices_cannot_reach_owner_only_routes(method: str, path: str) -> None:
@@ -175,6 +201,63 @@ def test_valid_device_credentials_identify_the_calling_device() -> None:
     assert actor.kind is ActorKind.DEVICE
     assert actor.device_id == "device_1"
     assert actor.device_name == "Phone"
+
+
+def test_external_routes_require_a_scoped_service_key_even_on_loopback() -> None:
+    with pytest.raises(AccessDeniedError) as missing:
+        authorize(
+            method="POST",
+            path="/v1/external/predict-choice",
+            client_host="127.0.0.1",
+            lan_enabled=False,
+            authorization=None,
+            authenticate=_accept,
+            authenticate_service=_accept_service,
+        )
+    assert missing.value.status_code == 401
+
+    actor = authorize(
+        method="POST",
+        path="/v1/external/predict-choice",
+        client_host="127.0.0.1",
+        lan_enabled=False,
+        authorization="Bearer sk_soulmate.credential_1.secret",
+        authenticate=_accept,
+        authenticate_service=_accept_service,
+    )
+    assert actor.kind is ActorKind.SERVICE
+    assert actor.service_identity_id == SERVICE_IDENTITY.id
+    assert actor.credential_id == API_CREDENTIAL.id
+
+
+def test_external_keys_cannot_exceed_their_scope() -> None:
+    with pytest.raises(AccessDeniedError) as denied:
+        authorize(
+            method="GET",
+            path="/v1/external/preference-summary",
+            client_host="127.0.0.1",
+            lan_enabled=False,
+            authorization="Bearer sk_soulmate.credential_1.secret",
+            authenticate=_accept,
+            authenticate_service=_accept_service,
+        )
+    assert denied.value.status_code == 403
+    assert denied.value.service_identity_id == SERVICE_IDENTITY.id
+
+
+def test_invalid_service_keys_receive_a_generic_error() -> None:
+    with pytest.raises(AccessDeniedError) as denied:
+        authorize(
+            method="POST",
+            path="/v1/external/predict-choice",
+            client_host="127.0.0.1",
+            lan_enabled=False,
+            authorization="Bearer invalid",
+            authenticate=_accept,
+            authenticate_service=_reject_service,
+        )
+    assert denied.value.status_code == 401
+    assert denied.value.detail == "An external service API key is required."
 
 
 @pytest.mark.parametrize(

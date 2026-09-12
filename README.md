@@ -3,9 +3,9 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 8 Active Learning & Outcome Intelligence is implemented
+**Current status:** Phase 9 MCP & External Personal Intelligence API is implemented
 locally. See the [phase status](docs/phase-status.md) and detailed
-[Phase 8 report](docs/phases/phase-8-report.md).
+[Phase 9 report](docs/phases/phase-9-report.md).
 
 ## Development setup
 
@@ -117,6 +117,25 @@ combines that prediction with satisfaction, regret, similar resolved choices, an
 matching goals or constraints. Both modes report their model snapshot and
 algorithm version, and clients display them as distinct results.
 
+Phase 9 adds separately scoped external service identities, independently
+revocable API keys stored only as secure hashes, and a metadata-only local audit
+trail. The desktop External Agents screen controls permissions and shows each new
+key once. External REST responses provide derived summaries and decision results
+without returning raw evidence, memories, outcome notes, or the broader personal
+database.
+
+Run the stdio MCP adapter through the daemon executable:
+
+```sh
+SOULMATE_API_KEY='<key-shown-once>' uv run --locked decision-twin mcp
+```
+
+Set `SOULMATE_BASE_URL` only when the daemon does not use the default
+`http://127.0.0.1:7432`. The six tools are `predict_choice`, `rank_options`,
+`get_preference_summary`, `find_similar_decisions`, `record_decision`, and
+`record_outcome`. Grant the corresponding scopes in the desktop UI. Every tool
+call passes the same authorization boundary and application services as REST.
+
 The desktop history views use `GET /v1/conversations` and `GET /v1/decisions`.
 The My Model screen can inspect provenance, add correction evidence, and use
 `DELETE /v1/evidence/{id}` to remove evidence before a deterministic model rebuild.
@@ -135,8 +154,9 @@ credential, and the QR payload carries the certificate fingerprint so a phone pi
 the service it paired with. Revoke any device from the same screen; the next
 request from that device fails immediately.
 
-Loopback callers are the owner. Every other caller needs an active device
-credential. Pairing, device listing, revocation, network status, and evidence
+Loopback callers are the owner for normal owner/client routes. External API paths
+always require a service API key, including on loopback. Every other caller needs
+an active device credential. Pairing, device listing, revocation, network status, and evidence
 deletion are only available on the owner's machine. A paired device can chat,
 decide, resolve, read the model, record corrections, answer active-learning
 questions, record outcomes, and request advice.
@@ -164,7 +184,7 @@ environment overrides, `DATA_DIR`, and path semantics.
 | `apps/desktop/` | Tauri shell, React UI, native service management, and installer configuration |
 | `apps/web/` | React browser client served by the daemon |
 | `apps/mobile/` | Expo React Native client with QR pairing and pinned service identity |
-| `apps/mcp/` | Reserved integration location |
+| `apps/mcp/` | Scoped stdio MCP adapter backed by daemon REST application services |
 | `packages/llm-providers/` | Provider protocol, fake provider, egress policy, Ollama, and OpenAI-compatible adapters |
 | `packages/sdk-typescript/` | Typed REST client and pairing rules shared by clients |
 | `packages/sdk-python/` | Reserved future SDK location |

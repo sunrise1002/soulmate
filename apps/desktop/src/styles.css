@@ -1256,3 +1256,118 @@ select {
 .device-row p {
   margin: 4px 0 0;
 }
+
+.agent-create,
+.agent-card,
+.audit-card {
+  padding: 20px;
+}
+.agent-create {
+  display: grid;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+.agent-create > label {
+  display: grid;
+  gap: 7px;
+}
+.agent-create > label > span {
+  color: #716d63;
+  font-size: 11px;
+  font-weight: 600;
+}
+.agent-create input[type="text"],
+.agent-create > label input {
+  padding: 10px 11px;
+}
+.scope-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.scope-grid.compact {
+  margin: 18px 0;
+}
+.scope-choice {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: #66695f;
+  background: #faf8f3;
+  font-size: 11px;
+}
+.scope-choice input {
+  width: 14px;
+}
+.agent-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.agent-card > .secondary-button {
+  margin-top: 14px;
+}
+.credential-list {
+  display: grid;
+  gap: 5px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.credential-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font:
+    9px "DM Mono",
+    monospace;
+}
+.api-key-reveal {
+  display: grid;
+  grid-template-columns: 24px 1fr auto;
+  gap: 12px;
+  align-items: start;
+  margin-bottom: 16px;
+  padding: 16px;
+  border-color: #b8c9b2;
+  background: #edf3ea;
+}
+.api-key-reveal p {
+  margin: 4px 0 9px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.api-key-reveal code {
+  display: block;
+  padding: 9px;
+  overflow-wrap: anywhere;
+  border-radius: 6px;
+  background: white;
+  font-size: 10px;
+}
+.audit-card {
+  margin-top: 16px;
+}
+.audit-card ul {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.audit-card li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+}
+.audit-card small {
+  color: var(--muted);
+}

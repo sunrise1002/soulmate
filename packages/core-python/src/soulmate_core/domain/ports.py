@@ -6,6 +6,7 @@ from typing import Protocol
 
 from soulmate_core.domain.models import (
     ActiveQuestion,
+    ApiCredential,
     AuditEvent,
     Conversation,
     DecisionAdvice,
@@ -24,6 +25,7 @@ from soulmate_core.domain.models import (
     Profile,
     QuestionAnswer,
     RawEvent,
+    ServiceIdentity,
     Source,
     UserModelSnapshot,
 )
@@ -153,6 +155,8 @@ class AuditEventRepository(Protocol):
 
     def get(self, event_id: str) -> AuditEvent | None: ...
 
+    def list_for_profile(self, profile_id: str, limit: int = 100) -> tuple[AuditEvent, ...]: ...
+
 
 class JobRepository(Protocol):
     def enqueue(self, job: Job) -> None: ...
@@ -188,6 +192,30 @@ class PairedDeviceRepository(Protocol):
     def touch(self, device_id: str, last_seen_at: datetime) -> None: ...
 
     def revoke(self, device_id: str, revoked_at: datetime) -> bool: ...
+
+
+class ServiceIdentityRepository(Protocol):
+    def add(self, identity: ServiceIdentity) -> None: ...
+
+    def get(self, identity_id: str) -> ServiceIdentity | None: ...
+
+    def list_for_profile(self, profile_id: str) -> tuple[ServiceIdentity, ...]: ...
+
+    def replace_scopes(self, identity_id: str, scopes: tuple[str, ...]) -> bool: ...
+
+    def revoke(self, identity_id: str, revoked_at: datetime) -> bool: ...
+
+
+class ApiCredentialRepository(Protocol):
+    def add(self, credential: ApiCredential) -> None: ...
+
+    def get(self, credential_id: str) -> ApiCredential | None: ...
+
+    def list_for_identity(self, identity_id: str) -> tuple[ApiCredential, ...]: ...
+
+    def touch(self, credential_id: str, last_used_at: datetime) -> None: ...
+
+    def revoke(self, credential_id: str, revoked_at: datetime) -> bool: ...
 
 
 class SystemMetadataRepository(Protocol):

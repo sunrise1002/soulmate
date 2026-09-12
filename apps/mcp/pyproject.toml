@@ -1,0 +1,18 @@
+[project]
+name = "soulmate-mcp"
+version = "0.1.0"
+description = "Scoped MCP stdio adapter for the local Soulmate daemon"
+requires-python = ">=3.12"
+dependencies = [
+  "httpx>=0.28,<1",
+]
+
+[project.scripts]
+soulmate-mcp = "soulmate_mcp.server:main"
+
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/soulmate_mcp"]

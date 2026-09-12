@@ -77,6 +77,11 @@ describe("desktop navigation", () => {
         screen.getByLabelText("Enable access from other devices"),
       ).not.toBeNull(),
     );
+
+    fireEvent.click(screen.getByRole("button", { name: "External Agents" }));
+    expect(
+      screen.getByRole("heading", { name: "External Agents" }),
+    ).not.toBeNull();
   });
 
   it("keeps access from other devices off until the owner enables it", async () => {

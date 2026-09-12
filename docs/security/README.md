@@ -22,6 +22,15 @@ tokens and device credentials are stored, and failed authentication returns one
 generic message. Revocation takes effect on the next request. Pairing token issue,
 device pairing, and revocation are recorded as audit events.
 
+External applications use a separate service-identity boundary even on loopback;
+they never inherit owner authority. Each identity has explicit scopes and one or
+more independently revocable high-entropy API keys. Only SHA-256 hashes of API-key
+secrets are stored. The usable key is shown once, authentication failures remain
+generic, and scope or revocation changes apply on the next request. External
+responses omit raw memories, evidence, outcome history, and notes. Every external request
+adds a local audit event containing identity, credential identifier, method, path,
+and status only—never the key or request payload.
+
 The service certificate is self-signed and generated locally with an owner-only
 private key. Browsers show a warning until the owner accepts it, and mobile
 transport pinning requires a native network configuration built from the stored

@@ -159,6 +159,46 @@ describe("SoulmateClient", () => {
     );
   });
 
+  it("exposes scoped external identity and intelligence operations", async () => {
+    const { fetch, calls } = stub(200, {});
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      credential: "sk_soulmate.credential_1.secret",
+      fetch,
+    });
+    const decision = {
+      domain: "shopping",
+      question: "Which laptop?",
+      options: [
+        { label: "A", description: "Quiet", features: { quiet: 1 } },
+        { label: "B", description: "Fast", features: { quiet: -1 } },
+      ],
+    };
+
+    await client.predictChoice(decision);
+    await client.rankOptions(decision);
+    await client.preferenceSummary();
+    await client.findSimilarDecisions(decision);
+    await client.recordExternalDecision(decision);
+    await client.recordExternalOutcome("decision/1", 0.8, false);
+    await client.updateServiceIdentityScopes("service/1", ["decision:predict"]);
+    await client.revokeApiCredential("service/1", "credential/1");
+
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://127.0.0.1:7432/v1/external/predict-choice",
+      "http://127.0.0.1:7432/v1/external/rank-options",
+      "http://127.0.0.1:7432/v1/external/preference-summary",
+      "http://127.0.0.1:7432/v1/external/find-similar-decisions",
+      "http://127.0.0.1:7432/v1/external/record-decision",
+      "http://127.0.0.1:7432/v1/external/record-outcome",
+      "http://127.0.0.1:7432/v1/service-identities/service%2F1/scopes",
+      "http://127.0.0.1:7432/v1/service-identities/service%2F1/credentials/credential%2F1",
+    ]);
+    expect(headersOf(calls[0] as Call).Authorization).toBe(
+      "Bearer sk_soulmate.credential_1.secret",
+    );
+  });
+
   it.each([
     [401, "A paired device credential is required.", true],
     [403, "This action is only available on the owner's device.", true],

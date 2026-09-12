@@ -12,6 +12,7 @@ from urllib.request import ProxyHandler, build_opener
 from alembic.util.exc import CommandError
 from soulmate_core.evaluation import evaluate_dataset, load_dataset
 from soulmate_core.preferences import ModelRebuilder
+from soulmate_mcp.server import main as mcp_main
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -173,6 +174,7 @@ def _parser() -> argparse.ArgumentParser:
         subcommand.add_argument("--config", type=Path, help="Path to a TOML configuration file")
     evaluate = commands.add_parser("evaluate", help="Run reproducible decision evaluation")
     evaluate.add_argument("--dataset", type=Path, help="Path to an evaluation JSON dataset")
+    commands.add_parser("mcp", help="Run the scoped MCP stdio adapter")
     return parser
 
 
@@ -181,6 +183,9 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "evaluate":
         raise SystemExit(_evaluate(args.dataset))
+    if args.command == "mcp":
+        mcp_main()
+        return
     try:
         settings = load_settings(args.config)
     except ConfigurationError as exc:

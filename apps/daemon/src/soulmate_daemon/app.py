@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from soulmate_core.domain import (
     ActiveQuestion,
+    AuditEvent,
     Conversation,
     DecisionAdvice,
     DecisionEvent,
@@ -39,6 +40,7 @@ from soulmate_daemon.active_learning import ActiveAnswerResult, ActiveLearningSe
 from soulmate_daemon.config import Settings
 from soulmate_daemon.conversation import ConversationService
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
+from soulmate_daemon.external_api import build_external_router
 from soulmate_daemon.jobs import DurableJobWorker
 from soulmate_daemon.network import (
     LanEndpoint,
@@ -46,8 +48,13 @@ from soulmate_daemon.network import (
     prepare_lan_endpoint,
 )
 from soulmate_daemon.providers import build_provider
-from soulmate_daemon.runtime import AppState, build_access_service, runtime_of
-from soulmate_daemon.security import AccessDeniedError, authorize
+from soulmate_daemon.runtime import (
+    AppState,
+    build_access_service,
+    build_external_identity_service,
+    runtime_of,
+)
+from soulmate_daemon.security import AccessDeniedError, ActorKind, authorize
 from soulmate_daemon.system import DEFAULT_PROFILE_ID, ensure_installation
 from soulmate_daemon.tls import CertificateError
 from soulmate_daemon.web import mount_web_client
@@ -586,6 +593,32 @@ def create_app(
         title="Soulmate", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan
     )
 
+    def record_external_audit(
+        state: AppState,
+        request: Request,
+        status_code: int,
+        *,
+        actor_type: str,
+        identity_id: str | None,
+        credential_id: str | None,
+    ) -> None:
+        state["repositories"].audit_events.add(
+            AuditEvent(
+                id=f"audit_{uuid4().hex}",
+                profile_id=DEFAULT_PROFILE_ID,
+                action="external_request",
+                actor_type=actor_type,
+                actor_id=identity_id,
+                metadata={
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status": status_code,
+                    **({} if credential_id is None else {"credential_id": credential_id}),
+                },
+                created_at=datetime.now(UTC),
+            )
+        )
+
     @app.middleware("http")
     async def enforce_device_access(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
@@ -595,6 +628,8 @@ def create_app(
         if runtime is None:
             return JSONResponse({"detail": "The local service is starting."}, status_code=503)
         state = cast(AppState, runtime)
+        is_external = request.url.path.startswith("/v1/external/")
+        external_service = build_external_identity_service(state)
         try:
             actor = await run_in_threadpool(
                 authorize,
@@ -604,11 +639,45 @@ def create_app(
                 lan_enabled=state["lan"] is not None,
                 authorization=request.headers.get("authorization"),
                 authenticate=build_access_service(state).authenticate,
+                authenticate_service=lambda credential: external_service.authenticate(
+                    credential, datetime.now(UTC)
+                ),
             )
         except AccessDeniedError as exc:
+            if is_external:
+                record_external_audit(
+                    state,
+                    request,
+                    exc.status_code,
+                    actor_type=("service" if exc.service_identity_id is not None else "anonymous"),
+                    identity_id=exc.service_identity_id,
+                    credential_id=exc.credential_id,
+                )
             return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
         request.state.actor = actor
-        return await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception:
+            if is_external:
+                record_external_audit(
+                    state,
+                    request,
+                    500,
+                    actor_type="service",
+                    identity_id=actor.service_identity_id,
+                    credential_id=actor.credential_id,
+                )
+            raise
+        if is_external:
+            record_external_audit(
+                state,
+                request,
+                response.status_code,
+                actor_type=("service" if actor.kind is ActorKind.SERVICE else actor.kind.value),
+                identity_id=actor.service_identity_id,
+                credential_id=actor.credential_id,
+            )
+        return response
 
     @app.get("/v1/health", response_model=HealthResponse)
     def health() -> HealthResponse:
@@ -1109,5 +1178,6 @@ def create_app(
         )
 
     app.include_router(build_access_router(app))
+    app.include_router(build_external_router(app))
     mount_web_client(app, resolved_settings.web_client_directory)
     return app

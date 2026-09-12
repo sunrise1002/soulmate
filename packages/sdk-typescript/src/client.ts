@@ -1,6 +1,8 @@
 import type {
   ActiveQuestion,
   ActiveQuestionAnswer,
+  ApiCredential,
+  AuditEvent,
   ChatResponse,
   Conversation,
   Decision,
@@ -10,6 +12,10 @@ import type {
   DecisionPrediction,
   DecisionOutcome,
   Evidence,
+  ExternalDecision,
+  ExternalDecisionInput,
+  ExternalOutcome,
+  ExternalPrediction,
   Health,
   ModelSummary,
   NetworkState,
@@ -17,10 +23,15 @@ import type {
   PairingInvitation,
   PairingResult,
   Preference,
+  PreferenceSummary,
   Resolution,
   Session,
+  ServiceIdentity,
+  SimilarDecision,
   SystemInfo,
   UncertaintySignal,
+  IssuedApiCredential,
+  IssuedServiceIdentity,
 } from "./types.ts";
 
 export type FetchLike = (
@@ -31,7 +42,7 @@ export type FetchLike = (
 export interface SoulmateClientOptions {
   /** Base service address, such as `https://192.168.1.20:7433`. */
   baseUrl: string;
-  /** Device credential issued by pairing; absent on the owner's own machine. */
+  /** Device credential or external service API key; absent for local owner calls. */
   credential?: string | undefined;
   fetch?: FetchLike | undefined;
 }
@@ -239,8 +250,8 @@ export class SoulmateClient {
     satisfaction: number,
     regret: boolean,
     notes?: string,
-  ): Promise<DecisionOutcome> {
-    return this.request<DecisionOutcome>(
+  ): Promise<ExternalOutcome> {
+    return this.request<ExternalOutcome>(
       "POST",
       `/v1/decisions/${encodeURIComponent(decisionId)}/outcome`,
       { satisfaction, regret, notes: notes ?? null },
@@ -283,5 +294,132 @@ export class SoulmateClient {
 
   networkState(): Promise<NetworkState> {
     return this.request<NetworkState>("GET", "/v1/network/state");
+  }
+
+  serviceIdentityScopes(): Promise<string[]> {
+    return this.request<string[]>("GET", "/v1/service-identities/scopes");
+  }
+
+  serviceIdentities(): Promise<ServiceIdentity[]> {
+    return this.request<ServiceIdentity[]>("GET", "/v1/service-identities");
+  }
+
+  createServiceIdentity(
+    name: string,
+    scopes: string[],
+    description?: string,
+  ): Promise<IssuedServiceIdentity> {
+    return this.request<IssuedServiceIdentity>(
+      "POST",
+      "/v1/service-identities",
+      { name, scopes, description: description ?? null },
+    );
+  }
+
+  updateServiceIdentityScopes(
+    identityId: string,
+    scopes: string[],
+  ): Promise<ServiceIdentity> {
+    return this.request<ServiceIdentity>(
+      "POST",
+      `/v1/service-identities/${encodeURIComponent(identityId)}/scopes`,
+      { scopes },
+    );
+  }
+
+  issueApiCredential(identityId: string): Promise<IssuedApiCredential> {
+    return this.request<IssuedApiCredential>(
+      "POST",
+      `/v1/service-identities/${encodeURIComponent(identityId)}/credentials`,
+    );
+  }
+
+  revokeApiCredential(
+    identityId: string,
+    credentialId: string,
+  ): Promise<ApiCredential> {
+    return this.request<ApiCredential>(
+      "DELETE",
+      `/v1/service-identities/${encodeURIComponent(identityId)}/credentials/${encodeURIComponent(credentialId)}`,
+    );
+  }
+
+  revokeServiceIdentity(identityId: string): Promise<ServiceIdentity> {
+    return this.request<ServiceIdentity>(
+      "DELETE",
+      `/v1/service-identities/${encodeURIComponent(identityId)}`,
+    );
+  }
+
+  auditEvents(limit = 100): Promise<AuditEvent[]> {
+    return this.request<AuditEvent[]>(
+      "GET",
+      `/v1/audit/events?limit=${String(limit)}`,
+    );
+  }
+
+  predictChoice(input: ExternalDecisionInput): Promise<ExternalPrediction> {
+    return this.request<ExternalPrediction>(
+      "POST",
+      "/v1/external/predict-choice",
+      input,
+    );
+  }
+
+  rankOptions(input: ExternalDecisionInput): Promise<ExternalPrediction> {
+    return this.request<ExternalPrediction>(
+      "POST",
+      "/v1/external/rank-options",
+      input,
+    );
+  }
+
+  preferenceSummary(): Promise<PreferenceSummary[]> {
+    return this.request<PreferenceSummary[]>(
+      "GET",
+      "/v1/external/preference-summary",
+    );
+  }
+
+  externalModelSummary(): Promise<ModelSummary> {
+    return this.request<ModelSummary>("GET", "/v1/external/model-summary");
+  }
+
+  findSimilarDecisions(
+    input: ExternalDecisionInput,
+  ): Promise<SimilarDecision[]> {
+    return this.request<SimilarDecision[]>(
+      "POST",
+      "/v1/external/find-similar-decisions",
+      input,
+    );
+  }
+
+  recordExternalDecision(
+    input: ExternalDecisionInput,
+  ): Promise<ExternalDecision> {
+    return this.request<ExternalDecision>(
+      "POST",
+      "/v1/external/record-decision",
+      input,
+    );
+  }
+
+  recordExternalOutcome(
+    decisionId: string,
+    satisfaction: number,
+    regret: boolean,
+    notes?: string,
+  ): Promise<DecisionOutcome> {
+    return this.request<DecisionOutcome>(
+      "POST",
+      "/v1/external/record-outcome",
+      {
+        decision_id: decisionId,
+        satisfaction,
+        regret,
+        notes: notes ?? null,
+      },
+    );
   }
 }

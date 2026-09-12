@@ -506,3 +506,52 @@ class PairedDevice:
     @property
     def is_active(self) -> bool:
         return self.revoked_at is None
+
+
+@dataclass(frozen=True, slots=True)
+class ServiceIdentity:
+    """A revocable, least-privilege identity for one external application."""
+
+    id: str
+    profile_id: str
+    name: str
+    description: str | None
+    scopes: tuple[str, ...]
+    created_at: datetime
+    revoked_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at, self.revoked_at)
+        if not self.name.strip():
+            raise ValueError("Service identity name must not be empty.")
+        if self.description is not None and not self.description.strip():
+            raise ValueError("Service identity description must be omitted or contain text.")
+        if not self.scopes or any(not scope.strip() for scope in self.scopes):
+            raise ValueError("Service identity scopes must not be empty.")
+        if tuple(sorted(set(self.scopes))) != self.scopes:
+            raise ValueError("Service identity scopes must be unique and sorted.")
+
+    @property
+    def is_active(self) -> bool:
+        return self.revoked_at is None
+
+
+@dataclass(frozen=True, slots=True)
+class ApiCredential:
+    """A revocable API-key hash; usable secret material is never persisted."""
+
+    id: str
+    service_identity_id: str
+    secret_hash: str
+    created_at: datetime
+    last_used_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at, self.last_used_at, self.revoked_at)
+        if not self.secret_hash:
+            raise ValueError("API credential hash must not be empty.")
+
+    @property
+    def is_active(self) -> bool:
+        return self.revoked_at is None
