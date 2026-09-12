@@ -72,6 +72,13 @@ an explicit `storage.path`, the database location is `DATA_DIR/decision-twin.db`
 An explicit storage path takes precedence over that derived location. Choose an
 absolute `DATA_DIR` when launching from different directories.
 
+Phase 10 local backups and encrypted exports default to `DATA_DIR/backups`.
+Archives read the configured database path but never include configuration, TLS
+keys, logs, or the backups directory itself. A staged desktop restore uses a
+private temporary directory and marker under `DATA_DIR`, applies on daemon
+restart, and is removed after successful migration. Do not manually edit or move
+`.restore-*` files while a restore is pending.
+
 Privacy mode accepts `strict_local`, `hybrid`, and `offline`. Storage accepts
 `sqlite`; vector backend accepts `sqlite_vec` or `cosine`; provider defaults are
 Ollama and local embeddings. `strict_local` and `offline` restrict model requests

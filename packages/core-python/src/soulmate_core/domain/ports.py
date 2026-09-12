@@ -27,6 +27,7 @@ from soulmate_core.domain.models import (
     RawEvent,
     ServiceIdentity,
     Source,
+    SourceDeletion,
     UserModelSnapshot,
 )
 
@@ -41,6 +42,18 @@ class SourceRepository(Protocol):
     def add(self, source: Source) -> None: ...
 
     def get(self, source_id: str) -> Source | None: ...
+
+    def list_for_profile(self, profile_id: str) -> tuple[Source, ...]: ...
+
+    def add_import(
+        self,
+        source: Source,
+        conversations: tuple[Conversation, ...],
+        messages: tuple[Message, ...],
+        events: tuple[RawEvent, ...],
+    ) -> None: ...
+
+    def remove_import(self, profile_id: str, source_id: str) -> SourceDeletion | None: ...
 
 
 class RawEventRepository(Protocol):

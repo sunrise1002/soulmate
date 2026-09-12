@@ -89,6 +89,14 @@ class Database:
             head_revision=self.head_revision(),
         )
 
+    def backup_to(self, destination: Path) -> None:
+        """Create a transactionally consistent SQLite snapshot, including live WAL data."""
+        self.connect()
+        destination = destination.expanduser().resolve()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with sqlite3.connect(self.path) as source, sqlite3.connect(destination) as target:
+            source.backup(target)
+
     def close(self) -> None:
         if self.engine is not None:
             self.engine.dispose()

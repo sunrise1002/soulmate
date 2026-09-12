@@ -1,9 +1,11 @@
 """Command-line lifecycle and diagnostics for the local daemon."""
 
 import argparse
+import getpass
 import json
 import os
 import socket
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -11,12 +13,20 @@ from urllib.request import ProxyHandler, build_opener
 
 from alembic.util.exc import CommandError
 from soulmate_core.evaluation import evaluate_dataset, load_dataset
+from soulmate_core.importing import ImportFormat
 from soulmate_core.preferences import ModelRebuilder
 from soulmate_mcp.server import main as mcp_main
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy.exc import SQLAlchemyError
 
 from soulmate_daemon.config import ConfigurationError, Settings, load_settings
+from soulmate_daemon.imports import ChatImportService
+from soulmate_daemon.portability import (
+    ARCHIVE_MAGIC,
+    ArchiveService,
+    PortabilityError,
+    restore_archive,
+)
 from soulmate_daemon.providers import build_provider
 from soulmate_daemon.serve import serve
 from soulmate_daemon.system import DEFAULT_PROFILE_ID, ensure_installation
@@ -161,6 +171,152 @@ def _evaluate(dataset_path: Path | None) -> int:
     return 0
 
 
+def _default_archive_path(settings: Settings, kind: str) -> Path:
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    extension = ".dtwb" if kind == "backup" else ".dtw"
+    filename = f"soulmate-{kind}-{timestamp}{extension}"
+    candidate = settings.data_dir.expanduser().resolve() / "backups" / filename
+    if not candidate.exists():
+        return candidate
+    return candidate.with_stem(f"{candidate.stem}-{datetime.now(UTC).microsecond:06d}")
+
+
+def _passphrase(path: Path | None, prompt: str) -> str:
+    if path is None:
+        try:
+            return getpass.getpass(prompt)
+        except EOFError as exc:
+            raise PortabilityError(
+                "A passphrase prompt requires a terminal or --passphrase-file."
+            ) from exc
+    try:
+        return path.expanduser().read_text(encoding="utf-8").splitlines()[0]
+    except (IndexError, OSError, UnicodeDecodeError) as exc:
+        raise PortabilityError("The passphrase file could not be read.") from exc
+
+
+def _create_archive(
+    settings: Settings,
+    *,
+    kind: str,
+    output: Path | None,
+    passphrase_file: Path | None = None,
+) -> int:
+    database = Database(settings.database_path)
+    try:
+        database.migrate()
+        repositories = Repositories(database.sessions())
+        ensure_installation(repositories.system_metadata, repositories.profiles)
+        passphrase = None
+        if kind == "export":
+            passphrase = _passphrase(passphrase_file, "Export passphrase: ")
+        result = ArchiveService(settings, database).create(
+            output or _default_archive_path(settings, kind), passphrase=passphrase
+        )
+    except (OSError, RuntimeError, SQLAlchemyError, PortabilityError) as exc:
+        print(
+            json.dumps(
+                {"created": False, "error": f"Archive creation failed: {exc}"},
+                sort_keys=True,
+            )
+        )
+        return 1
+    finally:
+        database.close()
+    print(
+        json.dumps(
+            {
+                "created": True,
+                "path": str(result.path),
+                "encrypted": result.encrypted,
+                "size_bytes": result.size_bytes,
+                "sha256": result.sha256,
+                "schema_revision": result.schema_revision,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+def _restore(settings: Settings, archive: Path, passphrase_file: Path | None) -> int:
+    passphrase = None
+    try:
+        with archive.expanduser().open("rb") as source:
+            encrypted = source.read(len(ARCHIVE_MAGIC)) == ARCHIVE_MAGIC
+    except OSError as exc:
+        print(json.dumps({"restored": False, "error": str(exc)}, sort_keys=True))
+        return 1
+    if encrypted or passphrase_file is not None:
+        try:
+            passphrase = _passphrase(passphrase_file, "Archive passphrase: ")
+        except PortabilityError as exc:
+            print(json.dumps({"restored": False, "error": str(exc)}, sort_keys=True))
+            return 1
+    try:
+        result = restore_archive(settings, archive, passphrase)
+    except (OSError, RuntimeError, SQLAlchemyError, PortabilityError) as exc:
+        print(json.dumps({"restored": False, "error": str(exc)}, sort_keys=True))
+        return 1
+    print(
+        json.dumps(
+            {
+                "restored": True,
+                "schema_revision_before": result.schema_revision_before,
+                "schema_revision_after": result.schema_revision_after,
+                "snapshot_version": result.snapshot_version,
+                "installation_id": result.installation_id,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+def _import_history(
+    settings: Settings, path: Path, import_format: ImportFormat, name: str | None
+) -> int:
+    try:
+        content = path.expanduser().read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        print(
+            json.dumps(
+                {"imported": False, "error": f"Import file could not be read: {exc}"},
+                sort_keys=True,
+            )
+        )
+        return 1
+    database = Database(settings.database_path)
+    try:
+        database.migrate()
+        repositories = Repositories(database.sessions())
+        ensure_installation(repositories.system_metadata, repositories.profiles)
+        result = ChatImportService(repositories.sources).import_content(
+            DEFAULT_PROFILE_ID,
+            name or path.name,
+            content,
+            import_format,
+        )
+    except (OSError, RuntimeError, SQLAlchemyError, ValueError) as exc:
+        print(json.dumps({"imported": False, "error": str(exc)}, sort_keys=True))
+        return 1
+    finally:
+        database.close()
+    print(
+        json.dumps(
+            {
+                "imported": True,
+                "source_id": result.source.id,
+                "format": result.detected_format.value,
+                "conversation_count": result.conversation_count,
+                "message_count": result.message_count,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="decision-twin", description="Soulmate local daemon")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -175,6 +331,35 @@ def _parser() -> argparse.ArgumentParser:
     evaluate = commands.add_parser("evaluate", help="Run reproducible decision evaluation")
     evaluate.add_argument("--dataset", type=Path, help="Path to an evaluation JSON dataset")
     commands.add_parser("mcp", help="Run the scoped MCP stdio adapter")
+    for command, help_text in (
+        ("backup", "Create a local credential-free backup archive"),
+        ("export", "Create an encrypted portable archive"),
+    ):
+        archive = commands.add_parser(command, help=help_text)
+        archive.add_argument("--config", type=Path, help="Path to a TOML configuration file")
+        archive.add_argument("--output", type=Path, help="Archive output path")
+        if command == "export":
+            archive.add_argument(
+                "--passphrase-file",
+                type=Path,
+                help="Read the passphrase from a local file instead of prompting",
+            )
+    restore = commands.add_parser("restore", help="Restore a backup into a fresh installation")
+    restore.add_argument("archive", type=Path, help="Backup or encrypted portable archive")
+    restore.add_argument("--config", type=Path, help="Path to a TOML configuration file")
+    restore.add_argument(
+        "--passphrase-file", type=Path, help="Read the archive passphrase from a file"
+    )
+    import_command = commands.add_parser("import", help="Import static chat history")
+    import_command.add_argument("path", type=Path, help="UTF-8 JSON, Markdown, or text file")
+    import_command.add_argument("--config", type=Path, help="Path to a TOML configuration file")
+    import_command.add_argument(
+        "--format",
+        type=ImportFormat,
+        choices=list(ImportFormat),
+        default=ImportFormat.AUTO,
+    )
+    import_command.add_argument("--name", help="Owner-visible source name")
     return parser
 
 
@@ -197,4 +382,19 @@ def main() -> None:
         raise SystemExit(_status(settings))
     if args.command == "doctor":
         raise SystemExit(_doctor(settings))
+    if args.command == "backup":
+        raise SystemExit(_create_archive(settings, kind="backup", output=args.output))
+    if args.command == "export":
+        raise SystemExit(
+            _create_archive(
+                settings,
+                kind="export",
+                output=args.output,
+                passphrase_file=args.passphrase_file,
+            )
+        )
+    if args.command == "restore":
+        raise SystemExit(_restore(settings, args.archive, args.passphrase_file))
+    if args.command == "import":
+        raise SystemExit(_import_history(settings, args.path, args.format, args.name))
     raise SystemExit(_rebuild_model(settings))

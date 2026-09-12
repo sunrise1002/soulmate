@@ -39,6 +39,7 @@ from soulmate_core.domain.models import (
     RawEvent,
     ServiceIdentity,
     Source,
+    SourceDeletion,
     UserModelSnapshot,
 )
 from sqlalchemy import and_, case, delete, func, or_, select, update
@@ -132,6 +133,152 @@ class SqliteSourceRepository:
                 return None
             return Source(row.id, row.profile_id, row.source_type, row.name, _utc(row.created_at))
 
+    def list_for_profile(self, profile_id: str) -> tuple[Source, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(SourceRow)
+                .where(SourceRow.profile_id == profile_id)
+                .order_by(SourceRow.created_at.desc(), SourceRow.id.desc())
+            )
+            return tuple(
+                Source(row.id, row.profile_id, row.source_type, row.name, _utc(row.created_at))
+                for row in rows
+            )
+
+    def add_import(
+        self,
+        source: Source,
+        conversations: tuple[Conversation, ...],
+        messages: tuple[Message, ...],
+        events: tuple[RawEvent, ...],
+    ) -> None:
+        conversation_ids = {item.id for item in conversations}
+        if (
+            not source.source_type.startswith("import:")
+            or any(
+                item.profile_id != source.profile_id or item.source_id != source.id
+                for item in conversations
+            )
+            or any(item.conversation_id not in conversation_ids for item in messages)
+            or any(
+                item.profile_id != source.profile_id or item.source_id != source.id
+                for item in events
+            )
+        ):
+            raise ValueError("Imported records must belong to one import source and profile.")
+        with self._sessions.begin() as session:
+            session.add(
+                SourceRow(
+                    id=source.id,
+                    profile_id=source.profile_id,
+                    source_type=source.source_type,
+                    name=source.name,
+                    created_at=source.created_at,
+                )
+            )
+            session.flush()
+            session.add_all(
+                ConversationRow(
+                    id=item.id,
+                    profile_id=item.profile_id,
+                    source_id=item.source_id,
+                    created_at=item.created_at,
+                    updated_at=item.updated_at,
+                )
+                for item in conversations
+            )
+            session.flush()
+            session.add_all(
+                MessageRow(
+                    id=item.id,
+                    conversation_id=item.conversation_id,
+                    role=item.role.value,
+                    content=item.content,
+                    provider_model=item.provider_model,
+                    created_at=item.created_at,
+                )
+                for item in messages
+            )
+            session.add_all(
+                RawEventRow(
+                    id=item.id,
+                    profile_id=item.profile_id,
+                    source_id=item.source_id,
+                    event_type=item.event_type,
+                    content_json=_json_dump(item.content),
+                    created_at=item.created_at,
+                    ingested_at=item.ingested_at,
+                    sensitivity=item.sensitivity,
+                )
+                for item in events
+            )
+
+    def remove_import(self, profile_id: str, source_id: str) -> SourceDeletion | None:
+        with self._sessions.begin() as session:
+            source = session.get(SourceRow, source_id)
+            if (
+                source is None
+                or source.profile_id != profile_id
+                or not source.source_type.startswith("import:")
+            ):
+                return None
+            event_ids = select(RawEventRow.id).where(RawEventRow.source_id == source_id)
+            conversation_ids = select(ConversationRow.id).where(
+                ConversationRow.source_id == source_id
+            )
+            evidence_filter = or_(
+                EvidenceRow.source_event_id.in_(event_ids),
+                EvidenceRow.source_message_id.in_(
+                    select(MessageRow.id).where(MessageRow.conversation_id.in_(conversation_ids))
+                ),
+            )
+            counts = SourceDeletion(
+                source_id=source_id,
+                raw_event_count=cast(
+                    int,
+                    session.scalar(
+                        select(func.count())
+                        .select_from(RawEventRow)
+                        .where(RawEventRow.source_id == source_id)
+                    ),
+                ),
+                conversation_count=cast(
+                    int,
+                    session.scalar(
+                        select(func.count())
+                        .select_from(ConversationRow)
+                        .where(ConversationRow.source_id == source_id)
+                    ),
+                ),
+                message_count=cast(
+                    int,
+                    session.scalar(
+                        select(func.count())
+                        .select_from(MessageRow)
+                        .where(MessageRow.conversation_id.in_(conversation_ids))
+                    ),
+                ),
+                evidence_count=cast(
+                    int,
+                    session.scalar(
+                        select(func.count()).select_from(EvidenceRow).where(evidence_filter)
+                    ),
+                ),
+            )
+            session.execute(delete(EvidenceRow).where(evidence_filter))
+            session.execute(delete(RawEventRow).where(RawEventRow.source_id == source_id))
+            session.execute(delete(ConversationRow).where(ConversationRow.source_id == source_id))
+            session.delete(source)
+            if counts.evidence_count:
+                statement = insert(EvidenceRevisionRow).values(profile_id=profile_id, revision=1)
+                session.execute(
+                    statement.on_conflict_do_update(
+                        index_elements=[EvidenceRevisionRow.profile_id],
+                        set_={"revision": EvidenceRevisionRow.revision + 1},
+                    )
+                )
+            return counts
+
 
 class SqliteRawEventRepository:
     def __init__(self, sessions: sessionmaker[Session]) -> None:
@@ -179,6 +326,7 @@ class SqliteConversationRepository:
                 ConversationRow(
                     id=conversation.id,
                     profile_id=conversation.profile_id,
+                    source_id=conversation.source_id,
                     created_at=conversation.created_at,
                     updated_at=conversation.updated_at,
                 )
@@ -189,7 +337,13 @@ class SqliteConversationRepository:
             row = session.get(ConversationRow, conversation_id)
             if row is None:
                 return None
-            return Conversation(row.id, row.profile_id, _utc(row.created_at), _utc(row.updated_at))
+            return Conversation(
+                row.id,
+                row.profile_id,
+                _utc(row.created_at),
+                _utc(row.updated_at),
+                row.source_id,
+            )
 
     def list_for_profile(self, profile_id: str) -> tuple[Conversation, ...]:
         with self._sessions() as session:
@@ -199,7 +353,13 @@ class SqliteConversationRepository:
                 .order_by(ConversationRow.updated_at.desc(), ConversationRow.id.desc())
             )
             return tuple(
-                Conversation(row.id, row.profile_id, _utc(row.created_at), _utc(row.updated_at))
+                Conversation(
+                    row.id,
+                    row.profile_id,
+                    _utc(row.created_at),
+                    _utc(row.updated_at),
+                    row.source_id,
+                )
                 for row in rows
             )
 

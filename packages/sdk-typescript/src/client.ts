@@ -4,8 +4,11 @@ import type {
   ApiCredential,
   AuditEvent,
   ChatResponse,
+  ChatImportResult,
   Conversation,
   Decision,
+  DataArchive,
+  DataSource,
   DecisionAdvice,
   DecisionHistoryItem,
   DecisionOptionInput,
@@ -32,6 +35,9 @@ import type {
   UncertaintySignal,
   IssuedApiCredential,
   IssuedServiceIdentity,
+  ImportFormat,
+  RestoreStaged,
+  SourceDeletionResult,
 } from "./types.ts";
 
 export type FetchLike = (
@@ -356,6 +362,49 @@ export class SoulmateClient {
       "GET",
       `/v1/audit/events?limit=${String(limit)}`,
     );
+  }
+
+  dataSources(): Promise<DataSource[]> {
+    return this.request<DataSource[]>("GET", "/v1/data/sources");
+  }
+
+  importChatHistory(
+    name: string,
+    content: string,
+    format: ImportFormat = "auto",
+  ): Promise<ChatImportResult> {
+    return this.request<ChatImportResult>("POST", "/v1/data/imports", {
+      name,
+      content,
+      format,
+    });
+  }
+
+  deleteDataSource(sourceId: string): Promise<SourceDeletionResult> {
+    return this.request<SourceDeletionResult>(
+      "DELETE",
+      `/v1/data/sources/${encodeURIComponent(sourceId)}`,
+    );
+  }
+
+  createBackup(): Promise<DataArchive> {
+    return this.request<DataArchive>("POST", "/v1/data/backups");
+  }
+
+  createEncryptedExport(passphrase: string): Promise<DataArchive> {
+    return this.request<DataArchive>("POST", "/v1/data/exports", {
+      passphrase,
+    });
+  }
+
+  stageRestore(
+    archiveBase64: string,
+    passphrase?: string,
+  ): Promise<RestoreStaged> {
+    return this.request<RestoreStaged>("POST", "/v1/data/restores", {
+      archive_base64: archiveBase64,
+      passphrase: passphrase ?? null,
+    });
   }
 
   predictChoice(input: ExternalDecisionInput): Promise<ExternalPrediction> {

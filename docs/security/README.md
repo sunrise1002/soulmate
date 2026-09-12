@@ -13,8 +13,9 @@ wildcard binds are rejected. Every request passes one authorization boundary bef
 any handler sees personal data: loopback callers are the owner, and every other
 caller needs a bearer credential issued by pairing. Health and pairing completion
 are the only public API paths. Pairing, device listing, revocation, network status,
-evidence deletion, and outcome deletion are owner-only. Removing an outcome also
-removes its source event and invalidates advice that may have used it.
+evidence deletion, outcome deletion, import, backup, export, restore, and imported
+source deletion are owner-only. Removing an outcome also removes its source event
+and invalidates advice that may have used it.
 
 Pairing tokens are 256-bit, single-use, and expire in five minutes; they are
 claimed atomically so a token can never be redeemed twice. Only hashes of pairing
@@ -31,6 +32,15 @@ responses omit raw memories, evidence, outcome history, and notes. Every externa
 adds a local audit event containing identity, credential identifier, method, path,
 and status only—never the key or request payload.
 
+Backups use SQLite's online backup operation so committed WAL data is captured.
+Every archive removes pairing tokens, paired-device credentials, API credentials,
+and installation identity while preserving service identities and local audit
+history. TLS private keys, provider secrets, logs, configuration, and existing
+backups are excluded. Portable `.dtw` archives use scrypt key derivation and
+AES-256-GCM authenticated encryption. Restore validates archive paths, checksums,
+format and database versions, refuses non-fresh installations, migrates known
+schemas, and rebuilds derived state from Evidence. See ADR-011.
+
 The service certificate is self-signed and generated locally with an owner-only
 private key. Browsers show a warning until the owner accepts it, and mobile
 transport pinning requires a native network configuration built from the stored
@@ -39,4 +49,5 @@ internet exposure is not supported.
 
 Do not put personal data or secrets into issue reports, logs, fixtures, source
 control, or CI artifacts. Use synthetic fixtures and keep runtime data outside
-tracked source. See ADR-001, ADR-005, ADR-006, ADR-008, ADR-009, and ADR-010.
+tracked source. See ADR-001, ADR-005, ADR-006, ADR-008, ADR-009, ADR-010, and
+ADR-011.

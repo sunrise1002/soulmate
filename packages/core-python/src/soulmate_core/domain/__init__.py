@@ -33,6 +33,7 @@ from soulmate_core.domain.models import (
     RawEvent,
     ServiceIdentity,
     Source,
+    SourceDeletion,
     UserModelSnapshot,
 )
 from soulmate_core.domain.ports import (
@@ -103,6 +104,7 @@ __all__ = [
     "ServiceIdentity",
     "ServiceIdentityRepository",
     "Source",
+    "SourceDeletion",
     "SourceRepository",
     "SystemMetadataRepository",
     "UserModelSnapshot",

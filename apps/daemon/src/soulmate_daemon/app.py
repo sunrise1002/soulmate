@@ -39,6 +39,7 @@ from soulmate_daemon.access_api import build_access_router
 from soulmate_daemon.active_learning import ActiveAnswerResult, ActiveLearningService
 from soulmate_daemon.config import Settings
 from soulmate_daemon.conversation import ConversationService
+from soulmate_daemon.data_api import build_data_router
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
 from soulmate_daemon.external_api import build_external_router
 from soulmate_daemon.jobs import DurableJobWorker
@@ -47,6 +48,7 @@ from soulmate_daemon.network import (
     NetworkConfigurationError,
     prepare_lan_endpoint,
 )
+from soulmate_daemon.portability import apply_pending_restore
 from soulmate_daemon.providers import build_provider
 from soulmate_daemon.runtime import (
     AppState,
@@ -562,12 +564,17 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        restored_revision = apply_pending_restore(resolved_settings)
         database = Database(resolved_settings.database_path)
         database.migrate()
         if database.session_factory is None:
             raise RuntimeError("Database session factory was not initialized.")
         repositories = Repositories(database.session_factory)
         installation_id = ensure_installation(repositories.system_metadata, repositories.profiles)
+        if restored_revision is not None:
+            ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
+                DEFAULT_PROFILE_ID
+            )
         endpoint, lan_error = _resolve_lan(resolved_settings, lan)
         app.state.runtime = AppState(
             settings=resolved_settings,
@@ -1179,5 +1186,6 @@ def create_app(
 
     app.include_router(build_access_router(app))
     app.include_router(build_external_router(app))
+    app.include_router(build_data_router(app))
     mount_web_client(app, resolved_settings.web_client_directory)
     return app

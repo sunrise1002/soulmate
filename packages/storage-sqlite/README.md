@@ -10,7 +10,10 @@ structured options, model-snapshot-bound predictions, and actual resolutions.
 Phase 7 adds hashed pairing tokens and paired-device credentials. Phase 8 adds
 active questions and answers, decision outcomes, and snapshot-bound advice.
 Phase 9 adds service identities, normalized permission scopes, and independently
-revocable hash-only API credentials.
+revocable hash-only API credentials. Phase 10 adds source-linked imported
+conversations plus transactional import and provenance-deletion operations. The
+database adapter also exposes SQLite's online backup operation so live WAL state
+is copied consistently.
 
 The adapter depends inward on `soulmate-core`; core never imports this package or
 SQLAlchemy. Schema changes require a new migration under

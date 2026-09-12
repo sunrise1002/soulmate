@@ -5,9 +5,9 @@ the previous phase before planning or implementing the current phase.
 
 ## Authorized scope
 
-Phase 9 — MCP & External Personal Intelligence API is complete locally. Phase 10
-is not authorized. Stop at the Phase 9 boundary until the user explicitly
-requests the next phase.
+Phase 10 — Import, Backup & Portability is complete locally. Phase 11 is not
+authorized. Stop at the Phase 10 boundary until the user explicitly requests the
+next phase.
 
 ## Reports
 
@@ -23,19 +23,20 @@ requests the next phase.
 | Phase 7 | Complete locally | [Phase 7 report](phases/phase-7-report.md) | Remote CI, native mobile builds, and browser trust of the self-signed certificate unverified |
 | Phase 8 | Complete locally | [Phase 8 report](phases/phase-8-report.md) | Remote CI, richer question generation, native mobile builds, and external outcome calibration unverified |
 | Phase 9 | Complete locally | [Phase 9 report](phases/phase-9-report.md) | Remote CI, remote MCP transport, cross-platform packaged MCP smoke tests, and native mobile builds unverified |
+| Phase 10 | Complete locally | [Phase 10 report](phases/phase-10-report.md) | Remote CI, cross-platform restore, large archives, and native mobile builds unverified |
 
-## Phase 9 exit criteria
+## Phase 10 exit criteria
 
-Passed locally on macOS arm64. An owner can create separately scoped external
-service identities, rotate or revoke hash-only API credentials, inspect a local
-audit trail, and use six MCP tools through the packaged daemon without exposing
-raw evidence, memories, outcome history, or notes. Scope changes and revocation take
-effect on the next request, and identity state survives restart.
+Passed locally on macOS arm64. An owner can create a consistent credential-free
+backup, restore it into a fresh installation, move the Personal Model and
+decision history through a passphrase-encrypted archive, import static chat
+histories, and delete an imported provenance source together with its derivative
+Evidence before a deterministic model rebuild.
 
 ## Next action
 
-Wait for explicit Phase 10 authorization. Before planning it, read the complete
-[Phase 9 report](phases/phase-9-report.md) and inspect current repository state.
+Wait for explicit Phase 11 authorization. Before planning it, read the complete
+[Phase 10 report](phases/phase-10-report.md) and inspect current repository state.
 
 ## Repository governance
 

@@ -82,6 +82,12 @@ describe("desktop navigation", () => {
     expect(
       screen.getByRole("heading", { name: "External Agents" }),
     ).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Data & Privacy" }));
+    expect(
+      screen.getByRole("heading", { name: "Data & Privacy" }),
+    ).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Back up now" })).not.toBeNull();
   });
 
   it("keeps access from other devices off until the owner enables it", async () => {

@@ -47,6 +47,7 @@ OWNER_ONLY_RULES: tuple[tuple[str | None, str], ...] = (
     ("DELETE", "/v1/decisions"),
     (None, "/v1/service-identities"),
     (None, "/v1/audit/events"),
+    (None, "/v1/data"),
 )
 
 PUBLIC_RULES: tuple[tuple[str | None, str], ...] = (

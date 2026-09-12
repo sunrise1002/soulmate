@@ -35,7 +35,11 @@ behavioral prediction and wellbeing recommendation as separate versioned models.
 Phase 9 added service identity and API-credential ports, SQLite adapters, scoped
 external REST operations, metadata-only request auditing, and a stdio MCP adapter
 that consults the daemon without reading local persistence directly. The Python
-SDK remains a documented placeholder.
+SDK remains a documented placeholder. Phase 10 added source-linked import
+provenance, consistent sanitized SQLite snapshots, authenticated encrypted
+archives, fresh-install restore, forward schema migration, and deterministic
+model rebuilding. Archive and import orchestration remain outside the kernel;
+provider-neutral parsing and repository contracts point inward.
 
 ADRs below record decisions from specification section 65. Each ADR status states
 whether the decision is architectural only or already implemented.
@@ -52,3 +56,4 @@ whether the decision is architectural only or already implemented.
 | [008](decisions/ADR-008-rest-and-mcp.md) | REST and MCP integration |
 | [009](decisions/ADR-009-lan-pairing.md) | LAN access through owner-approved device pairing |
 | [010](decisions/ADR-010-behavioral-wellbeing.md) | Separate behavioral prediction from wellbeing advice |
+| [011](decisions/ADR-011-portable-archives.md) | Credential-free authenticated portable archives |

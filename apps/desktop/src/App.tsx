@@ -2,6 +2,7 @@ import {
   BrainCircuit,
   Bot,
   Clock3,
+  Database,
   MessageCircleMore,
   Settings as SettingsIcon,
   Smartphone,
@@ -12,6 +13,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ServiceBadge } from "./components/ServiceBadge.tsx";
 import { ChatScreen } from "./screens/ChatScreen.tsx";
+import { DataScreen } from "./screens/DataScreen.tsx";
 import { DecideScreen } from "./screens/DecideScreen.tsx";
 import { DevicesScreen } from "./screens/DevicesScreen.tsx";
 import { ExternalAgentsScreen } from "./screens/ExternalAgentsScreen.tsx";
@@ -22,7 +24,14 @@ import { getServiceStatus } from "./runtime.ts";
 import type { ServiceStatus } from "./types.ts";
 
 type Screen =
-  "chat" | "decide" | "model" | "history" | "devices" | "agents" | "settings";
+  | "chat"
+  | "decide"
+  | "model"
+  | "history"
+  | "devices"
+  | "agents"
+  | "data"
+  | "settings";
 
 const navigation: {
   id: Screen;
@@ -35,6 +44,7 @@ const navigation: {
   { id: "history", label: "History", icon: Clock3 },
   { id: "devices", label: "Devices", icon: Smartphone },
   { id: "agents", label: "External Agents", icon: Bot },
+  { id: "data", label: "Data & Privacy", icon: Database },
   { id: "settings", label: "Settings", icon: SettingsIcon },
 ];
 
@@ -97,6 +107,13 @@ export function App() {
         return <DevicesScreen onServiceChanged={refreshServiceStatus} />;
       case "agents":
         return <ExternalAgentsScreen />;
+      case "data":
+        return (
+          <DataScreen
+            onDataChanged={() => setModelRevision((value) => value + 1)}
+            onServiceChanged={refreshServiceStatus}
+          />
+        );
       case "settings":
         return (
           <SettingsScreen

@@ -35,6 +35,13 @@ The External Agents screen creates scoped service identities, shows each new API
 key once, manages key rotation and revocation, and displays the local audit trail.
 The packaged sidecar also exposes the MCP stdio adapter as `decision-twin mcp`.
 
+The Data & Privacy screen creates consistent local backups, passphrase-encrypted
+portable exports, imports static JSON/Markdown/text histories, deletes imported
+sources and their derivative evidence, and stages restore into a fresh
+installation. Restore restarts the managed daemon so migrations and model rebuild
+run before the restored data is served. Desktop archive uploads are limited to 64
+MiB; use the CLI for larger supported archives.
+
 ## Verification and packaging
 
 ```sh
@@ -55,4 +62,6 @@ of Phase 6.
 - Strict-local and offline modes reject non-loopback provider endpoints.
 - Hybrid mode permits loopback HTTP or external HTTPS provider endpoints.
 - The shell retains only a bounded daemon log tail and does not log request bodies.
+- Data-management routes are owner-only and archives exclude all usable
+  authentication state.
 - The content security policy allows application assets and Tauri IPC only.

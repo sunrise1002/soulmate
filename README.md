@@ -3,9 +3,9 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 9 MCP & External Personal Intelligence API is implemented
-locally. See the [phase status](docs/phase-status.md) and detailed
-[Phase 9 report](docs/phases/phase-9-report.md).
+**Current status:** Phase 10 Import, Backup & Portability is implemented locally.
+See the [phase status](docs/phase-status.md) and detailed
+[Phase 10 report](docs/phases/phase-10-report.md).
 
 ## Development setup
 
@@ -69,6 +69,9 @@ uv run --locked decision-twin status
 uv run --locked decision-twin doctor
 uv run --locked decision-twin rebuild-model
 uv run --locked decision-twin evaluate
+uv run --locked decision-twin backup
+uv run --locked decision-twin import ./history.json
+uv run --locked decision-twin export --output ./personal-model.dtw
 ```
 
 `status` queries `/v1/health` and `/v1/system/info`. `doctor` checks storage
@@ -124,6 +127,35 @@ key once. External REST responses provide derived summaries and decision results
 without returning raw evidence, memories, outcome notes, or the broader personal
 database.
 
+Phase 10 adds consistent credential-free local backups and passphrase-encrypted
+portable exports. `backup` writes a `.dtwb` archive under `DATA_DIR/backups` by
+default. `export` writes an AES-256-GCM authenticated `.dtw` archive and prompts
+for a passphrase; automation can use `--passphrase-file PATH` without exposing the
+passphrase in process arguments. Archives include the database and any local
+`objects`, `indexes`, and `models` files. They exclude pairing state, API
+credentials, installation identity, TLS keys, provider secrets, logs,
+configuration, and existing backups.
+
+Restore while the daemon is stopped and only into a fresh installation:
+
+```sh
+DATA_DIR=./fresh-data uv run --locked decision-twin restore ./backup.dtwb
+DATA_DIR=./fresh-data uv run --locked decision-twin restore ./personal-model.dtw
+```
+
+Encrypted restore prompts for the passphrase or accepts `--passphrase-file`.
+Known older schemas migrate forward, the destination receives a new installation
+identity, and the Personal Model is rebuilt from Evidence. Restore never merges
+with or overwrites owner-created data.
+
+`import` accepts UTF-8 generic JSON, Markdown, plain text, ChatGPT exports, and
+Claude exports. Use `--format auto|json|markdown|text|chatgpt|claude`; auto is the
+default. Imports create provenance-linked conversations and RawEvents locally and
+never trigger hidden model-provider egress. The desktop Data & Privacy screen
+provides one-click backup, encrypted export, fresh-install staged restore, import,
+and source deletion. Deleting an imported source removes its messages, RawEvents,
+and derivative Evidence before rebuilding the model.
+
 Run the stdio MCP adapter through the daemon executable:
 
 ```sh
@@ -135,6 +167,12 @@ Set `SOULMATE_BASE_URL` only when the daemon does not use the default
 `get_preference_summary`, `find_similar_decisions`, `record_decision`, and
 `record_outcome`. Grant the corresponding scopes in the desktop UI. Every tool
 call passes the same authorization boundary and application services as REST.
+
+Phase 10 owner-only routes are `GET /v1/data/sources`,
+`POST /v1/data/imports`, `DELETE /v1/data/sources/{id}`,
+`POST /v1/data/backups`, `POST /v1/data/exports`, and
+`POST /v1/data/restores`. Paired devices and external service identities cannot
+use data-management operations.
 
 The desktop history views use `GET /v1/conversations` and `GET /v1/decisions`.
 The My Model screen can inspect provenance, add correction evidence, and use
@@ -189,7 +227,7 @@ environment overrides, `DATA_DIR`, and path semantics.
 | `packages/sdk-typescript/` | Typed REST client and pairing rules shared by clients |
 | `packages/sdk-python/` | Reserved future SDK location |
 | `tests/` | Unit, integration, and evaluation tests using synthetic data |
-| `docs/architecture/decisions/` | ADR-001 through ADR-010 |
+| `docs/architecture/decisions/` | ADR-001 through ADR-011 |
 | `docs/phases/` | Durable plans, results, issues, and handoff reports per phase |
 | `docs/contributor-guide/` | Conventions and configuration reference |
 

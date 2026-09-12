@@ -31,6 +31,48 @@ export interface ApiResponse<T> {
   body: T;
 }
 
+export type ImportFormat =
+  "auto" | "json" | "markdown" | "text" | "chatgpt" | "claude";
+
+export interface DataSource {
+  id: string;
+  source_type: string;
+  name: string;
+  created_at: string;
+}
+
+export interface DataArchive {
+  path: string;
+  filename: string;
+  created_at: string;
+  size_bytes: number;
+  sha256: string;
+  encrypted: boolean;
+  schema_revision: string;
+}
+
+export interface ChatImportResult {
+  source: DataSource;
+  detected_format: Exclude<ImportFormat, "auto">;
+  conversation_count: number;
+  message_count: number;
+}
+
+export interface SourceDeletionResult {
+  source_id: string;
+  raw_event_count: number;
+  conversation_count: number;
+  message_count: number;
+  evidence_count: number;
+  snapshot_version: number;
+}
+
+export interface RestoreStaged {
+  staged: boolean;
+  source_schema_revision: string;
+  restart_required: boolean;
+}
+
 export interface Health {
   status: string;
   database: string;

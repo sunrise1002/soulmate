@@ -69,10 +69,16 @@ class ConversationRow(Base):
     profile_id: Mapped[str] = mapped_column(
         ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
     )
+    source_id: Mapped[str | None] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
-    __table_args__ = (Index("ix_conversations_profile_updated", "profile_id", "updated_at"),)
+    __table_args__ = (
+        Index("ix_conversations_profile_updated", "profile_id", "updated_at"),
+        Index("ix_conversations_source", "source_id"),
+    )
 
 
 class MessageRow(Base):

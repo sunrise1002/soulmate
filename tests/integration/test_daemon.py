@@ -298,6 +298,73 @@ def test_rebuild_model_cli_creates_versioned_snapshots(tmp_path: Path) -> None:
     assert json.loads(second.stdout)["evidence_revision"] == 0
 
 
+def test_portability_cli_imports_backs_up_exports_and_restores(tmp_path: Path) -> None:
+    executable = shutil.which("decision-twin")
+    assert executable is not None
+    source_dir = tmp_path / "machine-a"
+    target_dir = tmp_path / "machine-b"
+    transcript = tmp_path / "synthetic.md"
+    transcript.write_text("User: I prefer local tools.\nAssistant: Noted.", encoding="utf-8")
+    archive = tmp_path / "backup.dtwb"
+    encrypted = tmp_path / "portable.dtw"
+    passphrase_file = tmp_path / "phrase.txt"
+    passphrase_file.write_text("synthetic export phrase\n", encoding="utf-8")
+    source_env = dict(os.environ, DATA_DIR=str(source_dir))
+
+    imported = subprocess.run(
+        [executable, "import", str(transcript)],
+        cwd=tmp_path,
+        env=source_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    backup = subprocess.run(
+        [executable, "backup", "--output", str(archive)],
+        cwd=tmp_path,
+        env=source_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    exported = subprocess.run(
+        [
+            executable,
+            "export",
+            "--output",
+            str(encrypted),
+            "--passphrase-file",
+            str(passphrase_file),
+        ],
+        cwd=tmp_path,
+        env=source_env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    restored = subprocess.run(
+        [executable, "restore", str(archive)],
+        cwd=tmp_path,
+        env=dict(os.environ, DATA_DIR=str(target_dir)),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert imported.returncode == backup.returncode == exported.returncode == 0
+    assert restored.returncode == 0
+    assert json.loads(imported.stdout)["message_count"] == 2
+    assert json.loads(backup.stdout)["encrypted"] is False
+    assert json.loads(exported.stdout)["encrypted"] is True
+    assert json.loads(restored.stdout)["schema_revision_after"] == "0008_phase_10"
+    target_database = Database(target_dir / "decision-twin.db")
+    target_database.migrate()
+    target_repositories = Repositories(target_database.sessions())
+    sources = target_repositories.sources.list_for_profile("profile_default")
+    assert sources[0].name == transcript.name
+    target_database.close()
+
+
 def test_cli_reports_bad_config_without_traceback(tmp_path: Path) -> None:
     executable = shutil.which("decision-twin")
     assert executable is not None

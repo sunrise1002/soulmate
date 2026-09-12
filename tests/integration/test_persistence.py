@@ -74,7 +74,7 @@ def test_initial_migration_creates_base_tables_and_required_pragmas(tmp_path: Pa
     assert check.integrity == "ok"
     assert check.journal_mode == "wal"
     assert check.foreign_keys is True
-    assert check.current_revision == check.head_revision == "0007_phase_9"
+    assert check.current_revision == check.head_revision == "0008_phase_10"
     database.close()
 
 
@@ -145,7 +145,7 @@ def test_phase_1_database_upgrades_without_losing_base_records(tmp_path: Path) -
     database.migrate()
 
     assert repositories.profiles.get(profile.id) == profile
-    assert database.current_revision() == "0007_phase_9"
+    assert database.current_revision() == "0008_phase_10"
     database.close()
 
 
@@ -217,7 +217,7 @@ def test_phase_2_database_upgrades_without_losing_evidence_or_model_state(tmp_pa
         ).scalar_one()
     assert evidence == ("phase-2-test", None, None)
     assert preference_count == 1
-    assert database.current_revision() == "0007_phase_9"
+    assert database.current_revision() == "0008_phase_10"
     database.close()
 
 
@@ -236,32 +236,50 @@ def test_phase_3_database_upgrades_without_losing_conversation_provenance(tmp_pa
     )
     event = RawEvent("event_preserved", profile.id, None, "conversation_message", {}, now, now)
     repositories.profiles.add(profile)
-    repositories.conversations.add(conversation)
+    assert database.engine is not None
+    with database.engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO conversations (id, profile_id, created_at, updated_at) "
+                "VALUES (:id, :profile_id, :created_at, :updated_at)"
+            ),
+            {
+                "id": conversation.id,
+                "profile_id": conversation.profile_id,
+                "created_at": conversation.created_at,
+                "updated_at": conversation.updated_at,
+            },
+        )
     repositories.messages.add(message)
     repositories.raw_events.add(event)
-    repositories.evidence.add(
-        Evidence(
-            "evidence_preserved",
-            profile.id,
-            EvidenceTargetType.PREFERENCE,
-            "work.remote",
-            0.8,
-            1.0,
-            1.0,
-            {},
-            "explicit_statement",
-            event.id,
-            "phase-3-test",
-            now,
-            source_message_id=message.id,
+    with database.engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO evidence "
+                "(id, profile_id, target_type, target_key, value_json, strength, confidence, "
+                "context_json, source_type, source_event_id, extractor_version, extractor_model, "
+                "source_message_id, created_at) VALUES "
+                "('evidence_preserved', :profile_id, 'preference', 'work.remote', '0.8', 1, 1, "
+                "'{}', 'explicit_statement', :event_id, 'phase-3-test', NULL, :message_id, "
+                ":created_at)"
+            ),
+            {
+                "profile_id": profile.id,
+                "event_id": event.id,
+                "message_id": message.id,
+                "created_at": now,
+            },
         )
-    )
+        connection.execute(
+            text("INSERT INTO evidence_revisions (profile_id, revision) VALUES (:profile_id, 1)"),
+            {"profile_id": profile.id},
+        )
 
     database.migrate()
 
     assert repositories.messages.get(message.id) == message
     assert repositories.evidence.get("evidence_preserved") is not None
-    assert database.current_revision() == "0007_phase_9"
+    assert database.current_revision() == "0008_phase_10"
     database.close()
 
 

@@ -98,9 +98,21 @@ class Conversation:
     profile_id: str
     created_at: datetime
     updated_at: datetime
+    source_id: str | None = None
 
     def __post_init__(self) -> None:
         _require_utc_aware(self.created_at, self.updated_at)
+
+
+@dataclass(frozen=True, slots=True)
+class SourceDeletion:
+    """Counts removed with one imported source and its provenance graph."""
+
+    source_id: str
+    raw_event_count: int
+    conversation_count: int
+    message_count: int
+    evidence_count: int
 
 
 @dataclass(frozen=True, slots=True)

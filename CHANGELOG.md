@@ -4,6 +4,16 @@
 
 ### Added
 
+- Phase 10 consistent SQLite backups, encrypted `.dtw` portable exports using
+  scrypt and AES-256-GCM, fresh-install restore with schema migration and a
+  deterministic Personal Model rebuild, and credential-free archive manifests.
+- Static chat history imports for generic JSON, Markdown, plain text, ChatGPT,
+  and Claude exports, with source-linked conversations and RawEvents.
+- Owner-only source deletion that atomically removes imported conversations,
+  RawEvents, and derivative Evidence before rebuilding the Personal Model.
+- `backup`, `export`, `restore`, and `import` CLI commands, owner-only data APIs,
+  typed SDK operations, a desktop Data & Privacy screen, migration
+  `0008_phase_10`, and ADR-011 for the portability boundary.
 - Phase 9 external service identities with independent revocable credentials,
   five least-privilege scopes, hash-only API-key persistence, and owner-controlled
   credential rotation and permission changes.
@@ -102,5 +112,6 @@
   templates, security guidance, and documented GitHub ruleset settings.
 
 No embeddings, real-provider evaluation, remote MCP transport,
-signing/notarization, automatic updates, import/backup, live connectors, or
-delegated decisions have been implemented.
+signing/notarization, automatic updates, live connectors, or delegated decisions
+have been implemented. Imported histories are normalized locally but do not
+automatically invoke an LLM or create derived Evidence.
