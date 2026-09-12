@@ -32,3 +32,20 @@ def test_kernel_declares_no_runtime_dependencies() -> None:
         metadata = tomllib.load(source)
     assert metadata["project"]["dependencies"] == []
     assert not metadata["project"].get("optional-dependencies")
+
+
+def test_connector_sdk_is_dependency_free_and_kernel_does_not_import_it() -> None:
+    root = Path(__file__).resolve().parents[2]
+    sdk = root / "packages/connector-sdk"
+    with (sdk / "pyproject.toml").open("rb") as package_file:
+        metadata = tomllib.load(package_file)
+    assert metadata["project"]["dependencies"] == []
+
+    kernel_imports: list[str] = []
+    for source_path in (root / "packages/core-python/src").rglob("*.py"):
+        for node in ast.walk(ast.parse(source_path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Import):
+                kernel_imports.extend(alias.name for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                kernel_imports.append(node.module)
+    assert not any(name.startswith("soulmate_connector_sdk") for name in kernel_imports)

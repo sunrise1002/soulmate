@@ -48,6 +48,7 @@ OWNER_ONLY_RULES: tuple[tuple[str | None, str], ...] = (
     (None, "/v1/service-identities"),
     (None, "/v1/audit/events"),
     (None, "/v1/data"),
+    (None, "/v1/connectors"),
 )
 
 PUBLIC_RULES: tuple[tuple[str | None, str], ...] = (

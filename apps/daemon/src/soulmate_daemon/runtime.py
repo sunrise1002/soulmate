@@ -3,6 +3,7 @@
 from typing import TypedDict, cast
 
 from fastapi import FastAPI
+from soulmate_connector_sdk import ConnectorCatalog
 from soulmate_core.access import DevicePairingService, ExternalIdentityService
 from soulmate_llm_providers import LLMProvider
 from soulmate_storage_sqlite import Database, Repositories
@@ -20,6 +21,7 @@ class AppState(TypedDict):
     provider: LLMProvider | None
     lan: LanEndpoint | None
     lan_error: str | None
+    connector_catalog: ConnectorCatalog
 
 
 def runtime_of(app: FastAPI) -> AppState:

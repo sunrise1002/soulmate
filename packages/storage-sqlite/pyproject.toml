@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "SQLite persistence adapter for Soulmate"
 requires-python = ">=3.12"
 dependencies = [
+  "soulmate-connector-sdk",
   "soulmate-core",
   "alembic>=1.15,<2",
   "sqlalchemy>=2.0,<3",

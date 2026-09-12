@@ -10,6 +10,7 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
+from soulmate_connector_sdk import SourceConnector, discover_connectors
 from soulmate_core.domain import (
     ActiveQuestion,
     AuditEvent,
@@ -38,6 +39,8 @@ from soulmate_daemon import __version__
 from soulmate_daemon.access_api import build_access_router
 from soulmate_daemon.active_learning import ActiveAnswerResult, ActiveLearningService
 from soulmate_daemon.config import Settings
+from soulmate_daemon.connector_api import build_connector_router
+from soulmate_daemon.connectors import CONNECTOR_SYNC_JOB, ConnectorService
 from soulmate_daemon.conversation import ConversationService
 from soulmate_daemon.data_api import build_data_router
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
@@ -559,6 +562,7 @@ def create_app(
     *,
     provider: LLMProvider | None = None,
     lan: LanEndpoint | None = None,
+    connectors: tuple[SourceConnector, ...] = (),
 ) -> FastAPI:
     resolved_settings = settings if settings is not None else Settings()
 
@@ -576,6 +580,7 @@ def create_app(
                 DEFAULT_PROFILE_ID
             )
         endpoint, lan_error = _resolve_lan(resolved_settings, lan)
+        connector_catalog = discover_connectors(connectors)
         app.state.runtime = AppState(
             settings=resolved_settings,
             database=database,
@@ -584,9 +589,24 @@ def create_app(
             provider=provider,
             lan=endpoint,
             lan_error=lan_error,
+            connector_catalog=connector_catalog,
         )
         stop = asyncio.Event()
-        worker = DurableJobWorker(repositories.jobs, {})
+
+        async def sync_connector(payload: dict[str, object]) -> None:
+            profile_id = payload.get("profile_id")
+            connector_id = payload.get("connector_id")
+            if not isinstance(profile_id, str) or not isinstance(connector_id, str):
+                raise ValueError("Connector sync job payload is invalid.")
+            await ConnectorService(
+                repositories.connector_registrations,
+                repositories.jobs,
+                repositories.audit_events,
+                connector_catalog,
+                privacy_mode=resolved_settings.privacy.mode,
+            ).sync(profile_id, connector_id)
+
+        worker = DurableJobWorker(repositories.jobs, {CONNECTOR_SYNC_JOB: sync_connector})
         worker_task = asyncio.create_task(worker.run(stop), name="soulmate-durable-worker")
         try:
             yield
@@ -1187,5 +1207,6 @@ def create_app(
     app.include_router(build_access_router(app))
     app.include_router(build_external_router(app))
     app.include_router(build_data_router(app))
+    app.include_router(build_connector_router(app))
     mount_web_client(app, resolved_settings.web_client_directory)
     return app

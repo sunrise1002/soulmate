@@ -71,6 +71,12 @@ def main() -> None:
                 "--specpath",
                 str(temporary_path),
                 "--collect-all",
+                "soulmate_connector_local",
+                "--collect-all",
+                "soulmate_connector_sdk",
+                "--copy-metadata",
+                "soulmate-local-notes-connector",
+                "--collect-all",
                 "soulmate_storage_sqlite",
                 "--collect-data",
                 "soulmate_core",
@@ -90,6 +96,9 @@ def main() -> None:
     )
     subprocess.run(  # noqa: S603 -- destination is the sidecar produced above.
         [str(destination), "evaluate"], check=True, capture_output=True, text=True, timeout=30
+    )
+    subprocess.run(  # noqa: S603 -- verifies bundled connector metadata and imports.
+        [str(destination), "connectors"], check=True, capture_output=True, text=True, timeout=30
     )
     print(destination.relative_to(root))
 

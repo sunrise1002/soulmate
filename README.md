@@ -3,9 +3,9 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 10 Import, Backup & Portability is implemented locally.
+**Current status:** Phase 11 Connector Ecosystem is implemented locally.
 See the [phase status](docs/phase-status.md) and detailed
-[Phase 10 report](docs/phases/phase-10-report.md).
+[Phase 11 report](docs/phases/phase-11-report.md).
 
 ## Development setup
 
@@ -72,6 +72,7 @@ uv run --locked decision-twin evaluate
 uv run --locked decision-twin backup
 uv run --locked decision-twin import ./history.json
 uv run --locked decision-twin export --output ./personal-model.dtw
+uv run --locked decision-twin connectors
 ```
 
 `status` queries `/v1/health` and `/v1/system/info`. `doctor` checks storage
@@ -156,6 +157,24 @@ provides one-click backup, encrypted export, fresh-install staged restore, impor
 and source deletion. Deleting an imported source removes its messages, RawEvents,
 and derivative Evidence before rebuilding the model.
 
+Phase 11 adds an independently installable Python connector SDK and entry-point
+discovery without adding connector dependencies to the Personalization Kernel.
+The owner-only Connections API and desktop screen show each plugin's declared data,
+network, credential, and RawEvent-learning permissions before registration.
+Synchronizations run as durable local jobs, deduplicate external item identities,
+and persist sanitized state and audits. Connector credentials come only from
+dedicated `DECISION_TWIN_CONNECTOR__...` process variables, while allowed network
+calls pass a manifest host allowlist and the central privacy policy.
+
+The bundled Local Notes reference connector reads only UTF-8 Markdown and text
+files under one explicitly configured directory and performs no network calls.
+Connector routes are `GET /v1/connectors/catalog`, `GET/POST /v1/connectors`,
+`PATCH/DELETE /v1/connectors/{id}`, `POST /v1/connectors/{id}/sync`, and
+`GET /v1/connectors/syncs/{job_id}`. Removing a connector deletes its RawEvents and
+derivative Evidence before rebuilding the Personal Model. Installed connector
+packages are trusted owner-selected code; see ADR-012 before installing third-party
+plugins.
+
 Run the stdio MCP adapter through the daemon executable:
 
 ```sh
@@ -217,6 +236,8 @@ environment overrides, `DATA_DIR`, and path semantics.
 | Path | Responsibility |
 | --- | --- |
 | `packages/core-python/src/soulmate_core/` | Infrastructure-independent entities and repository ports |
+| `packages/connector-sdk/` | Stable permission manifest, event, sync, discovery, and persistence contracts for plugins |
+| `packages/connectors-local/` | Independently packaged Local Notes reference connector |
 | `packages/storage-sqlite/` | SQLAlchemy adapter and packaged Alembic migrations |
 | `apps/daemon/src/soulmate_daemon/` | Configuration, API, worker, diagnostics, and composition root |
 | `apps/desktop/` | Tauri shell, React UI, native service management, and installer configuration |
@@ -227,7 +248,7 @@ environment overrides, `DATA_DIR`, and path semantics.
 | `packages/sdk-typescript/` | Typed REST client and pairing rules shared by clients |
 | `packages/sdk-python/` | Reserved future SDK location |
 | `tests/` | Unit, integration, and evaluation tests using synthetic data |
-| `docs/architecture/decisions/` | ADR-001 through ADR-011 |
+| `docs/architecture/decisions/` | ADR-001 through ADR-012 |
 | `docs/phases/` | Durable plans, results, issues, and handoff reports per phase |
 | `docs/contributor-guide/` | Conventions and configuration reference |
 

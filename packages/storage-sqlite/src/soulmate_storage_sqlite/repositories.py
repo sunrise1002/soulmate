@@ -6,6 +6,14 @@ from dataclasses import replace
 from datetime import UTC, datetime
 from typing import cast
 
+from soulmate_connector_sdk import (
+    ConnectorPermission,
+    ConnectorRegistration,
+    ConnectorRemoval,
+    ConnectorSyncStatus,
+    PersistedConnectorEvent,
+    StoredSyncResult,
+)
 from soulmate_core.domain.models import (
     ActiveQuestion,
     ActiveQuestionStatus,
@@ -50,6 +58,8 @@ from soulmate_storage_sqlite.schema import (
     ActiveQuestionRow,
     ApiCredentialRow,
     AuditEventRow,
+    ConnectorItemRow,
+    ConnectorRegistrationRow,
     ConstraintRow,
     ConversationRow,
     DecisionAdviceRow,
@@ -1652,6 +1662,256 @@ class SqliteApiCredentialRepository:
         )
 
 
+class SqliteConnectorRegistrationRepository:
+    """Persist connector consent, cursors, idempotency keys, and source provenance."""
+
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def add(self, registration: ConnectorRegistration) -> None:
+        with self._sessions.begin() as session:
+            session.add(
+                SourceRow(
+                    id=registration.source_id,
+                    profile_id=registration.profile_id,
+                    source_type=f"connector:{registration.connector_id}",
+                    name=registration.name,
+                    created_at=registration.created_at,
+                )
+            )
+            session.flush()
+            session.add(
+                ConnectorRegistrationRow(
+                    id=registration.id,
+                    profile_id=registration.profile_id,
+                    connector_id=registration.connector_id,
+                    name=registration.name,
+                    source_id=registration.source_id,
+                    enabled=registration.enabled,
+                    granted_permissions_json=_json_dump(
+                        [item.value for item in registration.granted_permissions]
+                    ),
+                    configuration_json=_json_dump(registration.configuration),
+                    cursor_json=(
+                        None if registration.cursor is None else _json_dump(registration.cursor)
+                    ),
+                    sync_status=registration.sync_status.value,
+                    last_sync_at=registration.last_sync_at,
+                    last_error_code=registration.last_error_code,
+                    created_at=registration.created_at,
+                    updated_at=registration.updated_at,
+                )
+            )
+
+    def get(self, profile_id: str, connector_id: str) -> ConnectorRegistration | None:
+        with self._sessions() as session:
+            row = session.scalar(
+                select(ConnectorRegistrationRow).where(
+                    ConnectorRegistrationRow.profile_id == profile_id,
+                    ConnectorRegistrationRow.connector_id == connector_id,
+                )
+            )
+            return None if row is None else self._to_domain(row)
+
+    def list_for_profile(self, profile_id: str) -> tuple[ConnectorRegistration, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(ConnectorRegistrationRow)
+                .where(ConnectorRegistrationRow.profile_id == profile_id)
+                .order_by(ConnectorRegistrationRow.created_at, ConnectorRegistrationRow.id)
+            )
+            return tuple(self._to_domain(row) for row in rows)
+
+    def set_enabled(
+        self, profile_id: str, connector_id: str, enabled: bool, updated_at: datetime
+    ) -> bool:
+        with self._sessions.begin() as session:
+            changed = session.execute(
+                update(ConnectorRegistrationRow)
+                .where(
+                    ConnectorRegistrationRow.profile_id == profile_id,
+                    ConnectorRegistrationRow.connector_id == connector_id,
+                )
+                .values(enabled=enabled, updated_at=updated_at)
+                .returning(ConnectorRegistrationRow.id)
+            ).scalar_one_or_none()
+            return changed is not None
+
+    def mark_running(self, registration_id: str, updated_at: datetime) -> bool:
+        with self._sessions.begin() as session:
+            changed = session.execute(
+                update(ConnectorRegistrationRow)
+                .where(
+                    ConnectorRegistrationRow.id == registration_id,
+                    ConnectorRegistrationRow.enabled.is_(True),
+                )
+                .values(
+                    sync_status=ConnectorSyncStatus.RUNNING.value,
+                    last_error_code=None,
+                    updated_at=updated_at,
+                )
+                .returning(ConnectorRegistrationRow.id)
+            ).scalar_one_or_none()
+            return changed is not None
+
+    def apply_sync(
+        self,
+        registration_id: str,
+        events: tuple[PersistedConnectorEvent, ...],
+        cursor: dict[str, object] | None,
+        completed_at: datetime,
+    ) -> StoredSyncResult:
+        external_ids = tuple(item.external_id for item in events)
+        if len(set(external_ids)) != len(external_ids):
+            raise ValueError("A connector sync returned duplicate external IDs.")
+        with self._sessions.begin() as session:
+            registration = session.get(ConnectorRegistrationRow, registration_id)
+            if registration is None:
+                raise KeyError(registration_id)
+            if not registration.enabled:
+                raise ValueError("The connector is disabled.")
+            existing = set(
+                session.scalars(
+                    select(ConnectorItemRow.external_id).where(
+                        ConnectorItemRow.registration_id == registration_id,
+                        ConnectorItemRow.external_id.in_(external_ids),
+                    )
+                )
+            )
+            accepted = tuple(item for item in events if item.external_id not in existing)
+            session.add_all(
+                RawEventRow(
+                    id=item.raw_event_id,
+                    profile_id=registration.profile_id,
+                    source_id=registration.source_id,
+                    event_type=item.event_type,
+                    content_json=_json_dump(item.content),
+                    created_at=item.created_at,
+                    ingested_at=item.ingested_at,
+                    sensitivity=item.sensitivity,
+                )
+                for item in accepted
+            )
+            session.flush()
+            session.add_all(
+                ConnectorItemRow(
+                    registration_id=registration_id,
+                    external_id=item.external_id,
+                    raw_event_id=item.raw_event_id,
+                )
+                for item in accepted
+            )
+            registration.cursor_json = None if cursor is None else _json_dump(cursor)
+            registration.sync_status = ConnectorSyncStatus.SUCCEEDED.value
+            registration.last_sync_at = completed_at
+            registration.last_error_code = None
+            registration.updated_at = completed_at
+            return StoredSyncResult(
+                accepted_count=len(accepted),
+                duplicate_count=len(events) - len(accepted),
+            )
+
+    def mark_failed(self, registration_id: str, error_code: str, failed_at: datetime) -> None:
+        with self._sessions.begin() as session:
+            changed = session.execute(
+                update(ConnectorRegistrationRow)
+                .where(ConnectorRegistrationRow.id == registration_id)
+                .values(
+                    sync_status=ConnectorSyncStatus.FAILED.value,
+                    last_error_code=error_code,
+                    updated_at=failed_at,
+                )
+                .returning(ConnectorRegistrationRow.id)
+            ).scalar_one_or_none()
+            if changed is None:
+                raise KeyError(registration_id)
+
+    def remove(self, profile_id: str, connector_id: str) -> ConnectorRemoval | None:
+        with self._sessions.begin() as session:
+            registration = session.scalar(
+                select(ConnectorRegistrationRow).where(
+                    ConnectorRegistrationRow.profile_id == profile_id,
+                    ConnectorRegistrationRow.connector_id == connector_id,
+                )
+            )
+            if registration is None:
+                return None
+            event_ids = select(RawEventRow.id).where(
+                RawEventRow.source_id == registration.source_id
+            )
+            raw_event_count = cast(
+                int,
+                session.scalar(
+                    select(func.count())
+                    .select_from(RawEventRow)
+                    .where(RawEventRow.source_id == registration.source_id)
+                ),
+            )
+            evidence_count = cast(
+                int,
+                session.scalar(
+                    select(func.count())
+                    .select_from(EvidenceRow)
+                    .where(EvidenceRow.source_event_id.in_(event_ids))
+                ),
+            )
+            result = ConnectorRemoval(
+                connector_id=connector_id,
+                source_id=registration.source_id,
+                raw_event_count=raw_event_count,
+                evidence_count=evidence_count,
+            )
+            session.execute(delete(EvidenceRow).where(EvidenceRow.source_event_id.in_(event_ids)))
+            session.execute(
+                delete(ConnectorItemRow).where(ConnectorItemRow.registration_id == registration.id)
+            )
+            session.execute(delete(RawEventRow).where(RawEventRow.source_id == result.source_id))
+            session.delete(registration)
+            source = session.get(SourceRow, result.source_id)
+            if source is not None:
+                session.delete(source)
+            if evidence_count:
+                statement = insert(EvidenceRevisionRow).values(profile_id=profile_id, revision=1)
+                session.execute(
+                    statement.on_conflict_do_update(
+                        index_elements=[EvidenceRevisionRow.profile_id],
+                        set_={"revision": EvidenceRevisionRow.revision + 1},
+                    )
+                )
+            return result
+
+    @staticmethod
+    def _to_domain(row: ConnectorRegistrationRow) -> ConnectorRegistration:
+        permissions = tuple(
+            sorted(
+                (ConnectorPermission(item) for item in json.loads(row.granted_permissions_json)),
+                key=str,
+            )
+        )
+        configuration = cast(dict[str, object], json.loads(row.configuration_json))
+        cursor = (
+            None
+            if row.cursor_json is None
+            else cast(dict[str, object], json.loads(row.cursor_json))
+        )
+        return ConnectorRegistration(
+            id=row.id,
+            profile_id=row.profile_id,
+            connector_id=row.connector_id,
+            name=row.name,
+            source_id=row.source_id,
+            enabled=row.enabled,
+            granted_permissions=permissions,
+            configuration=configuration,
+            cursor=cursor,
+            sync_status=ConnectorSyncStatus(row.sync_status),
+            last_sync_at=None if row.last_sync_at is None else _utc(row.last_sync_at),
+            last_error_code=row.last_error_code,
+            created_at=_utc(row.created_at),
+            updated_at=_utc(row.updated_at),
+        )
+
+
 class SqliteSystemMetadataRepository:
     def __init__(self, sessions: sessionmaker[Session]) -> None:
         self._sessions = sessions
@@ -1703,4 +1963,5 @@ class Repositories:
         self.paired_devices = SqlitePairedDeviceRepository(sessions)
         self.service_identities = SqliteServiceIdentityRepository(sessions)
         self.api_credentials = SqliteApiCredentialRepository(sessions)
+        self.connector_registrations = SqliteConnectorRegistrationRepository(sessions)
         self.system_metadata = SqliteSystemMetadataRepository(sessions)

@@ -40,6 +40,10 @@ provenance, consistent sanitized SQLite snapshots, authenticated encrypted
 archives, fresh-install restore, forward schema migration, and deterministic
 model rebuilding. Archive and import orchestration remain outside the kernel;
 provider-neutral parsing and repository contracts point inward.
+Phase 11 adds a separate dependency-free connector SDK, independently installed
+Python entry-point discovery, explicit owner consent, durable sync orchestration,
+and source-linked RawEvent ingestion. The SQLite adapter persists connector state,
+but the Personalization Kernel does not import the SDK or any plugin. See ADR-012.
 
 ADRs below record decisions from specification section 65. Each ADR status states
 whether the decision is architectural only or already implemented.
@@ -57,3 +61,4 @@ whether the decision is architectural only or already implemented.
 | [009](decisions/ADR-009-lan-pairing.md) | LAN access through owner-approved device pairing |
 | [010](decisions/ADR-010-behavioral-wellbeing.md) | Separate behavioral prediction from wellbeing advice |
 | [011](decisions/ADR-011-portable-archives.md) | Credential-free authenticated portable archives |
+| [012](decisions/ADR-012-connector-plugins.md) | Permissioned connector plugins outside the kernel |

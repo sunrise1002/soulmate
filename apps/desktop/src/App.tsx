@@ -4,6 +4,7 @@ import {
   Clock3,
   Database,
   MessageCircleMore,
+  PlugZap,
   Settings as SettingsIcon,
   Smartphone,
   Sparkles,
@@ -13,6 +14,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { ServiceBadge } from "./components/ServiceBadge.tsx";
 import { ChatScreen } from "./screens/ChatScreen.tsx";
+import { ConnectionsScreen } from "./screens/ConnectionsScreen.tsx";
 import { DataScreen } from "./screens/DataScreen.tsx";
 import { DecideScreen } from "./screens/DecideScreen.tsx";
 import { DevicesScreen } from "./screens/DevicesScreen.tsx";
@@ -29,6 +31,7 @@ type Screen =
   | "model"
   | "history"
   | "devices"
+  | "connections"
   | "agents"
   | "data"
   | "settings";
@@ -43,6 +46,7 @@ const navigation: {
   { id: "model", label: "My Model", icon: BrainCircuit },
   { id: "history", label: "History", icon: Clock3 },
   { id: "devices", label: "Devices", icon: Smartphone },
+  { id: "connections", label: "Connections", icon: PlugZap },
   { id: "agents", label: "External Agents", icon: Bot },
   { id: "data", label: "Data & Privacy", icon: Database },
   { id: "settings", label: "Settings", icon: SettingsIcon },
@@ -105,6 +109,12 @@ export function App() {
         return <HistoryScreen />;
       case "devices":
         return <DevicesScreen onServiceChanged={refreshServiceStatus} />;
+      case "connections":
+        return (
+          <ConnectionsScreen
+            onDataChanged={() => setModelRevision((value) => value + 1)}
+          />
+        );
       case "agents":
         return <ExternalAgentsScreen />;
       case "data":

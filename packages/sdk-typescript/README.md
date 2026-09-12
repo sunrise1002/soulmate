@@ -19,6 +19,9 @@ so neither can drift from the daemon contract.
 - Phase 10 data methods cover static imports, source deletion, local backup,
   encrypted export, and staged restore. The daemon permits these operations only
   for a loopback owner, even though the shared client exposes their types.
+- Phase 11 connector methods expose installed permission manifests, registration,
+  durable synchronization status, enable/disable controls, and provenance-safe
+  removal. Connector management remains owner-only.
 
 The transport is injectable, so callers can wrap it. The mobile client uses that
 to refuse any request that leaves the paired origin.

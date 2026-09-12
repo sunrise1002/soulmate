@@ -5,8 +5,8 @@ the previous phase before planning or implementing the current phase.
 
 ## Authorized scope
 
-Phase 10 — Import, Backup & Portability is complete locally. Phase 11 is not
-authorized. Stop at the Phase 10 boundary until the user explicitly requests the
+Phase 11 — Connector Ecosystem is complete locally. Phase 12 is not authorized.
+Stop at the Phase 11 boundary until the user explicitly requests the
 next phase.
 
 ## Reports
@@ -24,19 +24,19 @@ next phase.
 | Phase 8 | Complete locally | [Phase 8 report](phases/phase-8-report.md) | Remote CI, richer question generation, native mobile builds, and external outcome calibration unverified |
 | Phase 9 | Complete locally | [Phase 9 report](phases/phase-9-report.md) | Remote CI, remote MCP transport, cross-platform packaged MCP smoke tests, and native mobile builds unverified |
 | Phase 10 | Complete locally | [Phase 10 report](phases/phase-10-report.md) | Remote CI, cross-platform restore, large archives, and native mobile builds unverified |
+| Phase 11 | Complete locally | [Phase 11 report](phases/phase-11-report.md) | Remote CI, plugin sandboxing/signing, scheduled sync, real service connectors, and cross-platform packaged discovery unverified |
 
-## Phase 10 exit criteria
+## Phase 11 exit criteria
 
-Passed locally on macOS arm64. An owner can create a consistent credential-free
-backup, restore it into a fresh installation, move the Personal Model and
-decision history through a passphrase-encrypted archive, import static chat
-histories, and delete an imported provenance source together with its derivative
-Evidence before a deterministic model rebuild.
+Passed locally on macOS arm64. An independently packaged connector can be
+discovered, declare capabilities, receive explicit owner consent, synchronize
+idempotent source-linked RawEvents through a durable job, survive restart, and be
+removed together with derivative Evidence before a deterministic model rebuild.
 
 ## Next action
 
-Wait for explicit Phase 11 authorization. Before planning it, read the complete
-[Phase 10 report](phases/phase-10-report.md) and inspect current repository state.
+Wait for explicit Phase 12 authorization. Before planning it, read the complete
+[Phase 11 report](phases/phase-11-report.md) and inspect current repository state.
 
 ## Repository governance
 

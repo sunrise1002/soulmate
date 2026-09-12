@@ -41,6 +41,16 @@ AES-256-GCM authenticated encryption. Restore validates archive paths, checksums
 format and database versions, refuses non-fresh installations, migrates known
 schemas, and rebuilds derived state from Evidence. See ADR-011.
 
+Connector discovery and management are owner-only. Each plugin must declare its
+data, network, credential, and learning capabilities, and registration grants must
+match that declaration exactly. Connector credentials use dedicated process
+environment variables and are never persisted. Network-capable plugins receive a
+host-allowlisted HTTP client behind the central privacy policy; offline mode denies
+all connector network calls. Connector jobs persist only sanitized status and audit
+metadata. Source removal deletes connector RawEvents and derivative Evidence before
+rebuilding the model. Installed Python plugins execute as trusted owner-selected
+code rather than inside a security sandbox; see ADR-012.
+
 The service certificate is self-signed and generated locally with an owner-only
 private key. Browsers show a warning until the owner accepts it, and mobile
 transport pinning requires a native network configuration built from the stored
@@ -50,4 +60,4 @@ internet exposure is not supported.
 Do not put personal data or secrets into issue reports, logs, fixtures, source
 control, or CI artifacts. Use synthetic fixtures and keep runtime data outside
 tracked source. See ADR-001, ADR-005, ADR-006, ADR-008, ADR-009, ADR-010, and
-ADR-011.
+ADR-011, and ADR-012.

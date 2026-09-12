@@ -21,10 +21,11 @@ data merely to satisfy this code convention.
 
 ## Phase boundary
 
-Phase 10 import, backup, restore, portable export, and model migration are complete
-locally. Phase 11 is not authorized; do not implement live connectors or a
-connector SDK until the user explicitly requests it. Remote CI verification for
-completed phases remains unconfirmed.
+Phase 11 connector SDK, permissioned discovery, durable synchronization, local
+reference connector, and provenance deletion are complete locally. Phase 12 is not
+authorized; do not implement delegated decisions or a Policy Engine until the user
+explicitly requests it. Remote CI verification for completed phases remains
+unconfirmed.
 For every later phase, follow specification section 74: plan only the current
 phase, implement small increments, validate, update documentation and phase status,
 then stop unless the user has authorized continuation. Explicit user instructions

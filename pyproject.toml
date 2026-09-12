@@ -4,8 +4,10 @@ version = "0.1.0"
 description = "Local-first personal decision model workspace"
 requires-python = ">=3.12"
 dependencies = [
+  "soulmate-connector-sdk",
   "soulmate-core",
   "soulmate-daemon",
+  "soulmate-local-notes-connector",
   "soulmate-llm-providers",
   "soulmate-mcp",
   "soulmate-storage-sqlite",
@@ -28,14 +30,18 @@ package = false
 members = [
   "apps/daemon",
   "apps/mcp",
+  "packages/connector-sdk",
+  "packages/connectors-local",
   "packages/core-python",
   "packages/llm-providers",
   "packages/storage-sqlite",
 ]
 
 [tool.uv.sources]
+soulmate-connector-sdk = { workspace = true }
 soulmate-core = { workspace = true }
 soulmate-daemon = { workspace = true }
+soulmate-local-notes-connector = { workspace = true }
 soulmate-llm-providers = { workspace = true }
 soulmate-mcp = { workspace = true }
 soulmate-storage-sqlite = { workspace = true }
@@ -95,6 +101,8 @@ strict = true
 files = [
   "apps/daemon/src",
   "apps/mcp/src",
+  "packages/connector-sdk/src",
+  "packages/connectors-local/src",
   "packages/core-python/src",
   "packages/llm-providers/src",
   "packages/storage-sqlite/src",

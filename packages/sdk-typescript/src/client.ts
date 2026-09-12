@@ -5,6 +5,12 @@ import type {
   AuditEvent,
   ChatResponse,
   ChatImportResult,
+  ConnectorManifest,
+  ConnectorPermission,
+  ConnectorRegistration,
+  ConnectorRemoval,
+  ConnectorSync,
+  ConnectorSyncStatus,
   Conversation,
   Decision,
   DataArchive,
@@ -405,6 +411,60 @@ export class SoulmateClient {
       archive_base64: archiveBase64,
       passphrase: passphrase ?? null,
     });
+  }
+
+  connectorCatalog(): Promise<ConnectorManifest[]> {
+    return this.request<ConnectorManifest[]>("GET", "/v1/connectors/catalog");
+  }
+
+  connectors(): Promise<ConnectorRegistration[]> {
+    return this.request<ConnectorRegistration[]>("GET", "/v1/connectors");
+  }
+
+  registerConnector(
+    connectorId: string,
+    permissions: ConnectorPermission[],
+    configuration: Record<string, unknown>,
+    name?: string,
+  ): Promise<ConnectorRegistration> {
+    return this.request<ConnectorRegistration>("POST", "/v1/connectors", {
+      connector_id: connectorId,
+      name: name ?? null,
+      permissions,
+      configuration,
+    });
+  }
+
+  setConnectorEnabled(
+    connectorId: string,
+    enabled: boolean,
+  ): Promise<ConnectorRegistration> {
+    return this.request<ConnectorRegistration>(
+      "PATCH",
+      `/v1/connectors/${encodeURIComponent(connectorId)}`,
+      { enabled },
+    );
+  }
+
+  syncConnector(connectorId: string): Promise<ConnectorSync> {
+    return this.request<ConnectorSync>(
+      "POST",
+      `/v1/connectors/${encodeURIComponent(connectorId)}/sync`,
+    );
+  }
+
+  connectorSyncStatus(jobId: string): Promise<ConnectorSyncStatus> {
+    return this.request<ConnectorSyncStatus>(
+      "GET",
+      `/v1/connectors/syncs/${encodeURIComponent(jobId)}`,
+    );
+  }
+
+  removeConnector(connectorId: string): Promise<ConnectorRemoval> {
+    return this.request<ConnectorRemoval>(
+      "DELETE",
+      `/v1/connectors/${encodeURIComponent(connectorId)}`,
+    );
   }
 
   predictChoice(input: ExternalDecisionInput): Promise<ExternalPrediction> {

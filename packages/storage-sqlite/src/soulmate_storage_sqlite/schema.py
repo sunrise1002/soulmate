@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     DateTime,
     Float,
@@ -547,4 +548,52 @@ class ApiCredentialRow(Base):
             "created_at",
             "id",
         ),
+    )
+
+
+class ConnectorRegistrationRow(Base):
+    __tablename__ = "connector_registrations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    connector_id: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    source_id: Mapped[str] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    granted_permissions_json: Mapped[str] = mapped_column(Text, nullable=False)
+    configuration_json: Mapped[str] = mapped_column(Text, nullable=False)
+    cursor_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sync_status: Mapped[str] = mapped_column(String, nullable=False)
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error_code: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "sync_status IN ('never', 'running', 'succeeded', 'failed')",
+            name="ck_connector_registrations_sync_status",
+        ),
+        Index(
+            "ux_connector_registrations_profile_connector",
+            "profile_id",
+            "connector_id",
+            unique=True,
+        ),
+    )
+
+
+class ConnectorItemRow(Base):
+    __tablename__ = "connector_items"
+
+    registration_id: Mapped[str] = mapped_column(
+        ForeignKey("connector_registrations.id", ondelete="CASCADE"), primary_key=True
+    )
+    external_id: Mapped[str] = mapped_column(String, primary_key=True)
+    raw_event_id: Mapped[str] = mapped_column(
+        ForeignKey("raw_events.id", ondelete="CASCADE"), nullable=False, unique=True
     )

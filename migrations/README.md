@@ -11,9 +11,11 @@ and source-message provenance for extracted evidence. Phase 4 migration
 resolutions. Phase 7 migration `0005_phase_7` adds secure pairing records. Phase 8
 migration `0006_phase_8` adds active questions, answers, outcomes, and versioned
 advice. Phase 9 migration `0007_phase_9` adds external service identities,
-normalized permission scopes, and hash-only API credentials. The daemon applies
-Phase 10 migration `0008_phase_10` links imported conversations to their source
-for provenance deletion. The daemon applies migrations automatically before
+normalized permission scopes, and hash-only API credentials. Phase 10 migration
+`0008_phase_10` links imported conversations to their source for provenance
+deletion. Phase 11 migration `0009_phase_11` adds connector registrations,
+permission/configuration snapshots, durable cursor and status state, and
+external-item idempotency keys. The daemon applies migrations automatically before
 serving requests or starting its worker.
 
 Every subsequent persistent schema change requires a new versioned migration and

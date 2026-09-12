@@ -42,6 +42,12 @@ installation. Restore restarts the managed daemon so migrations and model rebuil
 run before the restored data is served. Desktop archive uploads are limited to 64
 MiB; use the CLI for larger supported archives.
 
+The Connections screen discovers independently packaged connector entry points,
+shows their complete permission declarations, and requires owner approval before
+configuration. The bundled Local Notes reference connector synchronizes only an
+explicit directory and never uses the network. Connector removal deletes its
+RawEvents and derivative Evidence before rebuilding the Personal Model.
+
 ## Verification and packaging
 
 ```sh

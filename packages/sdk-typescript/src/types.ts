@@ -388,3 +388,62 @@ export interface RestoreStaged {
   source_schema_revision: string;
   restart_required: boolean;
 }
+
+export type ConnectorPermission =
+  "data:read" | "network:access" | "credentials:read" | "learning:ingest";
+
+export interface ConnectorCredentialDeclaration {
+  key: string;
+  label: string;
+  required: boolean;
+  available: boolean;
+}
+
+export interface ConnectorManifest {
+  connector_id: string;
+  name: string;
+  version: string;
+  description: string;
+  permissions: ConnectorPermission[];
+  data_access: string[];
+  network_hosts: string[];
+  credentials: ConnectorCredentialDeclaration[];
+  learning_mode: "raw_events";
+  configured: boolean;
+}
+
+export interface ConnectorRegistration {
+  connector_id: string;
+  name: string;
+  enabled: boolean;
+  granted_permissions: ConnectorPermission[];
+  configuration: Record<string, unknown>;
+  sync_status: "never" | "running" | "succeeded" | "failed";
+  last_sync_at: string | null;
+  last_error_code: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ConnectorSync {
+  job_id: string;
+  status: "queued" | "running" | "succeeded" | "failed";
+  created_at: string;
+}
+
+export interface ConnectorSyncStatus {
+  job_id: string;
+  status: "queued" | "running" | "succeeded" | "failed";
+  attempts: number;
+  max_attempts: number;
+  error: string | null;
+  updated_at: string;
+}
+
+export interface ConnectorRemoval {
+  connector_id: string;
+  source_id: string;
+  raw_event_count: number;
+  evidence_count: number;
+  snapshot_version: number;
+}

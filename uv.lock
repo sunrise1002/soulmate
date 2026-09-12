@@ -8,9 +8,11 @@ resolution-markers = [
 
 [manifest]
 members = [
+    "soulmate-connector-sdk",
     "soulmate-core",
     "soulmate-daemon",
     "soulmate-llm-providers",
+    "soulmate-local-notes-connector",
     "soulmate-mcp",
     "soulmate-storage-sqlite",
     "soulmate-workspace",
@@ -973,6 +975,11 @@ wheels = [
 ]
 
 [[package]]
+name = "soulmate-connector-sdk"
+version = "0.1.0"
+source = { editable = "packages/connector-sdk" }
+
+[[package]]
 name = "soulmate-core"
 version = "0.1.0"
 source = { editable = "packages/core-python" }
@@ -984,9 +991,12 @@ source = { editable = "apps/daemon" }
 dependencies = [
     { name = "cryptography" },
     { name = "fastapi" },
+    { name = "httpx" },
     { name = "pydantic" },
+    { name = "soulmate-connector-sdk" },
     { name = "soulmate-core" },
     { name = "soulmate-llm-providers" },
+    { name = "soulmate-local-notes-connector" },
     { name = "soulmate-mcp" },
     { name = "soulmate-storage-sqlite" },
     { name = "uvicorn" },
@@ -996,9 +1006,12 @@ dependencies = [
 requires-dist = [
     { name = "cryptography", specifier = ">=44,<47" },
     { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "httpx", specifier = ">=0.28,<1" },
     { name = "pydantic", specifier = ">=2.10,<3" },
+    { name = "soulmate-connector-sdk", editable = "packages/connector-sdk" },
     { name = "soulmate-core", editable = "packages/core-python" },
     { name = "soulmate-llm-providers", editable = "packages/llm-providers" },
+    { name = "soulmate-local-notes-connector", editable = "packages/connectors-local" },
     { name = "soulmate-mcp", editable = "apps/mcp" },
     { name = "soulmate-storage-sqlite", editable = "packages/storage-sqlite" },
     { name = "uvicorn", specifier = ">=0.34,<1" },
@@ -1014,6 +1027,17 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [{ name = "httpx", specifier = ">=0.28,<1" }]
+
+[[package]]
+name = "soulmate-local-notes-connector"
+version = "0.1.0"
+source = { editable = "packages/connectors-local" }
+dependencies = [
+    { name = "soulmate-connector-sdk" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "soulmate-connector-sdk", editable = "packages/connector-sdk" }]
 
 [[package]]
 name = "soulmate-mcp"
@@ -1032,6 +1056,7 @@ version = "0.1.0"
 source = { editable = "packages/storage-sqlite" }
 dependencies = [
     { name = "alembic" },
+    { name = "soulmate-connector-sdk" },
     { name = "soulmate-core" },
     { name = "sqlalchemy" },
 ]
@@ -1039,6 +1064,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "alembic", specifier = ">=1.15,<2" },
+    { name = "soulmate-connector-sdk", editable = "packages/connector-sdk" },
     { name = "soulmate-core", editable = "packages/core-python" },
     { name = "sqlalchemy", specifier = ">=2.0,<3" },
 ]
@@ -1048,9 +1074,11 @@ name = "soulmate-workspace"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "soulmate-connector-sdk" },
     { name = "soulmate-core" },
     { name = "soulmate-daemon" },
     { name = "soulmate-llm-providers" },
+    { name = "soulmate-local-notes-connector" },
     { name = "soulmate-mcp" },
     { name = "soulmate-storage-sqlite" },
 ]
@@ -1067,9 +1095,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "soulmate-connector-sdk", editable = "packages/connector-sdk" },
     { name = "soulmate-core", editable = "packages/core-python" },
     { name = "soulmate-daemon", editable = "apps/daemon" },
     { name = "soulmate-llm-providers", editable = "packages/llm-providers" },
+    { name = "soulmate-local-notes-connector", editable = "packages/connectors-local" },
     { name = "soulmate-mcp", editable = "apps/mcp" },
     { name = "soulmate-storage-sqlite", editable = "packages/storage-sqlite" },
 ]

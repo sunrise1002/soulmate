@@ -4,6 +4,17 @@
 
 ### Added
 
+- Phase 11 dependency-free Python connector SDK with immutable manifests,
+  validated RawEvent output, declared data/network/credential/learning
+  permissions, and independently installable `soulmate.connectors` entry points.
+- Owner-consented connector registration, environment-only credentials,
+  manifest-host and privacy-mode egress enforcement, durable idempotent sync jobs,
+  sanitized local audits/status, and migration `0009_phase_11`.
+- Independently packaged Local Notes reference connector with bounded UTF-8
+  Markdown/text ingestion and no network access.
+- Owner-only connector REST and CLI discovery surfaces, typed TypeScript SDK,
+  desktop Connections screen, provenance-complete removal and model rebuild, and
+  ADR-012 for the trusted plugin boundary.
 - Phase 10 consistent SQLite backups, encrypted `.dtw` portable exports using
   scrypt and AES-256-GCM, fresh-install restore with schema migration and a
   deterministic Personal Model rebuild, and credential-free archive manifests.
@@ -112,6 +123,7 @@
   templates, security guidance, and documented GitHub ruleset settings.
 
 No embeddings, real-provider evaluation, remote MCP transport,
-signing/notarization, automatic updates, live connectors, or delegated decisions
-have been implemented. Imported histories are normalized locally but do not
-automatically invoke an LLM or create derived Evidence.
+signing/notarization, automatic updates, delegated decisions, plugin sandbox, or
+live third-party service connector has been implemented. Imported and connector
+sources are normalized locally but do not automatically invoke an LLM or create
+derived Evidence.

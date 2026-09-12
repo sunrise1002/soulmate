@@ -1377,6 +1377,83 @@ select {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
+
+.connector-list {
+  display: grid;
+  gap: 16px;
+}
+
+.connector-card {
+  display: grid;
+  gap: 13px;
+  padding: 22px;
+}
+
+.connector-card > p,
+.connector-card > small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.connector-permissions,
+.connector-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.connector-permissions span {
+  padding: 5px 8px;
+  border: 1px solid #d5d9cf;
+  border-radius: 99px;
+  color: #5c6c59;
+  background: #eef1eb;
+  font:
+    10px "DM Mono",
+    monospace;
+}
+
+.connector-card label {
+  display: grid;
+  gap: 7px;
+}
+
+.connector-card label > span {
+  color: #716d63;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.path-input {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 8px;
+  align-items: center;
+  padding-left: 10px;
+  border: 1px solid #d2cdc1;
+  border-radius: 8px;
+  background: #fffefb;
+}
+
+.path-input input {
+  padding: 10px 11px 10px 0;
+  border: 0;
+}
+
+.status-chip.never,
+.status-chip.running,
+.status-chip.succeeded,
+.status-chip.failed {
+  text-transform: capitalize;
+}
+
+.status-chip.failed {
+  color: #8b574b;
+  border-color: #dfc7bf;
+  background: #f5e9e4;
+}
 .data-card {
   display: grid;
   align-content: start;

@@ -230,6 +230,44 @@ describe("SoulmateClient", () => {
     );
   });
 
+  it("exposes owner-only connector lifecycle operations", async () => {
+    const { fetch, calls } = stub(200, {});
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      fetch,
+    });
+
+    await client.connectorCatalog();
+    await client.connectors();
+    await client.registerConnector(
+      "soulmate.local-notes",
+      ["data:read", "learning:ingest"],
+      { path: "/synthetic/notes" },
+    );
+    await client.setConnectorEnabled("soulmate.local-notes", false);
+    await client.syncConnector("soulmate.local-notes");
+    await client.connectorSyncStatus("job/1");
+    await client.removeConnector("soulmate.local-notes");
+
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://127.0.0.1:7432/v1/connectors/catalog",
+      "http://127.0.0.1:7432/v1/connectors",
+      "http://127.0.0.1:7432/v1/connectors",
+      "http://127.0.0.1:7432/v1/connectors/soulmate.local-notes",
+      "http://127.0.0.1:7432/v1/connectors/soulmate.local-notes/sync",
+      "http://127.0.0.1:7432/v1/connectors/syncs/job%2F1",
+      "http://127.0.0.1:7432/v1/connectors/soulmate.local-notes",
+    ]);
+    expect(calls[2]?.init?.body).toBe(
+      JSON.stringify({
+        connector_id: "soulmate.local-notes",
+        name: null,
+        permissions: ["data:read", "learning:ingest"],
+        configuration: { path: "/synthetic/notes" },
+      }),
+    );
+  });
+
   it.each([
     [401, "A paired device credential is required.", true],
     [403, "This action is only available on the owner's device.", true],

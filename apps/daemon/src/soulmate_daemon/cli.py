@@ -12,6 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, build_opener
 
 from alembic.util.exc import CommandError
+from soulmate_connector_sdk import discover_connectors
 from soulmate_core.evaluation import evaluate_dataset, load_dataset
 from soulmate_core.importing import ImportFormat
 from soulmate_core.preferences import ModelRebuilder
@@ -169,6 +170,38 @@ def _evaluate(dataset_path: Path | None) -> int:
         return 1
     print(json.dumps({"evaluated": True, **report.as_dict()}, sort_keys=True))
     return 0
+
+
+def _list_connectors() -> int:
+    catalog = discover_connectors()
+    print(
+        json.dumps(
+            {
+                "connectors": [
+                    {
+                        "connector_id": connector.manifest.connector_id,
+                        "name": connector.manifest.name,
+                        "version": connector.manifest.version,
+                        "permissions": [
+                            permission.value for permission in connector.manifest.permissions
+                        ],
+                    }
+                    for connector in sorted(
+                        catalog.connectors.values(), key=lambda item: item.manifest.connector_id
+                    )
+                ],
+                "load_failures": [
+                    {
+                        "entry_point": failure.entry_point,
+                        "error_type": failure.error_type,
+                    }
+                    for failure in catalog.failures
+                ],
+            },
+            sort_keys=True,
+        )
+    )
+    return 0 if not catalog.failures else 1
 
 
 def _default_archive_path(settings: Settings, kind: str) -> Path:
@@ -331,6 +364,7 @@ def _parser() -> argparse.ArgumentParser:
     evaluate = commands.add_parser("evaluate", help="Run reproducible decision evaluation")
     evaluate.add_argument("--dataset", type=Path, help="Path to an evaluation JSON dataset")
     commands.add_parser("mcp", help="Run the scoped MCP stdio adapter")
+    commands.add_parser("connectors", help="List installed connector plugins")
     for command, help_text in (
         ("backup", "Create a local credential-free backup archive"),
         ("export", "Create an encrypted portable archive"),
@@ -371,6 +405,8 @@ def main() -> None:
     if args.command == "mcp":
         mcp_main()
         return
+    if args.command == "connectors":
+        raise SystemExit(_list_connectors())
     try:
         settings = load_settings(args.config)
     except ConfigurationError as exc:

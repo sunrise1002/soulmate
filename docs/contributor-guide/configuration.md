@@ -79,6 +79,16 @@ private temporary directory and marker under `DATA_DIR`, applies on daemon
 restart, and is removed after successful migration. Do not manually edit or move
 `.restore-*` files while a restore is pending.
 
+Phase 11 connector registration stores non-secret configuration and granted
+permission snapshots in SQLite. Connector credentials are read only from dedicated
+process variables using
+`DECISION_TWIN_CONNECTOR__<NORMALIZED_CONNECTOR_ID>__<NORMALIZED_KEY>`; for example,
+credential key `api_token` on `example.calendar` becomes
+`DECISION_TWIN_CONNECTOR__EXAMPLE_CALENDAR__API_TOKEN`. Credential values are not
+accepted by the registration API, persisted, logged, or included in archives.
+Connector HTTP destinations must appear in the installed manifest and pass the same
+privacy-mode policy as model calls. `offline` denies all connector network access.
+
 Privacy mode accepts `strict_local`, `hybrid`, and `offline`. Storage accepts
 `sqlite`; vector backend accepts `sqlite_vec` or `cosine`; provider defaults are
 Ollama and local embeddings. `strict_local` and `offline` restrict model requests
