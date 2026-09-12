@@ -3,9 +3,9 @@
 A local-first, self-hosted Personal Decision Model. The owner controls the data;
 agents, LLM providers, and clients are replaceable.
 
-**Current status:** Phase 7 Mobile/Web Clients & Secure Pairing is implemented
+**Current status:** Phase 8 Active Learning & Outcome Intelligence is implemented
 locally. See the [phase status](docs/phase-status.md) and detailed
-[Phase 7 report](docs/phases/phase-7-report.md).
+[Phase 8 report](docs/phases/phase-8-report.md).
 
 ## Development setup
 
@@ -107,6 +107,16 @@ evidence-backed factors, and records the exact Personal Model snapshot and
 learning algorithm version. Resolving the actual choice creates provenance-bearing
 `actual_choice` Evidence and rebuilds the model.
 
+Phase 8 adds `GET /v1/model/uncertainties`, persistent questions under
+`/v1/active-questions`, `POST /v1/decisions/{id}/outcome`, and
+`POST /v1/decisions/{id}/advise`. The owner can remove outcome source data with
+`DELETE /v1/decisions/{id}/outcome`. Pairwise answers create inspectable preference
+Evidence. Outcome feedback remains separate from behavioral preference learning:
+Predict Me estimates the owner's likely choice, while Advise Me independently
+combines that prediction with satisfaction, regret, similar resolved choices, and
+matching goals or constraints. Both modes report their model snapshot and
+algorithm version, and clients display them as distinct results.
+
 The desktop history views use `GET /v1/conversations` and `GET /v1/decisions`.
 The My Model screen can inspect provenance, add correction evidence, and use
 `DELETE /v1/evidence/{id}` to remove evidence before a deterministic model rebuild.
@@ -128,7 +138,8 @@ request from that device fails immediately.
 Loopback callers are the owner. Every other caller needs an active device
 credential. Pairing, device listing, revocation, network status, and evidence
 deletion are only available on the owner's machine. A paired device can chat,
-decide, resolve, read the model, and record corrections.
+decide, resolve, read the model, record corrections, answer active-learning
+questions, record outcomes, and request advice.
 
 The pairing and device endpoints are `POST /v1/pairing/start`,
 `POST /v1/pairing/complete`, `GET /v1/devices`, `DELETE /v1/devices/{id}`,
@@ -158,7 +169,7 @@ environment overrides, `DATA_DIR`, and path semantics.
 | `packages/sdk-typescript/` | Typed REST client and pairing rules shared by clients |
 | `packages/sdk-python/` | Reserved future SDK location |
 | `tests/` | Unit, integration, and evaluation tests using synthetic data |
-| `docs/architecture/decisions/` | ADR-001 through ADR-009 |
+| `docs/architecture/decisions/` | ADR-001 through ADR-010 |
 | `docs/phases/` | Durable plans, results, issues, and handoff reports per phase |
 | `docs/contributor-guide/` | Conventions and configuration reference |
 

@@ -5,9 +5,9 @@ the previous phase before planning or implementing the current phase.
 
 ## Authorized scope
 
-Phase 7 — Mobile/Web Clients & Secure Pairing is complete locally. Phase 8 is not
-authorized. Stop at the Phase 7 boundary until the user explicitly requests the
-next phase.
+Phase 8 — Active Learning & Outcome Intelligence is complete locally. Phase 9 is
+not authorized. Stop at the Phase 8 boundary until the user explicitly requests
+the next phase.
 
 ## Reports
 
@@ -21,20 +21,20 @@ next phase.
 | Phase 5 | Complete locally | [Phase 5 report](phases/phase-5-report.md) | Remote CI and external-dataset calibration unverified |
 | Phase 6 | Complete locally | [Phase 6 report](phases/phase-6-report.md) | Remote cross-platform installers, signing, and real providers unverified |
 | Phase 7 | Complete locally | [Phase 7 report](phases/phase-7-report.md) | Remote CI, native mobile builds, and browser trust of the self-signed certificate unverified |
+| Phase 8 | Complete locally | [Phase 8 report](phases/phase-8-report.md) | Remote CI, richer question generation, native mobile builds, and external outcome calibration unverified |
 
-## Phase 7 exit criteria
+## Phase 8 exit criteria
 
-Passed locally on macOS arm64, including a manual run of the packaged sidecar on a
-real network. The owner can install Soulmate, enable access from other devices,
-pair a phone or browser with a one-time code, communicate over TLS on the LAN,
-revoke the device from the desktop, and keep all Personal Model data on their own
-machine. Native iOS and Android builds of the React Native client were not
-produced, and the self-signed certificate is not installed into any trust store.
+Passed locally on macOS arm64. Soulmate ranks uncertain preferences, asks
+context-preserving trade-off questions, learns from answers, records decision
+outcomes and regret, and can recommend a different option from its behavioral
+prediction without changing Predict Me semantics. Phase 8 records and source data
+survive restart; the owner can delete an outcome and its derived advice.
 
 ## Next action
 
-Wait for explicit Phase 8 authorization. Before planning it, read the complete
-[Phase 7 report](phases/phase-7-report.md) and inspect current repository state.
+Wait for explicit Phase 9 authorization. Before planning it, read the complete
+[Phase 8 report](phases/phase-8-report.md) and inspect current repository state.
 
 ## Repository governance
 

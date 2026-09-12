@@ -4,6 +4,15 @@
 
 ### Added
 
+- Phase 8 deterministic uncertainty ranking, heuristic information-gain question
+  selection, persistent pairwise questions, and evidence-backed answers.
+- Restart-safe decision outcomes with satisfaction, regret, optional notes, and a
+  typed API shared by desktop, web, and mobile clients.
+- A separate wellbeing-aware Advise Me model that combines behavioral probability,
+  similar reported outcomes, and matching goals or constraints while preserving
+  Predict Me as a descriptive model.
+- SQLite migration `0006_phase_8` for active questions, answers, outcomes, and
+  versioned advice records, plus ADR-010 documenting the behavioral/wellbeing split.
 - Phase 7 opt-in access from other devices: a second TLS listener on an explicit
   LAN address, a self-signed service certificate with renewal, and a rejection of
   wildcard binds in both configuration and address resolution.
@@ -80,6 +89,5 @@
   hooks, Conventional Commit and branch validation, CI enforcement, issue/PR
   templates, security guidance, and documented GitHub ruleset settings.
 
-No embeddings, real-provider evaluation, Advise Me, mobile/web clients, secure
-pairing, MCP integration, signing/notarization, automatic updates, or later-phase
-features have been implemented.
+No embeddings, real-provider evaluation, MCP integration, signing/notarization,
+automatic updates, or later-phase features have been implemented.

@@ -86,6 +86,7 @@ def test_non_loopback_hosts_are_not_the_owner(host: str | None) -> None:
         ("DELETE", "/v1/devices/device_1", Requirement.OWNER),
         ("GET", "/v1/network/state", Requirement.OWNER),
         ("DELETE", "/v1/evidence/evidence_1", Requirement.OWNER),
+        ("DELETE", "/v1/decisions/decision_1/outcome", Requirement.OWNER),
         ("GET", "/v1/evidence/evidence_1", Requirement.DEVICE),
         ("POST", "/v1/chat", Requirement.DEVICE),
         ("GET", "/v1/model/summary", Requirement.DEVICE),
@@ -124,7 +125,12 @@ def test_remote_requests_are_refused_while_lan_access_is_disabled() -> None:
 
 @pytest.mark.parametrize(
     ("method", "path"),
-    [("POST", "/v1/pairing/start"), ("GET", "/v1/devices"), ("DELETE", "/v1/evidence/e1")],
+    [
+        ("POST", "/v1/pairing/start"),
+        ("GET", "/v1/devices"),
+        ("DELETE", "/v1/evidence/e1"),
+        ("DELETE", "/v1/decisions/d1/outcome"),
+    ],
 )
 def test_paired_devices_cannot_reach_owner_only_routes(method: str, path: str) -> None:
     # Given: a fully authorized paired device

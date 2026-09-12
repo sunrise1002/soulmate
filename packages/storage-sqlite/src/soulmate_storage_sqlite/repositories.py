@@ -7,11 +7,16 @@ from datetime import UTC, datetime
 from typing import cast
 
 from soulmate_core.domain.models import (
+    ActiveQuestion,
+    ActiveQuestionStatus,
+    AdviceRankingItem,
     AuditEvent,
     Constraint,
     Conversation,
+    DecisionAdvice,
     DecisionEvent,
     DecisionOption,
+    DecisionOutcome,
     DecisionPrediction,
     DecisionResolution,
     DecisionStatus,
@@ -29,6 +34,7 @@ from soulmate_core.domain.models import (
     PairingToken,
     Preference,
     Profile,
+    QuestionAnswer,
     RawEvent,
     Source,
     UserModelSnapshot,
@@ -38,11 +44,14 @@ from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from soulmate_storage_sqlite.schema import (
+    ActiveQuestionRow,
     AuditEventRow,
     ConstraintRow,
     ConversationRow,
+    DecisionAdviceRow,
     DecisionEventRow,
     DecisionOptionRow,
+    DecisionOutcomeRow,
     DecisionPredictionRow,
     DecisionResolutionRow,
     EvidenceRevisionRow,
@@ -55,6 +64,7 @@ from soulmate_storage_sqlite.schema import (
     PairingTokenRow,
     PreferenceRow,
     ProfileRow,
+    QuestionAnswerRow,
     RawEventRow,
     SourceRow,
     SystemMetadataRow,
@@ -414,6 +424,48 @@ class SqliteDecisionRepository:
             )
             return None if row is None else self._resolution_to_domain(row)
 
+    def add_advice(self, advice: DecisionAdvice) -> None:
+        with self._sessions.begin() as session:
+            decision = session.get(DecisionEventRow, advice.decision_id)
+            if decision is None or decision.profile_id != advice.profile_id:
+                raise ValueError("Advice must belong to the decision profile.")
+            session.add(
+                DecisionAdviceRow(
+                    id=advice.id,
+                    decision_id=advice.decision_id,
+                    profile_id=advice.profile_id,
+                    behavioral_prediction_id=advice.behavioral_prediction_id,
+                    ranking_json=_json_dump(
+                        [
+                            {
+                                "option_id": item.option_id,
+                                "recommendation_score": item.recommendation_score,
+                                "behavioral_probability": item.behavioral_probability,
+                                "wellbeing_score": item.wellbeing_score,
+                                "goal_alignment": item.goal_alignment,
+                            }
+                            for item in advice.ranking
+                        ]
+                    ),
+                    confidence=advice.confidence,
+                    rationale_json=_json_dump(advice.rationale),
+                    supporting_outcome_ids_json=_json_dump(advice.supporting_outcome_ids),
+                    model_snapshot_version=advice.model_snapshot_version,
+                    algorithm_version=advice.algorithm_version,
+                    created_at=advice.created_at,
+                )
+            )
+
+    def latest_advice(self, decision_id: str) -> DecisionAdvice | None:
+        with self._sessions() as session:
+            row = session.scalar(
+                select(DecisionAdviceRow)
+                .where(DecisionAdviceRow.decision_id == decision_id)
+                .order_by(DecisionAdviceRow.created_at.desc(), DecisionAdviceRow.id.desc())
+                .limit(1)
+            )
+            return None if row is None else self._advice_to_domain(row)
+
     @staticmethod
     def _event_to_domain(row: DecisionEventRow) -> DecisionEvent:
         return DecisionEvent(
@@ -469,6 +521,190 @@ class SqliteDecisionRepository:
             decision_id=row.decision_id,
             chosen_option_id=row.chosen_option_id,
             source_event_id=row.source_event_id,
+            created_at=_utc(row.created_at),
+        )
+
+    @staticmethod
+    def _advice_to_domain(row: DecisionAdviceRow) -> DecisionAdvice:
+        ranking = cast(list[dict[str, object]], json.loads(row.ranking_json))
+        return DecisionAdvice(
+            id=row.id,
+            decision_id=row.decision_id,
+            profile_id=row.profile_id,
+            behavioral_prediction_id=row.behavioral_prediction_id,
+            ranking=tuple(
+                AdviceRankingItem(
+                    option_id=str(item["option_id"]),
+                    recommendation_score=cast(float, item["recommendation_score"]),
+                    behavioral_probability=cast(float, item["behavioral_probability"]),
+                    wellbeing_score=cast(float | None, item["wellbeing_score"]),
+                    goal_alignment=cast(float | None, item["goal_alignment"]),
+                )
+                for item in ranking
+            ),
+            confidence=row.confidence,
+            rationale=tuple(json.loads(row.rationale_json)),
+            supporting_outcome_ids=tuple(json.loads(row.supporting_outcome_ids_json)),
+            model_snapshot_version=row.model_snapshot_version,
+            algorithm_version=row.algorithm_version,
+            created_at=_utc(row.created_at),
+        )
+
+
+class SqliteOutcomeRepository:
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def add(self, outcome: DecisionOutcome) -> None:
+        with self._sessions.begin() as session:
+            decision = session.get(DecisionEventRow, outcome.decision_id)
+            if decision is None or decision.profile_id != outcome.profile_id:
+                raise ValueError("Outcome must belong to the decision profile.")
+            session.add(
+                DecisionOutcomeRow(
+                    id=outcome.id,
+                    decision_id=outcome.decision_id,
+                    profile_id=outcome.profile_id,
+                    satisfaction=outcome.satisfaction,
+                    regret=outcome.regret,
+                    notes=outcome.notes,
+                    source_event_id=outcome.source_event_id,
+                    created_at=outcome.created_at,
+                )
+            )
+
+    def get_for_decision(self, decision_id: str) -> DecisionOutcome | None:
+        with self._sessions() as session:
+            row = session.scalar(
+                select(DecisionOutcomeRow).where(DecisionOutcomeRow.decision_id == decision_id)
+            )
+            return None if row is None else self._to_domain(row)
+
+    def list_for_profile(self, profile_id: str) -> tuple[DecisionOutcome, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(DecisionOutcomeRow)
+                .where(DecisionOutcomeRow.profile_id == profile_id)
+                .order_by(DecisionOutcomeRow.created_at, DecisionOutcomeRow.id)
+            )
+            return tuple(self._to_domain(row) for row in rows)
+
+    def remove_for_decision(self, decision_id: str) -> bool:
+        with self._sessions.begin() as session:
+            outcome = session.scalar(
+                select(DecisionOutcomeRow).where(DecisionOutcomeRow.decision_id == decision_id)
+            )
+            if outcome is None:
+                return False
+            source_event_id = outcome.source_event_id
+            session.execute(
+                delete(DecisionAdviceRow).where(DecisionAdviceRow.profile_id == outcome.profile_id)
+            )
+            session.delete(outcome)
+            session.flush()
+            session.execute(delete(RawEventRow).where(RawEventRow.id == source_event_id))
+            return True
+
+    @staticmethod
+    def _to_domain(row: DecisionOutcomeRow) -> DecisionOutcome:
+        return DecisionOutcome(
+            id=row.id,
+            decision_id=row.decision_id,
+            profile_id=row.profile_id,
+            satisfaction=row.satisfaction,
+            regret=row.regret,
+            notes=row.notes,
+            source_event_id=row.source_event_id,
+            created_at=_utc(row.created_at),
+        )
+
+
+class SqliteActiveQuestionRepository:
+    def __init__(self, sessions: sessionmaker[Session]) -> None:
+        self._sessions = sessions
+
+    def add(self, question: ActiveQuestion) -> None:
+        with self._sessions.begin() as session:
+            session.add(
+                ActiveQuestionRow(
+                    id=question.id,
+                    profile_id=question.profile_id,
+                    prompt=question.prompt,
+                    preference_keys_json=_json_dump(question.preference_keys),
+                    context_json=_json_dump(question.context),
+                    option_a_label=question.option_a_label,
+                    option_a_features_json=_json_dump(question.option_a_features),
+                    option_b_label=question.option_b_label,
+                    option_b_features_json=_json_dump(question.option_b_features),
+                    information_gain_score=question.information_gain_score,
+                    model_snapshot_version=question.model_snapshot_version,
+                    algorithm_version=question.algorithm_version,
+                    status=question.status.value,
+                    created_at=question.created_at,
+                )
+            )
+
+    def get(self, question_id: str) -> ActiveQuestion | None:
+        with self._sessions() as session:
+            row = session.get(ActiveQuestionRow, question_id)
+            return None if row is None else self._to_domain(row)
+
+    def list_for_profile(self, profile_id: str) -> tuple[ActiveQuestion, ...]:
+        with self._sessions() as session:
+            rows = session.scalars(
+                select(ActiveQuestionRow)
+                .where(ActiveQuestionRow.profile_id == profile_id)
+                .order_by(ActiveQuestionRow.created_at.desc(), ActiveQuestionRow.id.desc())
+            )
+            return tuple(self._to_domain(row) for row in rows)
+
+    def add_answer(self, answer: QuestionAnswer) -> None:
+        with self._sessions.begin() as session:
+            question = session.get(ActiveQuestionRow, answer.question_id)
+            if question is None or question.status != ActiveQuestionStatus.PENDING.value:
+                raise ValueError("Active question is missing or has already been answered.")
+            session.add(
+                QuestionAnswerRow(
+                    id=answer.id,
+                    question_id=answer.question_id,
+                    choice=answer.choice,
+                    source_event_id=answer.source_event_id,
+                    created_at=answer.created_at,
+                )
+            )
+            question.status = ActiveQuestionStatus.ANSWERED.value
+
+    def get_answer(self, question_id: str) -> QuestionAnswer | None:
+        with self._sessions() as session:
+            row = session.scalar(
+                select(QuestionAnswerRow).where(QuestionAnswerRow.question_id == question_id)
+            )
+            if row is None:
+                return None
+            return QuestionAnswer(
+                id=row.id,
+                question_id=row.question_id,
+                choice=row.choice,
+                source_event_id=row.source_event_id,
+                created_at=_utc(row.created_at),
+            )
+
+    @staticmethod
+    def _to_domain(row: ActiveQuestionRow) -> ActiveQuestion:
+        return ActiveQuestion(
+            id=row.id,
+            profile_id=row.profile_id,
+            prompt=row.prompt,
+            preference_keys=tuple(json.loads(row.preference_keys_json)),
+            context=json.loads(row.context_json),
+            option_a_label=row.option_a_label,
+            option_a_features=json.loads(row.option_a_features_json),
+            option_b_label=row.option_b_label,
+            option_b_features=json.loads(row.option_b_features_json),
+            information_gain_score=row.information_gain_score,
+            model_snapshot_version=row.model_snapshot_version,
+            algorithm_version=row.algorithm_version,
+            status=ActiveQuestionStatus(row.status),
             created_at=_utc(row.created_at),
         )
 
@@ -1123,6 +1359,8 @@ class Repositories:
         self.conversations = SqliteConversationRepository(sessions)
         self.messages = SqliteMessageRepository(sessions)
         self.decisions = SqliteDecisionRepository(sessions)
+        self.outcomes = SqliteOutcomeRepository(sessions)
+        self.active_questions = SqliteActiveQuestionRepository(sessions)
         self.evidence = SqliteEvidenceRepository(sessions)
         self.personal_models = SqlitePersonalModelRepository(sessions)
         self.audit_events = SqliteAuditEventRepository(sessions)

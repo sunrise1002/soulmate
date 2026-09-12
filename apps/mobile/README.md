@@ -4,6 +4,8 @@ Expo React Native client for the local Soulmate service. The phone is only a
 client: the Personal Model never leaves the owner's computer.
 
 Screens: Connect (QR scan), Chat, Decide, My Model, and History.
+Decide displays separate Predict Me and Advise Me results and records outcome
+feedback. My Model offers uncertainty-targeting pairwise questions.
 
 Pairing scans the QR code shown by the desktop Devices screen, validates the
 invitation before any network call, redeems it over TLS, and stores the credential

@@ -4,16 +4,19 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
-from typing import cast
+from typing import Literal, cast
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from soulmate_core.domain import (
+    ActiveQuestion,
     Conversation,
+    DecisionAdvice,
     DecisionEvent,
     DecisionOption,
+    DecisionOutcome,
     DecisionPrediction,
     DecisionResolution,
     Evidence,
@@ -21,6 +24,7 @@ from soulmate_core.domain import (
     Preference,
     RawEvent,
 )
+from soulmate_core.learning import rank_uncertainties
 from soulmate_core.preferences import ModelRebuilder
 from soulmate_llm_providers import EgressDeniedError, LLMProvider, ProviderError
 from soulmate_storage_sqlite import Database, Repositories
@@ -31,6 +35,7 @@ from starlette.responses import Response
 
 from soulmate_daemon import __version__
 from soulmate_daemon.access_api import build_access_router
+from soulmate_daemon.active_learning import ActiveAnswerResult, ActiveLearningService
 from soulmate_daemon.config import Settings
 from soulmate_daemon.conversation import ConversationService
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
@@ -219,6 +224,32 @@ class DecisionPredictionResponse(BaseModel):
     created_at: datetime
 
 
+class AdviceRankingResponse(BaseModel):
+    option_id: str
+    label: str
+    recommendation_score: float
+    behavioral_probability: float
+    wellbeing_score: float | None
+    goal_alignment: float | None
+
+
+class DecisionAdviceResponse(BaseModel):
+    id: str
+    decision_id: str
+    mode: str
+    predicted_option_id: str
+    predicted_choice: str
+    recommended_option_id: str
+    recommended_choice: str
+    ranking: list[AdviceRankingResponse]
+    confidence: float
+    rationale: tuple[str, ...]
+    supporting_outcome_ids: tuple[str, ...]
+    model_snapshot_version: int
+    algorithm_version: str
+    created_at: datetime
+
+
 class DecisionResolutionRequest(BaseModel):
     chosen_option_id: str = Field(min_length=1, max_length=200)
 
@@ -239,10 +270,77 @@ class ResolutionHistoryResponse(BaseModel):
     created_at: datetime
 
 
+class DecisionOutcomeRequest(BaseModel):
+    satisfaction: float = Field(ge=0.0, le=1.0)
+    regret: bool
+    notes: str | None = Field(default=None, max_length=10_000)
+
+    @field_validator("notes")
+    @classmethod
+    def notes_must_not_be_blank(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("Outcome notes must be omitted or contain text.")
+        return value
+
+
+class DecisionOutcomeResponse(BaseModel):
+    id: str
+    decision_id: str
+    satisfaction: float
+    regret: bool
+    notes: str | None
+    created_at: datetime
+
+
+class DecisionOutcomeDeletionResponse(BaseModel):
+    removed_outcome_id: str
+
+
 class DecisionHistoryResponse(BaseModel):
     decision: DecisionResponse
     prediction: DecisionPredictionResponse | None
     resolution: ResolutionHistoryResponse | None
+    advice: DecisionAdviceResponse | None
+    outcome: DecisionOutcomeResponse | None
+
+
+class UncertaintyResponse(BaseModel):
+    preference_key: str
+    context: dict[str, object]
+    uncertainty: float
+    confidence: float
+    information_value: float
+
+
+class ActiveQuestionGenerateRequest(BaseModel):
+    limit: int = Field(default=3, ge=1, le=10)
+    target_key: str | None = Field(default=None, min_length=1, max_length=200)
+
+
+class ActiveQuestionResponse(BaseModel):
+    id: str
+    prompt: str
+    preference_keys: tuple[str, ...]
+    context: dict[str, object]
+    option_a_label: str
+    option_b_label: str
+    information_gain_score: float
+    model_snapshot_version: int
+    algorithm_version: str
+    status: str
+    created_at: datetime
+
+
+class ActiveQuestionAnswerRequest(BaseModel):
+    choice: Literal["a", "b"]
+
+
+class ActiveQuestionAnswerResponse(BaseModel):
+    question_id: str
+    choice: str
+    learned_evidence: list[EvidenceResponse]
+    snapshot_version: int
+    created_at: datetime
 
 
 class EvidenceDeletionResponse(BaseModel):
@@ -383,6 +481,70 @@ def _stored_resolution_response(resolution: DecisionResolution) -> ResolutionHis
     )
 
 
+def _outcome_response(outcome: DecisionOutcome) -> DecisionOutcomeResponse:
+    return DecisionOutcomeResponse(
+        id=outcome.id,
+        decision_id=outcome.decision_id,
+        satisfaction=outcome.satisfaction,
+        regret=outcome.regret,
+        notes=outcome.notes,
+        created_at=outcome.created_at,
+    )
+
+
+def _advice_response(
+    advice: DecisionAdvice,
+    options: tuple[DecisionOption, ...],
+) -> DecisionAdviceResponse:
+    labels = {item.id: item.label for item in options}
+    recommended = advice.ranking[0]
+    predicted = sorted(
+        advice.ranking, key=lambda item: (-item.behavioral_probability, item.option_id)
+    )[0]
+    return DecisionAdviceResponse(
+        id=advice.id,
+        decision_id=advice.decision_id,
+        mode="advise_me",
+        predicted_option_id=predicted.option_id,
+        predicted_choice=labels[predicted.option_id],
+        recommended_option_id=recommended.option_id,
+        recommended_choice=labels[recommended.option_id],
+        ranking=[
+            AdviceRankingResponse(
+                option_id=item.option_id,
+                label=labels[item.option_id],
+                recommendation_score=item.recommendation_score,
+                behavioral_probability=item.behavioral_probability,
+                wellbeing_score=item.wellbeing_score,
+                goal_alignment=item.goal_alignment,
+            )
+            for item in advice.ranking
+        ],
+        confidence=advice.confidence,
+        rationale=advice.rationale,
+        supporting_outcome_ids=advice.supporting_outcome_ids,
+        model_snapshot_version=advice.model_snapshot_version,
+        algorithm_version=advice.algorithm_version,
+        created_at=advice.created_at,
+    )
+
+
+def _active_question_response(question: ActiveQuestion) -> ActiveQuestionResponse:
+    return ActiveQuestionResponse(
+        id=question.id,
+        prompt=question.prompt,
+        preference_keys=question.preference_keys,
+        context=question.context,
+        option_a_label=question.option_a_label,
+        option_b_label=question.option_b_label,
+        information_gain_score=question.information_gain_score,
+        model_snapshot_version=question.model_snapshot_version,
+        algorithm_version=question.algorithm_version,
+        status=question.status.value,
+        created_at=question.created_at,
+    )
+
+
 def create_app(
     settings: Settings | None = None,
     *,
@@ -505,6 +667,77 @@ def create_app(
         records = _state(app)["repositories"].personal_models.list_preferences(DEFAULT_PROFILE_ID)
         return [_preference_response(item) for item in records]
 
+    @app.get("/v1/model/uncertainties", response_model=list[UncertaintyResponse])
+    def uncertainties() -> list[UncertaintyResponse]:
+        repositories = _state(app)["repositories"]
+        snapshot = repositories.personal_models.latest_snapshot(DEFAULT_PROFILE_ID)
+        if snapshot is None:
+            return []
+        return [
+            UncertaintyResponse(
+                preference_key=item.preference_key,
+                context=item.context,
+                uncertainty=item.uncertainty,
+                confidence=item.confidence,
+                information_value=item.information_value,
+            )
+            for item in rank_uncertainties(snapshot.model.preferences)
+        ]
+
+    @app.get("/v1/active-questions", response_model=list[ActiveQuestionResponse])
+    def active_questions() -> list[ActiveQuestionResponse]:
+        records = _state(app)["repositories"].active_questions.list_for_profile(DEFAULT_PROFILE_ID)
+        return [_active_question_response(item) for item in records]
+
+    @app.post(
+        "/v1/active-questions/generate",
+        response_model=list[ActiveQuestionResponse],
+        status_code=201,
+    )
+    def generate_questions(
+        request: ActiveQuestionGenerateRequest,
+    ) -> list[ActiveQuestionResponse]:
+        repositories = _state(app)["repositories"]
+        service = ActiveLearningService(
+            questions=repositories.active_questions,
+            raw_events=repositories.raw_events,
+            evidence=repositories.evidence,
+            models=repositories.personal_models,
+        )
+        questions = service.generate(DEFAULT_PROFILE_ID, request.limit, request.target_key)
+        return [_active_question_response(item) for item in questions]
+
+    @app.post(
+        "/v1/active-questions/{question_id}/answer",
+        response_model=ActiveQuestionAnswerResponse,
+        status_code=201,
+    )
+    def answer_question(
+        question_id: str, request: ActiveQuestionAnswerRequest
+    ) -> ActiveQuestionAnswerResponse:
+        repositories = _state(app)["repositories"]
+        service = ActiveLearningService(
+            questions=repositories.active_questions,
+            raw_events=repositories.raw_events,
+            evidence=repositories.evidence,
+            models=repositories.personal_models,
+        )
+        try:
+            result: ActiveAnswerResult = service.answer(
+                DEFAULT_PROFILE_ID, question_id, request.choice
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Active question was not found.") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return ActiveQuestionAnswerResponse(
+            question_id=result.answer.question_id,
+            choice=result.answer.choice,
+            learned_evidence=[_evidence_response(item) for item in result.evidence],
+            snapshot_version=result.snapshot_version,
+            created_at=result.answer.created_at,
+        )
+
     @app.get("/v1/conversations", response_model=list[ConversationResponse])
     def conversations() -> list[ConversationResponse]:
         repositories = _state(app)["repositories"]
@@ -537,6 +770,8 @@ def create_app(
         for decision, options in repositories.decisions.list_for_profile(DEFAULT_PROFILE_ID):
             prediction = repositories.decisions.latest_prediction(decision.id)
             resolution = repositories.decisions.get_resolution(decision.id)
+            advice = repositories.decisions.latest_advice(decision.id)
+            outcome = repositories.outcomes.get_for_decision(decision.id)
             support = []
             if prediction is not None:
                 support = [
@@ -555,6 +790,8 @@ def create_app(
                     resolution=(
                         None if resolution is None else _stored_resolution_response(resolution)
                     ),
+                    advice=(None if advice is None else _advice_response(advice, options)),
+                    outcome=None if outcome is None else _outcome_response(outcome),
                 )
             )
         return result
@@ -652,6 +889,7 @@ def create_app(
             raw_events=repositories.raw_events,
             evidence=repositories.evidence,
             models=repositories.personal_models,
+            outcomes=repositories.outcomes,
             provider=provider,
         )
         try:
@@ -696,6 +934,7 @@ def create_app(
             raw_events=repositories.raw_events,
             evidence=repositories.evidence,
             models=repositories.personal_models,
+            outcomes=repositories.outcomes,
             provider=None,
         )
         try:
@@ -715,6 +954,32 @@ def create_app(
         return _prediction_response(prediction, stored[1], support)
 
     @app.post(
+        "/v1/decisions/{decision_id}/advise",
+        response_model=DecisionAdviceResponse,
+        status_code=201,
+    )
+    def advise_decision(decision_id: str) -> DecisionAdviceResponse:
+        repositories = _state(app)["repositories"]
+        service = DecisionService(
+            decisions=repositories.decisions,
+            raw_events=repositories.raw_events,
+            evidence=repositories.evidence,
+            models=repositories.personal_models,
+            outcomes=repositories.outcomes,
+            provider=None,
+        )
+        try:
+            advice = service.advise(DEFAULT_PROFILE_ID, decision_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Decision was not found.") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        stored = repositories.decisions.get(decision_id)
+        if stored is None:
+            raise HTTPException(status_code=404, detail="Decision was not found.")
+        return _advice_response(advice, stored[1])
+
+    @app.post(
         "/v1/decisions/{decision_id}/resolve",
         response_model=DecisionResolutionResponse,
         status_code=201,
@@ -728,6 +993,7 @@ def create_app(
             raw_events=repositories.raw_events,
             evidence=repositories.evidence,
             models=repositories.personal_models,
+            outcomes=repositories.outcomes,
             provider=None,
         )
         try:
@@ -739,6 +1005,57 @@ def create_app(
         except ValueError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return _resolution_response(result)
+
+    @app.post(
+        "/v1/decisions/{decision_id}/outcome",
+        response_model=DecisionOutcomeResponse,
+        status_code=201,
+    )
+    def record_outcome(
+        decision_id: str, request: DecisionOutcomeRequest
+    ) -> DecisionOutcomeResponse:
+        repositories = _state(app)["repositories"]
+        service = DecisionService(
+            decisions=repositories.decisions,
+            raw_events=repositories.raw_events,
+            evidence=repositories.evidence,
+            models=repositories.personal_models,
+            outcomes=repositories.outcomes,
+            provider=None,
+        )
+        try:
+            outcome = service.record_outcome(
+                DEFAULT_PROFILE_ID,
+                decision_id,
+                request.satisfaction,
+                request.regret,
+                request.notes,
+            )
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Decision was not found.") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return _outcome_response(outcome)
+
+    @app.delete(
+        "/v1/decisions/{decision_id}/outcome",
+        response_model=DecisionOutcomeDeletionResponse,
+    )
+    def delete_outcome(decision_id: str) -> DecisionOutcomeDeletionResponse:
+        repositories = _state(app)["repositories"]
+        service = DecisionService(
+            decisions=repositories.decisions,
+            raw_events=repositories.raw_events,
+            evidence=repositories.evidence,
+            models=repositories.personal_models,
+            outcomes=repositories.outcomes,
+            provider=None,
+        )
+        try:
+            outcome = service.delete_outcome(DEFAULT_PROFILE_ID, decision_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Decision outcome was not found.") from exc
+        return DecisionOutcomeDeletionResponse(removed_outcome_id=outcome.id)
 
     @app.post("/v1/chat", response_model=ChatResponse)
     async def chat(request: ChatRequest) -> ChatResponse:

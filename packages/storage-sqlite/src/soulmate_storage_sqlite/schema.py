@@ -180,6 +180,109 @@ class DecisionResolutionRow(Base):
     __table_args__ = (Index("ix_decision_resolutions_choice", "chosen_option_id"),)
 
 
+class DecisionOutcomeRow(Base):
+    __tablename__ = "decision_outcomes"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    decision_id: Mapped[str] = mapped_column(
+        ForeignKey("decision_events.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    satisfaction: Mapped[float] = mapped_column(Float, nullable=False)
+    regret: Mapped[bool] = mapped_column(nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_event_id: Mapped[str] = mapped_column(
+        ForeignKey("raw_events.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("satisfaction >= 0 AND satisfaction <= 1", name="ck_outcomes_satisfaction"),
+        Index("ix_decision_outcomes_profile_created", "profile_id", "created_at", "id"),
+    )
+
+
+class DecisionAdviceRow(Base):
+    __tablename__ = "decision_advice"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    decision_id: Mapped[str] = mapped_column(
+        ForeignKey("decision_events.id", ondelete="CASCADE"), nullable=False
+    )
+    profile_id: Mapped[str] = mapped_column(String, nullable=False)
+    behavioral_prediction_id: Mapped[str] = mapped_column(
+        ForeignKey("decision_predictions.id", ondelete="CASCADE"), nullable=False
+    )
+    ranking_json: Mapped[str] = mapped_column(Text, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    rationale_json: Mapped[str] = mapped_column(Text, nullable=False)
+    supporting_outcome_ids_json: Mapped[str] = mapped_column(Text, nullable=False)
+    model_snapshot_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    algorithm_version: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint("confidence >= 0 AND confidence <= 1", name="ck_advice_confidence"),
+        ForeignKeyConstraint(
+            ["profile_id", "model_snapshot_version"],
+            ["user_model_snapshots.profile_id", "user_model_snapshots.version"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_decision_advice_decision_created", "decision_id", "created_at", "id"),
+    )
+
+
+class ActiveQuestionRow(Base):
+    __tablename__ = "active_questions"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    profile_id: Mapped[str] = mapped_column(String, nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    preference_keys_json: Mapped[str] = mapped_column(Text, nullable=False)
+    context_json: Mapped[str] = mapped_column(Text, nullable=False)
+    option_a_label: Mapped[str] = mapped_column(Text, nullable=False)
+    option_a_features_json: Mapped[str] = mapped_column(Text, nullable=False)
+    option_b_label: Mapped[str] = mapped_column(Text, nullable=False)
+    option_b_features_json: Mapped[str] = mapped_column(Text, nullable=False)
+    information_gain_score: Mapped[float] = mapped_column(Float, nullable=False)
+    model_snapshot_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    algorithm_version: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(
+            "information_gain_score >= 0 AND information_gain_score <= 1",
+            name="ck_active_questions_information_gain",
+        ),
+        CheckConstraint("status IN ('pending', 'answered')", name="ck_active_questions_status"),
+        ForeignKeyConstraint(
+            ["profile_id", "model_snapshot_version"],
+            ["user_model_snapshots.profile_id", "user_model_snapshots.version"],
+            ondelete="RESTRICT",
+        ),
+        Index("ix_active_questions_profile_status", "profile_id", "status", "created_at"),
+    )
+
+
+class QuestionAnswerRow(Base):
+    __tablename__ = "question_answers"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    question_id: Mapped[str] = mapped_column(
+        ForeignKey("active_questions.id", ondelete="CASCADE"), unique=True, nullable=False
+    )
+    choice: Mapped[str] = mapped_column(String, nullable=False)
+    source_event_id: Mapped[str] = mapped_column(
+        ForeignKey("raw_events.id", ondelete="RESTRICT"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (CheckConstraint("choice IN ('a', 'b')", name="ck_question_answers_choice"),)
+
+
 class EvidenceRow(Base):
     __tablename__ = "evidence"
 

@@ -123,6 +123,42 @@ describe("SoulmateClient", () => {
     );
   });
 
+  it("exposes active learning, advice, and outcome operations", async () => {
+    // Given: a paired client and successful local service
+    const { fetch, calls } = stub(200, {});
+    const client = new SoulmateClient({
+      baseUrl: "https://192.168.1.20:7433",
+      credential: "device_1.secret",
+      fetch,
+    });
+
+    // When: Phase 8 workflows are requested
+    await client.generateActiveQuestions(2, "work.remote");
+    await client.answerActiveQuestion("question/1", "b");
+    await client.adviseDecision("decision/1");
+    await client.recordOutcome("decision/1", 0.25, true, "Synthetic outcome");
+    await client.deleteOutcome("decision/1");
+
+    // Then: identifiers and structured feedback use the versioned REST contract
+    expect(calls.map((call) => call.url)).toEqual([
+      "https://192.168.1.20:7433/v1/active-questions/generate",
+      "https://192.168.1.20:7433/v1/active-questions/question%2F1/answer",
+      "https://192.168.1.20:7433/v1/decisions/decision%2F1/advise",
+      "https://192.168.1.20:7433/v1/decisions/decision%2F1/outcome",
+      "https://192.168.1.20:7433/v1/decisions/decision%2F1/outcome",
+    ]);
+    expect(calls[0]?.init?.body).toBe(
+      JSON.stringify({ limit: 2, target_key: "work.remote" }),
+    );
+    expect(calls[3]?.init?.body).toBe(
+      JSON.stringify({
+        satisfaction: 0.25,
+        regret: true,
+        notes: "Synthetic outcome",
+      }),
+    );
+  });
+
   it.each([
     [401, "A paired device credential is required.", true],
     [403, "This action is only available on the owner's device.", true],

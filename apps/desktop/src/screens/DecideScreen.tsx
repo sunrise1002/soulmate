@@ -3,7 +3,13 @@ import { useState } from "react";
 import type { SyntheticEvent } from "react";
 
 import { apiRequest } from "../runtime.ts";
-import type { Decision, DecisionPrediction, Resolution } from "../types.ts";
+import type {
+  Decision,
+  DecisionAdvice,
+  DecisionOutcome,
+  DecisionPrediction,
+  Resolution,
+} from "../types.ts";
 import { percentage } from "../utils.ts";
 
 interface DraftOption {
@@ -33,7 +39,12 @@ export function DecideScreen({ onDecisionSaved }: DecideScreenProps) {
   ]);
   const [decision, setDecision] = useState<Decision | null>(null);
   const [prediction, setPrediction] = useState<DecisionPrediction | null>(null);
+  const [advice, setAdvice] = useState<DecisionAdvice | null>(null);
   const [resolution, setResolution] = useState<Resolution | null>(null);
+  const [outcome, setOutcome] = useState<DecisionOutcome | null>(null);
+  const [satisfaction, setSatisfaction] = useState(0.5);
+  const [regret, setRegret] = useState(false);
+  const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,7 +54,12 @@ export function DecideScreen({ onDecisionSaved }: DecideScreenProps) {
     setOptions([newOption(0), newOption(1)]);
     setDecision(null);
     setPrediction(null);
+    setAdvice(null);
     setResolution(null);
+    setOutcome(null);
+    setSatisfaction(0.5);
+    setRegret(false);
+    setNotes("");
     setError(null);
   }
 
@@ -67,14 +83,47 @@ export function DecideScreen({ onDecisionSaved }: DecideScreenProps) {
         "POST",
         `/v1/decisions/${created.id}/predict`,
       );
+      const recommendation = await apiRequest<DecisionAdvice>(
+        "POST",
+        `/v1/decisions/${created.id}/advise`,
+      );
       setDecision(created);
       setPrediction(result);
+      setAdvice(recommendation);
       onDecisionSaved();
     } catch (reason) {
       setError(
         reason instanceof Error
           ? reason.message
           : "The decision could not be predicted.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function recordOutcome(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (decision === null || resolution === null || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await apiRequest<DecisionOutcome>(
+        "POST",
+        `/v1/decisions/${decision.id}/outcome`,
+        {
+          satisfaction,
+          regret,
+          notes: notes.trim() || null,
+        },
+      );
+      setOutcome(result);
+      onDecisionSaved();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "The outcome could not be saved.",
       );
     } finally {
       setBusy(false);
@@ -163,6 +212,22 @@ export function DecideScreen({ onDecisionSaved }: DecideScreenProps) {
               Model snapshot {prediction.model_snapshot_version}
             </p>
           </article>
+          {advice !== null ? (
+            <article className="card factors-card">
+              <span className="section-label">Advise Me</span>
+              <h2>Consider {advice.recommended_choice}</h2>
+              <p>
+                Predict Me remains {advice.predicted_choice}; this
+                recommendation separately weighs your reported outcomes, goals,
+                and constraints.
+              </p>
+              <div className="tag-list">
+                {advice.rationale.map((reason) => (
+                  <span key={reason}>{reason}</span>
+                ))}
+              </div>
+            </article>
+          ) : null}
         </div>
         <article className="card resolve-card">
           <div>
@@ -190,6 +255,62 @@ export function DecideScreen({ onDecisionSaved }: DecideScreenProps) {
             ))}
           </div>
         </article>
+        {resolution !== null ? (
+          <form
+            className="card resolve-card"
+            onSubmit={(event) => void recordOutcome(event)}
+          >
+            <div>
+              <span className="section-label">Outcome</span>
+              <h2>How did this choice work out?</h2>
+              {outcome !== null ? (
+                <p>
+                  Outcome saved. It will inform future advice, not Predict Me.
+                </p>
+              ) : null}
+            </div>
+            {outcome === null ? (
+              <div className="resolve-actions">
+                <label>
+                  Satisfaction {percentage(satisfaction)}
+                  <input
+                    aria-label="Satisfaction"
+                    max="1"
+                    min="0"
+                    step="0.05"
+                    type="range"
+                    value={satisfaction}
+                    onChange={(event) =>
+                      setSatisfaction(Number(event.target.value))
+                    }
+                  />
+                </label>
+                <label>
+                  <input
+                    checked={regret}
+                    type="checkbox"
+                    onChange={(event) => setRegret(event.target.checked)}
+                  />{" "}
+                  I regret this choice
+                </label>
+                <textarea
+                  maxLength={10000}
+                  placeholder="Optional notes about what happened"
+                  rows={2}
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                />
+                <button
+                  className="secondary-button"
+                  disabled={busy}
+                  type="submit"
+                >
+                  Save outcome
+                </button>
+              </div>
+            ) : null}
+          </form>
+        ) : null}
         {error ? <div className="inline-error">{error}</div> : null}
       </section>
     );

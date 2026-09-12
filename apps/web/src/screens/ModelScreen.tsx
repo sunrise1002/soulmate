@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ModelSummary, Preference, SoulmateClient } from "@soulmate/sdk";
+import type {
+  ActiveQuestion,
+  ModelSummary,
+  Preference,
+  SoulmateClient,
+} from "@soulmate/sdk";
 
 interface Props {
   client: SoulmateClient;
@@ -9,13 +14,21 @@ interface Props {
 export function ModelScreen({ client, onAuthError }: Props) {
   const [summary, setSummary] = useState<ModelSummary | null>(null);
   const [preferences, setPreferences] = useState<Preference[]>([]);
+  const [question, setQuestion] = useState<ActiveQuestion | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
   const load = useCallback(() => {
-    Promise.all([client.modelSummary(), client.preferences()])
-      .then(([nextSummary, nextPreferences]) => {
+    Promise.all([
+      client.modelSummary(),
+      client.preferences(),
+      client.activeQuestions(),
+    ])
+      .then(([nextSummary, nextPreferences, questions]) => {
         setSummary(nextSummary);
         setPreferences(nextPreferences);
+        setQuestion(
+          questions.find((item) => item.status === "pending") ?? null,
+        );
       })
       .catch(onAuthError);
   }, [client, onAuthError]);
@@ -33,6 +46,29 @@ export function ModelScreen({ client, onAuthError }: Props) {
     }
   };
 
+  const generateQuestion = async () => {
+    try {
+      const generated = await client.generateActiveQuestions(1);
+      setQuestion(generated[0] ?? null);
+      if (generated.length === 0)
+        setStatus("No new question is available yet.");
+    } catch (caught) {
+      onAuthError(caught);
+    }
+  };
+
+  const answerQuestion = async (choice: "a" | "b") => {
+    if (question === null) return;
+    try {
+      await client.answerActiveQuestion(question.id, choice);
+      setQuestion(null);
+      setStatus("Your answer was added as preference evidence.");
+      load();
+    } catch (caught) {
+      onAuthError(caught);
+    }
+  };
+
   return (
     <section className="panel">
       <h2>My Model</h2>
@@ -42,6 +78,24 @@ export function ModelScreen({ client, onAuthError }: Props) {
           preferences · evidence revision {summary.evidence_revision}
         </p>
       )}
+      <div className="prediction">
+        <h3>Clarify uncertain trade-offs</h3>
+        {question === null ? (
+          <button type="button" onClick={() => void generateQuestion()}>
+            Ask me a question
+          </button>
+        ) : (
+          <div>
+            <p>{question.prompt}</p>
+            <button type="button" onClick={() => void answerQuestion("a")}>
+              {question.option_a_label}
+            </button>
+            <button type="button" onClick={() => void answerQuestion("b")}>
+              {question.option_b_label}
+            </button>
+          </div>
+        )}
+      </div>
       <ul className="preferences">
         {preferences.map((preference) => (
           <li key={`${preference.key}-${String(preference.model_version)}`}>

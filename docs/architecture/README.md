@@ -30,7 +30,9 @@ Tauri desktop shell. The webview talks only through a fixed loopback native prox
 Phase 7 added device pairing ports and rules to the kernel, an opt-in TLS listener
 on an explicit LAN address, a single authorization boundary in front of every
 route, and web and React Native clients built on a shared TypeScript SDK. MCP and
-the Python SDK remain documented placeholders.
+the Python SDK remain documented placeholders. Phase 8 added deterministic active
+learning plus outcome-aware advice while keeping behavioral prediction and
+wellbeing recommendation as separate versioned models.
 
 ADRs below record decisions from specification section 65. Each ADR status states
 whether the decision is architectural only or already implemented.
@@ -46,3 +48,4 @@ whether the decision is architectural only or already implemented.
 | [007](decisions/ADR-007-desktop-daemon.md) | Desktop daemon model |
 | [008](decisions/ADR-008-rest-and-mcp.md) | REST and MCP integration |
 | [009](decisions/ADR-009-lan-pairing.md) | LAN access through owner-approved device pairing |
+| [010](decisions/ADR-010-behavioral-wellbeing.md) | Separate behavioral prediction from wellbeing advice |

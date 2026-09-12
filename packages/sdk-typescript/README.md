@@ -11,6 +11,8 @@ so neither can drift from the daemon contract.
   `https://` service address, and a `sha256:` fingerprint.
 - `assertPinnedFingerprint` and `connectionFrom` bind a credential to the service
   identity and certificate fingerprint that were pinned during pairing.
+- Active-learning, outcome, and advice methods keep the Phase 8 REST contracts
+  identical across the web and mobile clients.
 
 The transport is injectable, so callers can wrap it. The mobile client uses that
 to refuse any request that leaves the paired origin.

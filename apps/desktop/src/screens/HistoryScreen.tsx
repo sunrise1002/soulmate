@@ -1,4 +1,4 @@
-import { CheckCircle2, Clock3, Gauge, Sparkles } from "lucide-react";
+import { CheckCircle2, Clock3, Gauge, Sparkles, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 import { EmptyState } from "../components/EmptyState.tsx";
@@ -24,6 +24,19 @@ export function HistoryScreen() {
   }, []);
 
   useEffect(() => void load(), [load]);
+
+  async function deleteOutcome(decisionId: string) {
+    try {
+      await apiRequest("DELETE", `/v1/decisions/${decisionId}/outcome`);
+      await load();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "The outcome could not be deleted.",
+      );
+    }
+  }
 
   return (
     <section className="screen history-screen">
@@ -81,7 +94,30 @@ export function HistoryScreen() {
                           : percentage(item.prediction.confidence)}
                       </strong>
                     </div>
+                    <div>
+                      <Sparkles size={16} />
+                      <span>Advised</span>
+                      <strong>
+                        {item.advice?.recommended_choice ?? "Not advised"}
+                      </strong>
+                    </div>
                   </div>
+                  {item.outcome !== null ? (
+                    <div>
+                      <p className="muted">
+                        Outcome: {percentage(item.outcome.satisfaction)}{" "}
+                        satisfaction
+                        {item.outcome.regret ? " · regret reported" : ""}
+                      </p>
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() => void deleteOutcome(item.decision.id)}
+                      >
+                        <Trash2 size={14} /> Delete outcome
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
               </article>
             );

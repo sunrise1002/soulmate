@@ -1,10 +1,14 @@
 import type {
+  ActiveQuestion,
+  ActiveQuestionAnswer,
   ChatResponse,
   Conversation,
   Decision,
+  DecisionAdvice,
   DecisionHistoryItem,
   DecisionOptionInput,
   DecisionPrediction,
+  DecisionOutcome,
   Evidence,
   Health,
   ModelSummary,
@@ -16,6 +20,7 @@ import type {
   Resolution,
   Session,
   SystemInfo,
+  UncertaintySignal,
 } from "./types.ts";
 
 export type FetchLike = (
@@ -122,6 +127,36 @@ export class SoulmateClient {
     return this.request<Preference[]>("GET", "/v1/preferences");
   }
 
+  uncertainties(): Promise<UncertaintySignal[]> {
+    return this.request<UncertaintySignal[]>("GET", "/v1/model/uncertainties");
+  }
+
+  activeQuestions(): Promise<ActiveQuestion[]> {
+    return this.request<ActiveQuestion[]>("GET", "/v1/active-questions");
+  }
+
+  generateActiveQuestions(
+    limit = 3,
+    targetKey?: string,
+  ): Promise<ActiveQuestion[]> {
+    return this.request<ActiveQuestion[]>(
+      "POST",
+      "/v1/active-questions/generate",
+      { limit, target_key: targetKey ?? null },
+    );
+  }
+
+  answerActiveQuestion(
+    questionId: string,
+    choice: "a" | "b",
+  ): Promise<ActiveQuestionAnswer> {
+    return this.request<ActiveQuestionAnswer>(
+      "POST",
+      `/v1/active-questions/${encodeURIComponent(questionId)}/answer`,
+      { choice },
+    );
+  }
+
   preferenceEvidence(key: string): Promise<Evidence[]> {
     return this.request<Evidence[]>(
       "GET",
@@ -181,6 +216,13 @@ export class SoulmateClient {
     );
   }
 
+  adviseDecision(decisionId: string): Promise<DecisionAdvice> {
+    return this.request<DecisionAdvice>(
+      "POST",
+      `/v1/decisions/${encodeURIComponent(decisionId)}/advise`,
+    );
+  }
+
   resolveDecision(
     decisionId: string,
     chosenOptionId: string,
@@ -189,6 +231,26 @@ export class SoulmateClient {
       "POST",
       `/v1/decisions/${encodeURIComponent(decisionId)}/resolve`,
       { chosen_option_id: chosenOptionId },
+    );
+  }
+
+  recordOutcome(
+    decisionId: string,
+    satisfaction: number,
+    regret: boolean,
+    notes?: string,
+  ): Promise<DecisionOutcome> {
+    return this.request<DecisionOutcome>(
+      "POST",
+      `/v1/decisions/${encodeURIComponent(decisionId)}/outcome`,
+      { satisfaction, regret, notes: notes ?? null },
+    );
+  }
+
+  deleteOutcome(decisionId: string): Promise<{ removed_outcome_id: string }> {
+    return this.request<{ removed_outcome_id: string }>(
+      "DELETE",
+      `/v1/decisions/${encodeURIComponent(decisionId)}/outcome`,
     );
   }
 

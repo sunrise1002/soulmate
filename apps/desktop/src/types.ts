@@ -140,6 +140,32 @@ export interface DecisionPrediction {
   created_at: string;
 }
 
+export interface AdviceRanking {
+  option_id: string;
+  label: string;
+  recommendation_score: number;
+  behavioral_probability: number;
+  wellbeing_score: number | null;
+  goal_alignment: number | null;
+}
+
+export interface DecisionAdvice {
+  id: string;
+  decision_id: string;
+  mode: "advise_me";
+  predicted_option_id: string;
+  predicted_choice: string;
+  recommended_option_id: string;
+  recommended_choice: string;
+  ranking: AdviceRanking[];
+  confidence: number;
+  rationale: string[];
+  supporting_outcome_ids: string[];
+  model_snapshot_version: number;
+  algorithm_version: string;
+  created_at: string;
+}
+
 export interface Resolution {
   id: string;
   decision_id: string;
@@ -147,10 +173,35 @@ export interface Resolution {
   created_at: string;
 }
 
+export interface DecisionOutcome {
+  id: string;
+  decision_id: string;
+  satisfaction: number;
+  regret: boolean;
+  notes: string | null;
+  created_at: string;
+}
+
 export interface DecisionHistoryItem {
   decision: Decision;
   prediction: DecisionPrediction | null;
   resolution: Resolution | null;
+  advice: DecisionAdvice | null;
+  outcome: DecisionOutcome | null;
+}
+
+export interface ActiveQuestion {
+  id: string;
+  prompt: string;
+  preference_keys: string[];
+  context: Record<string, unknown>;
+  option_a_label: string;
+  option_b_label: string;
+  information_gain_score: number;
+  model_snapshot_version: number;
+  algorithm_version: string;
+  status: "pending" | "answered";
+  created_at: string;
 }
 
 export interface PairedDevice {

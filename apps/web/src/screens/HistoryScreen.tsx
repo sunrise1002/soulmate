@@ -39,6 +39,17 @@ export function HistoryScreen({ client, onAuthError }: Props) {
                 )?.label ?? "another option"}
               </span>
             )}
+            {item.advice !== null && (
+              <span className="hint">
+                Advised {item.advice.recommended_choice}
+              </span>
+            )}
+            {item.outcome !== null && (
+              <span className="hint">
+                Satisfaction {(item.outcome.satisfaction * 100).toFixed(0)}%
+                {item.outcome.regret ? " · regret" : ""}
+              </span>
+            )}
           </li>
         ))}
       </ul>

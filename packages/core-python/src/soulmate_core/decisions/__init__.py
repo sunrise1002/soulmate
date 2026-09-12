@@ -1,5 +1,10 @@
 """Deterministic decision prediction and resolution learning."""
 
+from soulmate_core.decisions.advisor import (
+    ADVICE_ALGORITHM_VERSION,
+    DecisionAdvisor,
+    OutcomeHistory,
+)
 from soulmate_core.decisions.predictor import (
     DECISION_ALGORITHM_VERSION,
     DecisionPredictor,
@@ -8,8 +13,11 @@ from soulmate_core.decisions.predictor import (
 )
 
 __all__ = [
+    "ADVICE_ALGORITHM_VERSION",
     "DECISION_ALGORITHM_VERSION",
+    "DecisionAdvisor",
     "DecisionPredictor",
+    "OutcomeHistory",
     "ResolvedDecision",
     "resolution_evidence",
 ]

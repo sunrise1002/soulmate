@@ -5,10 +5,13 @@ from datetime import datetime
 from typing import Protocol
 
 from soulmate_core.domain.models import (
+    ActiveQuestion,
     AuditEvent,
     Conversation,
+    DecisionAdvice,
     DecisionEvent,
     DecisionOption,
+    DecisionOutcome,
     DecisionPrediction,
     DecisionResolution,
     DerivedModel,
@@ -19,6 +22,7 @@ from soulmate_core.domain.models import (
     PairingToken,
     Preference,
     Profile,
+    QuestionAnswer,
     RawEvent,
     Source,
     UserModelSnapshot,
@@ -81,6 +85,32 @@ class DecisionRepository(Protocol):
     def resolve(self, resolution: DecisionResolution) -> None: ...
 
     def get_resolution(self, decision_id: str) -> DecisionResolution | None: ...
+
+    def add_advice(self, advice: DecisionAdvice) -> None: ...
+
+    def latest_advice(self, decision_id: str) -> DecisionAdvice | None: ...
+
+
+class OutcomeRepository(Protocol):
+    def add(self, outcome: DecisionOutcome) -> None: ...
+
+    def get_for_decision(self, decision_id: str) -> DecisionOutcome | None: ...
+
+    def list_for_profile(self, profile_id: str) -> tuple[DecisionOutcome, ...]: ...
+
+    def remove_for_decision(self, decision_id: str) -> bool: ...
+
+
+class ActiveQuestionRepository(Protocol):
+    def add(self, question: ActiveQuestion) -> None: ...
+
+    def get(self, question_id: str) -> ActiveQuestion | None: ...
+
+    def list_for_profile(self, profile_id: str) -> tuple[ActiveQuestion, ...]: ...
+
+    def add_answer(self, answer: QuestionAnswer) -> None: ...
+
+    def get_answer(self, question_id: str) -> QuestionAnswer | None: ...
 
 
 class EvidenceRepository(Protocol):

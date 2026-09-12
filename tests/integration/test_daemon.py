@@ -472,6 +472,151 @@ def test_decision_prediction_resolution_learning_and_restart(tmp_path: Path) -> 
         assert next_prediction["similar_decision_ids"] == [decision["id"]]
 
 
+def test_active_question_answer_rebuilds_model_and_survives_restart(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path / "owner-data")
+    with owner_client(create_app(settings)) as client:
+        for key, value in (("work.speed", 0.2), ("work.quality", 0.3)):
+            assert (
+                client.post(
+                    "/v1/preferences/corrections",
+                    json={"target_key": key, "value": value},
+                ).status_code
+                == 201
+            )
+
+        generated = client.post("/v1/active-questions/generate", json={"limit": 1})
+        assert generated.status_code == 201
+        question = generated.json()[0]
+        assert set(question["preference_keys"]) == {"work.speed", "work.quality"}
+        assert question["model_snapshot_version"] == 2
+
+        answered = client.post(
+            f"/v1/active-questions/{question['id']}/answer", json={"choice": "b"}
+        )
+        assert answered.status_code == 201
+        assert answered.json()["choice"] == "b"
+        assert len(answered.json()["learned_evidence"]) == 2
+        assert (
+            client.post(
+                f"/v1/active-questions/{question['id']}/answer", json={"choice": "other"}
+            ).status_code
+            == 422
+        )
+        assert (
+            client.post(
+                f"/v1/active-questions/{question['id']}/answer", json={"choice": "a"}
+            ).status_code
+            == 409
+        )
+
+    with owner_client(create_app(settings)) as client:
+        stored = client.get("/v1/active-questions")
+        assert stored.status_code == 200
+        assert stored.json()[0]["status"] == "answered"
+        assert client.get("/v1/model/summary").json()["evidence_revision"] == 4
+
+
+def test_outcomes_inform_advise_me_without_changing_predict_me(tmp_path: Path) -> None:
+    settings = Settings(data_dir=tmp_path / "owner-data")
+    payload = {
+        "domain": "career",
+        "question": "Stay with the familiar path or try a new one?",
+        "options": [
+            {
+                "label": "Familiar path",
+                "description": "Keep the known path",
+                "features": {"novelty": -1.0},
+                "feature_confidence": 1.0,
+            },
+            {
+                "label": "New path",
+                "description": "Try a new path",
+                "features": {"novelty": 1.0},
+                "feature_confidence": 1.0,
+            },
+        ],
+    }
+    with owner_client(create_app(settings)) as client:
+        client.post("/v1/preferences/corrections", json={"target_key": "novelty", "value": -1.0})
+        historical = client.post("/v1/decisions", json=payload).json()
+        historical_prediction = client.post(f"/v1/decisions/{historical['id']}/predict").json()
+        assert historical_prediction["predicted_choice"] == "Familiar path"
+        familiar_id = next(
+            item["id"] for item in historical["options"] if item["label"] == "Familiar path"
+        )
+        client.post(
+            f"/v1/decisions/{historical['id']}/resolve",
+            json={"chosen_option_id": familiar_id},
+        )
+        outcome = client.post(
+            f"/v1/decisions/{historical['id']}/outcome",
+            json={"satisfaction": 0.0, "regret": True, "notes": "Synthetic outcome"},
+        )
+        assert outcome.status_code == 201
+        assert (
+            client.post(
+                f"/v1/decisions/{historical['id']}/outcome",
+                json={"satisfaction": 1.0, "regret": False},
+            ).status_code
+            == 409
+        )
+
+        current = client.post("/v1/decisions", json=payload).json()
+        assert (
+            client.post(
+                f"/v1/decisions/{current['id']}/outcome",
+                json={"satisfaction": 0.5, "regret": False},
+            ).status_code
+            == 409
+        )
+        assert (
+            client.post(
+                f"/v1/decisions/{current['id']}/outcome",
+                json={"satisfaction": 1.1, "regret": False},
+            ).status_code
+            == 422
+        )
+        prediction = client.post(f"/v1/decisions/{current['id']}/predict").json()
+        client.post("/v1/preferences/corrections", json={"target_key": "novelty", "value": -0.9})
+        advice = client.post(f"/v1/decisions/{current['id']}/advise")
+
+        assert prediction["predicted_choice"] == "Familiar path"
+        assert advice.status_code == 201
+        assert advice.json()["mode"] == "advise_me"
+        assert advice.json()["predicted_choice"] == "Familiar path"
+        assert advice.json()["recommended_choice"] == "New path"
+        assert advice.json()["supporting_outcome_ids"] == [outcome.json()["id"]]
+        assert advice.json()["model_snapshot_version"] > prediction["model_snapshot_version"]
+
+    database = Database(settings.database_path)
+    database.migrate()
+    stored_outcome = Repositories(database.sessions()).outcomes.get_for_decision(historical["id"])
+    assert stored_outcome is not None
+    source_event_id = stored_outcome.source_event_id
+    database.close()
+
+    with owner_client(create_app(settings)) as client:
+        history = client.get("/v1/decisions").json()
+        historical_item = next(
+            item for item in history if item["decision"]["id"] == historical["id"]
+        )
+        current_item = next(item for item in history if item["decision"]["id"] == current["id"])
+        assert historical_item["outcome"]["regret"] is True
+        assert current_item["advice"]["recommended_choice"] == "New path"
+
+        deleted = client.delete(f"/v1/decisions/{historical['id']}/outcome")
+        assert deleted.json() == {"removed_outcome_id": outcome.json()["id"]}
+        refreshed = client.get("/v1/decisions").json()
+        assert all(item["outcome"] is None for item in refreshed)
+        assert all(item["advice"] is None for item in refreshed)
+        assert client.delete(f"/v1/decisions/{historical['id']}/outcome").status_code == 404
+
+    database = Database(settings.database_path)
+    database.migrate()
+    assert Repositories(database.sessions()).raw_events.get(source_event_id) is None
+    database.close()
+
+
 def test_decision_extracts_natural_option_features_with_validated_provider_output(
     tmp_path: Path,
 ) -> None:

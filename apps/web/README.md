@@ -5,6 +5,8 @@ served by the daemon from the service root.
 
 Screens: Connect, Chat, Decide, My Model, and History. It talks only to the origin
 that served it, so the daemon remains the single source of personal data.
+Decide displays separate Predict Me and Advise Me results and records outcome
+feedback. My Model offers uncertainty-targeting pairwise questions.
 
 A browser on the owner's own machine reaches the service over loopback and needs
 no credential. A browser on another device must first enable access from other

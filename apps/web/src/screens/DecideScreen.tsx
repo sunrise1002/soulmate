@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type {
   Decision,
+  DecisionAdvice,
   DecisionPrediction,
   SoulmateClient,
 } from "@soulmate/sdk";
@@ -18,6 +19,8 @@ export function DecideScreen({ client, onAuthError }: Props) {
   const [options, setOptions] = useState<string[]>(EMPTY_OPTIONS);
   const [decision, setDecision] = useState<Decision | null>(null);
   const [prediction, setPrediction] = useState<DecisionPrediction | null>(null);
+  const [advice, setAdvice] = useState<DecisionAdvice | null>(null);
+  const [resolved, setResolved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -37,6 +40,7 @@ export function DecideScreen({ client, onAuthError }: Props) {
       );
       setDecision(created);
       setPrediction(await client.predictDecision(created.id));
+      setAdvice(await client.adviseDecision(created.id));
     } catch (caught) {
       onAuthError(caught);
       setError(
@@ -53,8 +57,25 @@ export function DecideScreen({ client, onAuthError }: Props) {
     }
     try {
       await client.resolveDecision(decision.id, optionId);
+      setResolved(true);
+    } catch (caught) {
+      onAuthError(caught);
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "The choice could not be recorded.",
+      );
+    }
+  };
+
+  const recordOutcome = async (satisfaction: number, regret: boolean) => {
+    if (decision === null) return;
+    try {
+      await client.recordOutcome(decision.id, satisfaction, regret);
       setDecision(null);
       setPrediction(null);
+      setAdvice(null);
+      setResolved(false);
       setQuestion("");
       setOptions(EMPTY_OPTIONS);
     } catch (caught) {
@@ -62,7 +83,7 @@ export function DecideScreen({ client, onAuthError }: Props) {
       setError(
         caught instanceof Error
           ? caught.message
-          : "The choice could not be recorded.",
+          : "The outcome could not be recorded.",
       );
     }
   };
@@ -120,6 +141,7 @@ export function DecideScreen({ client, onAuthError }: Props) {
               <li key={item.option_id}>
                 {item.label} · {(item.probability * 100).toFixed(0)}%
                 <button
+                  disabled={resolved}
                   type="button"
                   onClick={() => void resolve(item.option_id)}
                 >
@@ -128,6 +150,32 @@ export function DecideScreen({ client, onAuthError }: Props) {
               </li>
             ))}
           </ul>
+          {advice !== null && (
+            <div>
+              <h3>Advise Me: {advice.recommended_choice}</h3>
+              <p className="hint">
+                Separate from Predict Me; informed by outcomes, goals, and
+                constraints.
+              </p>
+            </div>
+          )}
+          {resolved && (
+            <div>
+              <p>How did the choice work out?</p>
+              <button
+                type="button"
+                onClick={() => void recordOutcome(0.9, false)}
+              >
+                Satisfying
+              </button>
+              <button
+                type="button"
+                onClick={() => void recordOutcome(0.2, true)}
+              >
+                Disappointing / regret
+              </button>
+            </div>
+          )}
         </div>
       )}
       {error !== null && <p role="alert">{error}</p>}

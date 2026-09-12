@@ -12,7 +12,12 @@ import type { SyntheticEvent } from "react";
 
 import { EmptyState } from "../components/EmptyState.tsx";
 import { apiRequest } from "../runtime.ts";
-import type { Evidence, ModelSummary, Preference } from "../types.ts";
+import type {
+  ActiveQuestion,
+  Evidence,
+  ModelSummary,
+  Preference,
+} from "../types.ts";
 import {
   formatDate,
   humanizeKey,
@@ -33,6 +38,7 @@ interface CorrectionDraft {
 
 export function ModelScreen({ revision, onModelChanged }: ModelScreenProps) {
   const [preferences, setPreferences] = useState<Preference[]>([]);
+  const [questions, setQuestions] = useState<ActiveQuestion[]>([]);
   const [summary, setSummary] = useState<ModelSummary | null>(null);
   const [selected, setSelected] = useState<Preference | null>(null);
   const [evidence, setEvidence] = useState<Evidence[]>([]);
@@ -42,12 +48,14 @@ export function ModelScreen({ revision, onModelChanged }: ModelScreenProps) {
 
   const load = useCallback(async () => {
     try {
-      const [model, items] = await Promise.all([
+      const [model, items, activeQuestions] = await Promise.all([
         apiRequest<ModelSummary>("GET", "/v1/model/summary"),
         apiRequest<Preference[]>("GET", "/v1/preferences"),
+        apiRequest<ActiveQuestion[]>("GET", "/v1/active-questions"),
       ]);
       setSummary(model);
       setPreferences(items);
+      setQuestions(activeQuestions.filter((item) => item.status === "pending"));
       setSelected(
         (current) => items.find((item) => item.key === current?.key) ?? null,
       );
@@ -75,6 +83,53 @@ export function ModelScreen({ revision, onModelChanged }: ModelScreenProps) {
       setError(
         reason instanceof Error ? reason.message : "Evidence is unavailable.",
       );
+    }
+  }
+
+  async function generateQuestion(targetKey?: string) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const generated = await apiRequest<ActiveQuestion[]>(
+        "POST",
+        "/v1/active-questions/generate",
+        { limit: 1, target_key: targetKey ?? null },
+      );
+      setQuestions((items) => [...generated, ...items]);
+      setError(
+        generated.length === 0
+          ? "Add more preference evidence before generating another question."
+          : null,
+      );
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "A question could not be generated.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function answerQuestion(questionId: string, choice: "a" | "b") {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await apiRequest("POST", `/v1/active-questions/${questionId}/answer`, {
+        choice,
+      });
+      setQuestions((items) => items.filter((item) => item.id !== questionId));
+      await load();
+      onModelChanged();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "The answer could not be saved.",
+      );
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -130,6 +185,8 @@ export function ModelScreen({ revision, onModelChanged }: ModelScreenProps) {
     }
   }
 
+  const activeQuestion = questions[0];
+
   return (
     <section className="screen model-screen">
       <header className="screen-header model-header">
@@ -167,6 +224,45 @@ export function ModelScreen({ revision, onModelChanged }: ModelScreenProps) {
         </div>
       </div>
       {error ? <div className="inline-error">{error}</div> : null}
+      <article className="card resolve-card">
+        <div>
+          <span className="section-label">Active learning</span>
+          <h2>Clarify uncertain trade-offs</h2>
+          <p>
+            Soulmate asks only about areas where stronger evidence is useful.
+          </p>
+        </div>
+        {activeQuestion === undefined ? (
+          <button
+            className="secondary-button"
+            disabled={busy || preferences.length === 0}
+            type="button"
+            onClick={() => void generateQuestion()}
+          >
+            Ask me a question
+          </button>
+        ) : (
+          <div className="resolve-actions">
+            <strong>{activeQuestion.prompt}</strong>
+            <button
+              className="choice"
+              disabled={busy}
+              type="button"
+              onClick={() => void answerQuestion(activeQuestion.id, "a")}
+            >
+              {activeQuestion.option_a_label}
+            </button>
+            <button
+              className="choice"
+              disabled={busy}
+              type="button"
+              onClick={() => void answerQuestion(activeQuestion.id, "b")}
+            >
+              {activeQuestion.option_b_label}
+            </button>
+          </div>
+        )}
+      </article>
       {preferences.length ? (
         <div className="preference-grid">
           {preferences.map((item) => (
@@ -248,6 +344,14 @@ export function ModelScreen({ revision, onModelChanged }: ModelScreenProps) {
               }
             >
               <Pencil size={15} /> Correct this
+            </button>
+            <button
+              className="secondary-button"
+              disabled={busy}
+              type="button"
+              onClick={() => void generateQuestion(selected.key)}
+            >
+              Ask me about this
             </button>
             <div className="evidence-heading">
               <span className="section-label">Why Soulmate thinks this</span>

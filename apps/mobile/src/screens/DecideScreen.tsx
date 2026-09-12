@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button, Text, TextInput, View } from "react-native";
 import type {
   Decision,
+  DecisionAdvice,
   DecisionPrediction,
   SoulmateClient,
 } from "@soulmate/sdk";
@@ -19,6 +20,8 @@ export function DecideScreen({ client, onError }: Props) {
   const [second, setSecond] = useState("");
   const [decision, setDecision] = useState<Decision | null>(null);
   const [prediction, setPrediction] = useState<DecisionPrediction | null>(null);
+  const [advice, setAdvice] = useState<DecisionAdvice | null>(null);
+  const [resolved, setResolved] = useState(false);
   const [pending, setPending] = useState(false);
 
   const predict = async () => {
@@ -30,6 +33,7 @@ export function DecideScreen({ client, onError }: Props) {
       ]);
       setDecision(created);
       setPrediction(await client.predictDecision(created.id));
+      setAdvice(await client.adviseDecision(created.id));
     } catch (caught) {
       onError(caught);
     } finally {
@@ -43,8 +47,20 @@ export function DecideScreen({ client, onError }: Props) {
     }
     try {
       await client.resolveDecision(decision.id, optionId);
+      setResolved(true);
+    } catch (caught) {
+      onError(caught);
+    }
+  };
+
+  const recordOutcome = async (satisfaction: number, regret: boolean) => {
+    if (decision === null) return;
+    try {
+      await client.recordOutcome(decision.id, satisfaction, regret);
       setDecision(null);
       setPrediction(null);
+      setAdvice(null);
+      setResolved(false);
       setQuestion("");
       setFirst("");
       setSecond("");
@@ -93,11 +109,33 @@ export function DecideScreen({ client, onError }: Props) {
           </Text>
           {prediction.ranking.map((item) => (
             <Button
+              disabled={resolved}
               key={item.option_id}
               title={`I chose ${item.label}`}
               onPress={() => void resolve(item.option_id)}
             />
           ))}
+          {advice !== null && (
+            <View style={styles.card}>
+              <Text>Advise Me: {advice.recommended_choice}</Text>
+              <Text style={styles.hint}>
+                Separate from your predicted choice.
+              </Text>
+            </View>
+          )}
+          {resolved && (
+            <View style={styles.card}>
+              <Text>How did the choice work out?</Text>
+              <Button
+                title="Satisfying"
+                onPress={() => void recordOutcome(0.9, false)}
+              />
+              <Button
+                title="Disappointing / regret"
+                onPress={() => void recordOutcome(0.2, true)}
+              />
+            </View>
+          )}
         </View>
       )}
     </View>

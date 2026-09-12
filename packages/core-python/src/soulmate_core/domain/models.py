@@ -46,6 +46,13 @@ class DecisionStatus(StrEnum):
     RESOLVED = "resolved"
 
 
+class ActiveQuestionStatus(StrEnum):
+    """Lifecycle states for an uncertainty-targeting question."""
+
+    PENDING = "pending"
+    ANSWERED = "answered"
+
+
 @dataclass(frozen=True, slots=True)
 class Profile:
     id: str
@@ -193,6 +200,115 @@ class DecisionResolution:
 
     def __post_init__(self) -> None:
         _require_utc_aware(self.created_at)
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionOutcome:
+    """Owner-reported wellbeing after a resolved decision."""
+
+    id: str
+    decision_id: str
+    profile_id: str
+    satisfaction: float
+    regret: bool
+    notes: str | None
+    source_event_id: str
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at)
+        if not 0.0 <= self.satisfaction <= 1.0:
+            raise ValueError("Outcome satisfaction must be between 0 and 1.")
+        if self.notes is not None and not self.notes.strip():
+            raise ValueError("Outcome notes must be omitted or contain text.")
+
+
+@dataclass(frozen=True, slots=True)
+class AdviceRankingItem:
+    option_id: str
+    recommendation_score: float
+    behavioral_probability: float
+    wellbeing_score: float | None
+    goal_alignment: float | None
+
+    def __post_init__(self) -> None:
+        values = (self.recommendation_score, self.behavioral_probability)
+        optional = (self.wellbeing_score, self.goal_alignment)
+        if any(not 0.0 <= value <= 1.0 for value in values):
+            raise ValueError("Advice scores must be between 0 and 1.")
+        if any(value is not None and not 0.0 <= value <= 1.0 for value in optional):
+            raise ValueError("Optional advice scores must be between 0 and 1.")
+
+
+@dataclass(frozen=True, slots=True)
+class DecisionAdvice:
+    """Normative recommendation kept separate from behavioral prediction."""
+
+    id: str
+    decision_id: str
+    profile_id: str
+    behavioral_prediction_id: str
+    ranking: tuple[AdviceRankingItem, ...]
+    confidence: float
+    rationale: tuple[str, ...]
+    supporting_outcome_ids: tuple[str, ...]
+    model_snapshot_version: int
+    algorithm_version: str
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at)
+        if not self.ranking or not self.algorithm_version:
+            raise ValueError("Advice ranking and algorithm version must not be empty.")
+        if not 0.0 <= self.confidence <= 1.0:
+            raise ValueError("Advice confidence must be between 0 and 1.")
+        if self.model_snapshot_version < 1:
+            raise ValueError("Advice must reference a persisted model snapshot.")
+
+
+@dataclass(frozen=True, slots=True)
+class ActiveQuestion:
+    """Deterministic pairwise question aimed at uncertain preferences."""
+
+    id: str
+    profile_id: str
+    prompt: str
+    preference_keys: tuple[str, ...]
+    context: dict[str, object]
+    option_a_label: str
+    option_a_features: dict[str, float]
+    option_b_label: str
+    option_b_features: dict[str, float]
+    information_gain_score: float
+    model_snapshot_version: int
+    algorithm_version: str
+    status: ActiveQuestionStatus
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at)
+        if not self.prompt.strip() or not self.preference_keys:
+            raise ValueError("Active question prompt and preference keys must not be empty.")
+        if not self.option_a_label.strip() or not self.option_b_label.strip():
+            raise ValueError("Active question option labels must not be empty.")
+        if not 0.0 <= self.information_gain_score <= 1.0:
+            raise ValueError("Information-gain score must be between 0 and 1.")
+        if self.model_snapshot_version < 1 or not self.algorithm_version:
+            raise ValueError("Active question must record model and algorithm versions.")
+
+
+@dataclass(frozen=True, slots=True)
+class QuestionAnswer:
+    id: str
+    question_id: str
+    choice: str
+    source_event_id: str
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at)
+        if self.choice not in {"a", "b"}:
+            raise ValueError("Question answer choice must be 'a' or 'b'.")
 
 
 @dataclass(frozen=True, slots=True)

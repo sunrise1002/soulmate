@@ -13,7 +13,8 @@ wildcard binds are rejected. Every request passes one authorization boundary bef
 any handler sees personal data: loopback callers are the owner, and every other
 caller needs a bearer credential issued by pairing. Health and pairing completion
 are the only public API paths. Pairing, device listing, revocation, network status,
-and evidence deletion are owner-only.
+evidence deletion, and outcome deletion are owner-only. Removing an outcome also
+removes its source event and invalidates advice that may have used it.
 
 Pairing tokens are 256-bit, single-use, and expire in five minutes; they are
 claimed atomically so a token can never be redeemed twice. Only hashes of pairing
@@ -29,4 +30,4 @@ internet exposure is not supported.
 
 Do not put personal data or secrets into issue reports, logs, fixtures, source
 control, or CI artifacts. Use synthetic fixtures and keep runtime data outside
-tracked source. See ADR-001, ADR-005, ADR-006, ADR-008, and ADR-009.
+tracked source. See ADR-001, ADR-005, ADR-006, ADR-008, ADR-009, and ADR-010.

@@ -21,10 +21,10 @@ data merely to satisfy this code convention.
 
 ## Phase boundary
 
-Phase 7 mobile/web clients and secure pairing are complete locally. Phase 8 is not
-authorized; do not implement active learning, outcome tracking, or regret analysis
-until the user explicitly requests it. Remote CI verification for completed phases
-remains unconfirmed.
+Phase 8 active learning and outcome intelligence are complete locally. Phase 9 is
+not authorized; do not implement MCP, external service credentials, or permission
+scopes until the user explicitly requests it. Remote CI verification for completed
+phases remains unconfirmed.
 For every later phase, follow specification section 74: plan only the current
 phase, implement small increments, validate, update documentation and phase status,
 then stop unless the user has authorized continuation. Explicit user instructions

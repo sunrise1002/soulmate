@@ -62,12 +62,16 @@ def test_initial_migration_creates_base_tables_and_required_pragmas(tmp_path: Pa
         "decision_resolutions",
         "paired_devices",
         "pairing_tokens",
+        "active_questions",
+        "question_answers",
+        "decision_outcomes",
+        "decision_advice",
     } == tables
     check = database.check()
     assert check.integrity == "ok"
     assert check.journal_mode == "wal"
     assert check.foreign_keys is True
-    assert check.current_revision == check.head_revision == "0005_phase_7"
+    assert check.current_revision == check.head_revision == "0006_phase_8"
     database.close()
 
 
@@ -138,7 +142,7 @@ def test_phase_1_database_upgrades_without_losing_base_records(tmp_path: Path) -
     database.migrate()
 
     assert repositories.profiles.get(profile.id) == profile
-    assert database.current_revision() == "0005_phase_7"
+    assert database.current_revision() == "0006_phase_8"
     database.close()
 
 
@@ -210,7 +214,7 @@ def test_phase_2_database_upgrades_without_losing_evidence_or_model_state(tmp_pa
         ).scalar_one()
     assert evidence == ("phase-2-test", None, None)
     assert preference_count == 1
-    assert database.current_revision() == "0005_phase_7"
+    assert database.current_revision() == "0006_phase_8"
     database.close()
 
 
@@ -254,7 +258,7 @@ def test_phase_3_database_upgrades_without_losing_conversation_provenance(tmp_pa
 
     assert repositories.messages.get(message.id) == message
     assert repositories.evidence.get("evidence_preserved") is not None
-    assert database.current_revision() == "0005_phase_7"
+    assert database.current_revision() == "0006_phase_8"
     database.close()
 
 

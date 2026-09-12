@@ -33,6 +33,17 @@ export function HistoryScreen({ client, onError }: Props) {
                 Predicted {item.prediction.predicted_choice}
               </Text>
             )}
+            {item.advice !== null && (
+              <Text style={styles.hint}>
+                Advised {item.advice.recommended_choice}
+              </Text>
+            )}
+            {item.outcome !== null && (
+              <Text style={styles.hint}>
+                Satisfaction {(item.outcome.satisfaction * 100).toFixed(0)}%
+                {item.outcome.regret ? " · regret" : ""}
+              </Text>
+            )}
           </View>
         )}
       />

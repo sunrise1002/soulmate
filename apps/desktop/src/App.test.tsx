@@ -61,6 +61,9 @@ describe("desktop navigation", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "My Model" }));
     expect(screen.getByRole("heading", { name: "My Model" })).not.toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Clarify uncertain trade-offs" }),
+    ).not.toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "History" }));
     expect(
