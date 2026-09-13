@@ -10,7 +10,7 @@ API key shown once, then configure an MCP client with:
 ```json
 {
   "command": "uv",
-  "args": ["run", "decision-twin", "mcp"],
+  "args": ["run", "soulmate", "mcp"],
   "env": {
     "SOULMATE_BASE_URL": "http://127.0.0.1:7432",
     "SOULMATE_API_KEY": "<key-shown-once>"

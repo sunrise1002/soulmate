@@ -31,7 +31,7 @@ later phases are not authorized.
 | P2-03 Derived State | Contextual `Fact`, `Preference`, `Goal`, and `Constraint` records with confidence and supporting evidence IDs |
 | P2-04 Aggregation | Standard-library weighted aggregation grouped by exact canonical context; contradictions remain in evidence and reduce confidence |
 | P2-05 Snapshot | Immutable SQLite snapshots record profile version, algorithm version, evidence revision, full model content, and creation time |
-| P2-06 Rebuild | `decision-twin rebuild-model` deterministically derives and atomically replaces current state before creating a snapshot |
+| P2-06 Rebuild | `soulmate rebuild-model` deterministically derives and atomically replaces current state before creating a snapshot |
 | P2-07 Explainability | Local endpoints expose evidence details and all supporting preference evidence |
 
 The default source reliability configuration is named `evidence-weights-v1`, and

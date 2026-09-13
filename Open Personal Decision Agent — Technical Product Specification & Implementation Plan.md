@@ -104,7 +104,7 @@ Docker Compose
 
 or
 
-decision-twin serve
+soulmate serve
 ```
 
 ---
@@ -481,7 +481,7 @@ Use:
 
 ```text
 DATA_DIR/
-├── decision-twin.db
+├── soulmate.db
 ├── objects/
 │   ├── ab/
 │   │   └── <sha256>
@@ -1367,7 +1367,7 @@ The daemon should be packaged as a Tauri sidecar executable.
 Development:
 
 ```bash
-uv run decision-twin serve
+uv run soulmate serve
 ```
 
 Release:
@@ -1767,7 +1767,7 @@ Only later implement live external connectors requiring credentials.
 Provide:
 
 ```bash
-decision-twin backup
+soulmate backup
 ```
 
 Backup should include:
@@ -1968,7 +1968,7 @@ Data & Privacy
 Recommended monorepo:
 
 ```text
-decision-twin/
+soulmate/
 │
 ├── apps/
 │   ├── daemon/
@@ -2165,21 +2165,21 @@ ADR-008 REST + MCP external integration
 Provide:
 
 ```bash
-decision-twin serve
+soulmate serve
 
-decision-twin status
+soulmate status
 
-decision-twin doctor
+soulmate doctor
 
-decision-twin pair
+soulmate pair
 
-decision-twin backup
+soulmate backup
 
-decision-twin export
+soulmate export
 
-decision-twin import
+soulmate import
 
-decision-twin rebuild-model
+soulmate rebuild-model
 ```
 
 `doctor` should detect:
@@ -2209,7 +2209,7 @@ mode = "strict_local"
 
 [storage]
 backend = "sqlite"
-path = "./data/decision-twin.db"
+path = "./data/soulmate.db"
 
 [vector]
 backend = "sqlite_vec"
@@ -2409,7 +2409,7 @@ Implement simple local background worker.
 A developer can run:
 
 ```bash
-uv run decision-twin serve
+uv run soulmate serve
 ```
 
 and receive:
@@ -2474,7 +2474,7 @@ Implement versioned `UserModelSnapshot`.
 Implement:
 
 ```bash
-decision-twin rebuild-model
+soulmate rebuild-model
 ```
 
 Given the same evidence and algorithm version, rebuild must be deterministic.
@@ -2763,7 +2763,7 @@ Predictions store learning algorithm version.
 Automated evaluation command such as:
 
 ```bash
-decision-twin evaluate
+soulmate evaluate
 ```
 
 produces reproducible metrics.

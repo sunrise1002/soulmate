@@ -25,7 +25,7 @@ imports, and delegated decisions are not authorized.
 
 | Task | Result |
 | --- | --- |
-| P10-01 Backup | `decision-twin backup`, `POST /v1/data/backups`, and the desktop action use SQLite online backup for a consistent local `.dtwb` archive |
+| P10-01 Backup | `soulmate backup`, `POST /v1/data/backups`, and the desktop action use SQLite online backup for a consistent local `.dtwb` archive |
 | P10-02 Restore | CLI restore and desktop staged restore accept only a fresh installation; restart applies the archive, migrates it, assigns a new installation identity, and rebuilds the model |
 | P10-03 Encrypted Export | `.dtw` encrypts and authenticates the versioned ZIP payload with AES-256-GCM and a scrypt-derived key; wrong passphrases and modified archives fail generically |
 | P10-04 Chat Import | Auto-detected or explicit generic JSON, Markdown, plain text, ChatGPT, and Claude exports normalize locally into source-linked conversations, messages, and RawEvents |

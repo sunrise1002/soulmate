@@ -26,8 +26,8 @@ mode = "strict_local"
 
 [storage]
 backend = "sqlite"
-# Omit path to use DATA_DIR/decision-twin.db. `serve` creates and migrates it.
-# path = "./data/decision-twin.db"
+# Omit path to use DATA_DIR/soulmate.db. `serve` creates and migrates it.
+# path = "./data/soulmate.db"
 
 [vector]
 backend = "sqlite_vec"

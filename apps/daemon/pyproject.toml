@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
-decision-twin = "soulmate_daemon.cli:main"
+soulmate = "soulmate_daemon.cli:main"
 
 [build-system]
 requires = ["hatchling>=1.27,<2"]

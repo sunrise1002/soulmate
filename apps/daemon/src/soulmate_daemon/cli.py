@@ -351,7 +351,7 @@ def _import_history(
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="decision-twin", description="Soulmate local daemon")
+    parser = argparse.ArgumentParser(prog="soulmate", description="Soulmate local daemon")
     commands = parser.add_subparsers(dest="command", required=True)
     for command, help_text in (
         ("serve", "Start the local Soulmate daemon"),

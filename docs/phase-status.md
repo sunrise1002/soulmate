@@ -48,3 +48,10 @@ quality gates, Git metadata policy, CI enforcement, templates, security guidance
 and maintainer repository settings are documented under the
 [contributor guide](contributor-guide/README.md). This does not alter the authorized
 phase boundary above. Remote CI and GitHub ruleset activation remain unverified.
+
+## Repository maintenance
+
+On 2026-09-14, remaining legacy product identifiers were standardized on
+Soulmate across runtime defaults, packaging, tests, configuration, and
+documentation. `pnpm check:all` passed locally on macOS arm64; remote CI remains
+unverified. This maintenance does not define or authorize a later product phase.

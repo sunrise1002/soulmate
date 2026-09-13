@@ -68,7 +68,7 @@ access is a startup decision, so the service must restart to apply it.
 
 Relative paths resolve against the process working directory, including when the
 TOML file is elsewhere. `~` is expanded when resolving the database path. Without
-an explicit `storage.path`, the database location is `DATA_DIR/decision-twin.db`.
+an explicit `storage.path`, the database location is `DATA_DIR/soulmate.db`.
 An explicit storage path takes precedence over that derived location. Choose an
 absolute `DATA_DIR` when launching from different directories.
 
@@ -82,9 +82,9 @@ restart, and is removed after successful migration. Do not manually edit or move
 Phase 11 connector registration stores non-secret configuration and granted
 permission snapshots in SQLite. Connector credentials are read only from dedicated
 process variables using
-`DECISION_TWIN_CONNECTOR__<NORMALIZED_CONNECTOR_ID>__<NORMALIZED_KEY>`; for example,
+`SOULMATE_CONNECTOR__<NORMALIZED_CONNECTOR_ID>__<NORMALIZED_KEY>`; for example,
 credential key `api_token` on `example.calendar` becomes
-`DECISION_TWIN_CONNECTOR__EXAMPLE_CALENDAR__API_TOKEN`. Credential values are not
+`SOULMATE_CONNECTOR__EXAMPLE_CALENDAR__API_TOKEN`. Credential values are not
 accepted by the registration API, persisted, logged, or included in archives.
 Connector HTTP destinations must appear in the installed manifest and pass the same
 privacy-mode policy as model calls. `offline` denies all connector network access.

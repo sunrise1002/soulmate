@@ -47,7 +47,7 @@
   outcome recording, with local metadata-only auditing for every request.
 - A stdio MCP adapter with `predict_choice`, `rank_options`,
   `get_preference_summary`, `find_similar_decisions`, `record_decision`, and
-  `record_outcome`, available through `decision-twin mcp` and the packaged daemon
+  `record_outcome`, available through `soulmate mcp` and the packaged daemon
   sidecar.
 - Desktop External Agents permission UI, typed TypeScript external-access SDK,
   and SQLite migration `0007_phase_9` for identities, scopes, and API-key hashes.
@@ -84,7 +84,7 @@
   handling, and strict-local, hybrid, and offline privacy controls.
 - Conversation and decision history API reads plus evidence deletion with a
   deterministic Personal Model rebuild.
-- Phase 5 synthetic decision benchmark and offline `decision-twin evaluate`
+- Phase 5 synthetic decision benchmark and offline `soulmate evaluate`
   command with reproducible random, frozen LLM-only, memory-only, Personal Model,
   and Decision Model comparisons.
 - Top-1 and Top-2 accuracy, log loss, multiclass Brier score, and populated-bin
@@ -145,6 +145,11 @@ Evidence.
 
 ### Changed
 
+- Standardized the remaining legacy product identifiers on Soulmate across the
+  CLI executable, default database filename, connector credential variables,
+  packaged desktop sidecar, tests, configuration examples, and documentation.
+  Existing installations must rename their default database file and update
+  connector credential environment variables before upgrading.
 - Shortened `README.md` to orientation, quick start, CLI, device access,
   repository map, and a documentation index; the per-phase narrative now lives in
   `docs/index.html` and the phase reports.

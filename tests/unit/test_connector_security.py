@@ -33,7 +33,7 @@ def _network_manifest() -> ConnectorManifest:
 def test_connector_credentials_have_stable_separate_environment_names() -> None:
     assert (
         credential_environment_name("example.remote", "api_token")
-        == "DECISION_TWIN_CONNECTOR__EXAMPLE_REMOTE__API_TOKEN"
+        == "SOULMATE_CONNECTOR__EXAMPLE_REMOTE__API_TOKEN"
     )
 
 

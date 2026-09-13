@@ -48,7 +48,7 @@ def main() -> None:
     extension = ".exe" if sys.platform == "win32" else ""
     output = root / "apps" / "desktop" / "src-tauri" / "binaries"
     output.mkdir(parents=True, exist_ok=True)
-    destination = output / f"decision-twin-{target}{extension}"
+    destination = output / f"soulmate-{target}{extension}"
     if args.if_missing and destination.is_file():
         print(destination.relative_to(root))
         return
@@ -63,7 +63,7 @@ def main() -> None:
                 "--noconfirm",
                 "--onefile",
                 "--name",
-                "decision-twin",
+                "soulmate",
                 "--distpath",
                 str(temporary_path / "dist"),
                 "--workpath",
@@ -87,7 +87,7 @@ def main() -> None:
             cwd=root,
             check=True,
         )
-        built = temporary_path / "dist" / f"decision-twin{extension}"
+        built = temporary_path / "dist" / f"soulmate{extension}"
         shutil.copy2(built, destination)
     if sys.platform != "win32":
         destination.chmod(destination.stat().st_mode | stat.S_IXUSR)

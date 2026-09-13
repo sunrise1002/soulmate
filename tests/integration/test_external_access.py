@@ -132,7 +132,7 @@ def test_api_keys_are_hash_only_restart_safe_and_revocable(tmp_path: Path) -> No
     identity = issued["identity"]
     credential_id = identity["credentials"][0]["id"]
 
-    assert api_key.encode() not in (tmp_path / "owner-data" / "decision-twin.db").read_bytes()
+    assert api_key.encode() not in (tmp_path / "owner-data" / "soulmate.db").read_bytes()
     with _client(tmp_path, api_key) as restarted_external:
         assert restarted_external.get("/v1/external/preference-summary").status_code == 200
 

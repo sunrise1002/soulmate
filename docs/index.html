@@ -567,10 +567,10 @@
 pnpm --filter @soulmate/desktop tauri build</code></pre>
 
           <h3>8.2 Path B — run the service directly</h3>
-<pre><code>uv run --locked decision-twin serve</code></pre>
+<pre><code>uv run --locked soulmate serve</code></pre>
           <p>
             The process listens on <code>127.0.0.1:7432</code>, applies packaged Alembic migrations,
-            creates <code>DATA_DIR/decision-twin.db</code>, and starts the durable local job worker.
+            creates <code>DATA_DIR/soulmate.db</code>, and starts the durable local job worker.
             Stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd>. It enables no telemetry, and model calls happen
             only when <code>/v1/chat</code> is used and the configured egress policy allows them.
           </p>
@@ -599,8 +599,8 @@ pnpm --filter @soulmate/desktop tauri dev    # desktop product in dev mode</code
           <ol>
             <li>Copy <code>config.example.toml</code> to <code>config.toml</code> (optional; local config is git-ignored).</li>
             <li>Point the provider at a local model, e.g. <code>SOULMATE_LLM__OLLAMA__MODEL=llama3.2</code>. The daemon starts fine without one; <code>/v1/chat</code> simply reports the provider as unavailable.</li>
-            <li>Run <code>decision-twin doctor</code> — it checks storage permissions, database integrity, WAL, foreign keys, migration state, port availability, and whether the selected provider has a model.</li>
-            <li>Start chatting and deciding. Optionally import existing history with <code>decision-twin import ./history.json</code>.</li>
+            <li>Run <code>soulmate doctor</code> — it checks storage permissions, database integrity, WAL, foreign keys, migration state, port availability, and whether the selected provider has a model.</li>
+            <li>Start chatting and deciding. Optionally import existing history with <code>soulmate import ./history.json</code>.</li>
           </ol>
         </section>
 
@@ -630,17 +630,17 @@ pnpm --filter @soulmate/desktop tauri dev    # desktop product in dev mode</code
           <table>
             <thead><tr><th>Command</th><th>Purpose</th></tr></thead>
             <tbody>
-              <tr><td><code>decision-twin serve</code></td><td>Start the local daemon (migrations, database creation, job worker).</td></tr>
-              <tr><td><code>decision-twin status</code></td><td>Query <code>/v1/health</code> and <code>/v1/system/info</code> of a running daemon.</td></tr>
-              <tr><td><code>decision-twin doctor</code></td><td>Inspect configuration, storage, integrity, migrations, port, and provider readiness.</td></tr>
-              <tr><td><code>decision-twin rebuild-model</code></td><td>Deterministically replace derived state from all stored evidence; writes a new snapshot.</td></tr>
-              <tr><td><code>decision-twin evaluate [--dataset PATH]</code></td><td>Run the packaged synthetic decision dataset with no database, network, or provider.</td></tr>
-              <tr><td><code>decision-twin import PATH [--format …] [--name …]</code></td><td>Import chat history: <code>auto</code>, <code>json</code>, <code>markdown</code>, <code>text</code>, <code>chatgpt</code>, <code>claude</code>.</td></tr>
-              <tr><td><code>decision-twin backup [--output PATH]</code></td><td>Write a credential-free <code>.dtwb</code> archive (default <code>DATA_DIR/backups</code>).</td></tr>
-              <tr><td><code>decision-twin export [--output PATH] [--passphrase-file PATH]</code></td><td>Write an AES-256-GCM encrypted portable <code>.dtw</code> archive.</td></tr>
-              <tr><td><code>decision-twin restore ARCHIVE [--passphrase-file PATH]</code></td><td>Restore into a <em>fresh</em> installation while the daemon is stopped.</td></tr>
-              <tr><td><code>decision-twin connectors</code></td><td>List installed connector plugins discovered via entry points.</td></tr>
-              <tr><td><code>decision-twin mcp</code></td><td>Run the scoped stdio MCP adapter against the daemon.</td></tr>
+              <tr><td><code>soulmate serve</code></td><td>Start the local daemon (migrations, database creation, job worker).</td></tr>
+              <tr><td><code>soulmate status</code></td><td>Query <code>/v1/health</code> and <code>/v1/system/info</code> of a running daemon.</td></tr>
+              <tr><td><code>soulmate doctor</code></td><td>Inspect configuration, storage, integrity, migrations, port, and provider readiness.</td></tr>
+              <tr><td><code>soulmate rebuild-model</code></td><td>Deterministically replace derived state from all stored evidence; writes a new snapshot.</td></tr>
+              <tr><td><code>soulmate evaluate [--dataset PATH]</code></td><td>Run the packaged synthetic decision dataset with no database, network, or provider.</td></tr>
+              <tr><td><code>soulmate import PATH [--format …] [--name …]</code></td><td>Import chat history: <code>auto</code>, <code>json</code>, <code>markdown</code>, <code>text</code>, <code>chatgpt</code>, <code>claude</code>.</td></tr>
+              <tr><td><code>soulmate backup [--output PATH]</code></td><td>Write a credential-free <code>.dtwb</code> archive (default <code>DATA_DIR/backups</code>).</td></tr>
+              <tr><td><code>soulmate export [--output PATH] [--passphrase-file PATH]</code></td><td>Write an AES-256-GCM encrypted portable <code>.dtw</code> archive.</td></tr>
+              <tr><td><code>soulmate restore ARCHIVE [--passphrase-file PATH]</code></td><td>Restore into a <em>fresh</em> installation while the daemon is stopped.</td></tr>
+              <tr><td><code>soulmate connectors</code></td><td>List installed connector plugins discovered via entry points.</td></tr>
+              <tr><td><code>soulmate mcp</code></td><td>Run the scoped stdio MCP adapter against the daemon.</td></tr>
             </tbody>
           </table>
 
@@ -682,7 +682,7 @@ pnpm --filter @soulmate/desktop tauri dev    # desktop product in dev mode</code
               <tr><td><code>SOULMATE_NETWORK__LAN_HOST</code> / <code>__LAN_PORT</code></td><td>explicit LAN address</td><td>detected / <code>7433</code></td></tr>
               <tr><td><code>SOULMATE_NETWORK__PAIRING_TTL_SECONDS</code></td><td>pairing code lifetime</td><td><code>300</code> (30–3600)</td></tr>
               <tr><td><code>SOULMATE_WEB__ENABLED</code></td><td><code>web.enabled</code></td><td><code>true</code></td></tr>
-              <tr><td><code>SOULMATE_STORAGE__PATH</code></td><td><code>storage.path</code></td><td>unset → <code>DATA_DIR/decision-twin.db</code></td></tr>
+              <tr><td><code>SOULMATE_STORAGE__PATH</code></td><td><code>storage.path</code></td><td>unset → <code>DATA_DIR/soulmate.db</code></td></tr>
             </tbody>
           </table>
 
@@ -793,7 +793,7 @@ POST /v1/external/delegation-requests/{id}/complete</code></pre>
           <p>Each identity carries one or more independently revocable high-entropy API keys. Only SHA-256 hashes are stored, the usable key is shown exactly once, and scope or revocation changes take effect on the next request.</p>
 
           <h3>12.2 MCP adapter</h3>
-<pre><code>SOULMATE_API_KEY='&lt;key-shown-once&gt;' uv run --locked decision-twin mcp</code></pre>
+<pre><code>SOULMATE_API_KEY='&lt;key-shown-once&gt;' uv run --locked soulmate mcp</code></pre>
           <p>Set <code>SOULMATE_BASE_URL</code> only when the daemon is not on the default <code>http://127.0.0.1:7432</code>. Nine tools are exposed:</p>
 <pre><code>predict_choice        rank_options            get_preference_summary
 find_similar_decisions  record_decision       record_outcome
@@ -801,7 +801,7 @@ request_delegation    get_delegation          complete_delegation</code></pre>
           <p>Example MCP client configuration:</p>
 <pre><code>{
   "command": "uv",
-  "args": ["run", "decision-twin", "mcp"],
+  "args": ["run", "soulmate", "mcp"],
   "env": {
     "SOULMATE_BASE_URL": "http://127.0.0.1:7432",
     "SOULMATE_API_KEY": "&lt;key-shown-once&gt;"
@@ -850,7 +850,7 @@ request_delegation    get_delegation          complete_delegation</code></pre>
             <div class="step"><b>Sync</b><span>A durable local job deduplicates external item identities and writes source-linked RawEvents.</span></div>
           </div>
           <ul>
-            <li>Credentials are read only from <code>DECISION_TWIN_CONNECTOR__&lt;CONNECTOR_ID&gt;__&lt;KEY&gt;</code> — never accepted by the API, persisted, logged, or included in archives.</li>
+            <li>Credentials are read only from <code>SOULMATE_CONNECTOR__&lt;CONNECTOR_ID&gt;__&lt;KEY&gt;</code> — never accepted by the API, persisted, logged, or included in archives.</li>
             <li>Network-capable plugins get a host-allowlisted HTTP client behind the central privacy policy; <code>offline</code> mode denies all connector network calls.</li>
             <li>Jobs persist only sanitized status and audit metadata.</li>
             <li>Removing a connector deletes its RawEvents and derivative Evidence, then rebuilds the model.</li>
@@ -885,8 +885,8 @@ request_delegation    get_delegation          complete_delegation</code></pre>
           </div>
           <p>Archives include the database and any local <code>objects</code>, <code>indexes</code>, and <code>models</code> files. They <strong>exclude</strong> pairing state, API credentials, installation identity, TLS keys, provider secrets, logs, configuration, and existing backups.</p>
 <pre><code># restore only while the daemon is stopped, and only into a fresh installation
-DATA_DIR=./fresh-data uv run --locked decision-twin restore ./backup.dtwb
-DATA_DIR=./fresh-data uv run --locked decision-twin restore ./personal-model.dtw</code></pre>
+DATA_DIR=./fresh-data uv run --locked soulmate restore ./backup.dtwb
+DATA_DIR=./fresh-data uv run --locked soulmate restore ./personal-model.dtw</code></pre>
           <div class="note warn">
             <strong>Restore never merges.</strong>
             <p>It will not overwrite or blend into owner-created data. Deleting an imported source removes its messages, RawEvents, and derivative Evidence before the model is rebuilt.</p>

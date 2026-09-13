@@ -32,7 +32,7 @@ synchronization, and a hosted connector registry are not authorized.
 | Area | Result |
 | --- | --- |
 | Connector SDK | `soulmate-connector-sdk` defines manifest, permissions, credentials, network context, event limits, synchronization, persistence protocol, and `soulmate.connectors` discovery contracts without dependencies |
-| Plugin packaging | Installed Python distributions register independent entry points; `decision-twin connectors` reports loaded plugins and sanitized load failures |
+| Plugin packaging | Installed Python distributions register independent entry points; `soulmate connectors` reports loaded plugins and sanitized load failures |
 | Consent | Registration requires all and only the manifest's declared data-read, network, credential, and RawEvent-learning permissions; permission drift stops synchronization |
 | Credentials and egress | Connector secrets come from dedicated process variables and are never persisted; network calls use a 5 MiB bounded, no-redirect, declared-host client behind the privacy policy, with all connector networking denied in offline mode |
 | Durable sync | Owner requests enqueue restart-safe SQLite jobs; accepted external identities are idempotent, cursors and sanitized status persist, and audit events contain only identifiers, counts, and error codes |

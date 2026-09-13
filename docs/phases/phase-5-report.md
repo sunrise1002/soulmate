@@ -30,7 +30,7 @@ outcomes/regret, Advise Me, embeddings, and later integrations are not authorize
 | P5-06 Confidence calibration | Evaluation reports observed accuracy and mean confidence per populated bin plus aggregate expected calibration error |
 | P5-07 Algorithm versioning | New predictions persist `decision-predictor-v2:contextual-v1:bradley-terry-online-v1:confidence-v2` in the existing version column |
 
-`decision-twin evaluate` defaults to the packaged dataset, accepts an optional
+`soulmate evaluate` defaults to the packaged dataset, accepts an optional
 validated `--dataset` JSON path, emits stable machine-readable JSON, and accesses
 neither owner persistence nor the network. Evaluation is chronological: each
 decision is predicted before its choice updates the online learner.

@@ -74,7 +74,7 @@ restart. No daemon was left running after verification.
 
 ## Phase 2 handoff
 
-Phase 1 exit criteria pass locally: `decision-twin serve` provides a healthy
+Phase 1 exit criteria pass locally: `soulmate serve` provides a healthy
 loopback service, creates persistent SQLite storage, restarts with the same
 installation identity, and automatically applies the current migration.
 

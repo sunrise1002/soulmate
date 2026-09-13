@@ -17,8 +17,8 @@ Use `snake_case` for Python modules/functions/variables, `PascalCase` for classe
 and `UPPER_SNAKE_CASE` for constants. Use `camelCase` for TypeScript variables and
 functions, `PascalCase` for components/types, and `kebab-case` for package names.
 The product is Soulmate; Python packages use `soulmate-*` distributions and
-`soulmate_*` imports. Retain `decision-twin` for the CLI and database filename to
-match the specification. Do not rename the original specification.
+`soulmate_*` imports. Use `soulmate` for the CLI and `soulmate.db` for the default
+database filename. Do not rename the original specification.
 
 ## Boundaries
 

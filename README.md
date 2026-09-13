@@ -37,11 +37,11 @@ Your editor's Git environment also needs `uv` on PATH for the pre-commit hook.
 Run the service:
 
 ```sh
-uv run --locked decision-twin serve
+uv run --locked soulmate serve
 ```
 
 It listens on `127.0.0.1:7432`, applies packaged Alembic migrations, creates
-`DATA_DIR/decision-twin.db`, and starts the durable local job worker. It enables
+`DATA_DIR/soulmate.db`, and starts the durable local job worker. It enables
 no telemetry; model calls happen only when `/v1/chat` is used and must pass the
 configured egress policy.
 
@@ -65,7 +65,7 @@ for environment overrides, `DATA_DIR`, and path semantics.
 ## CLI
 
 ```sh
-uv run --locked decision-twin <command>
+uv run --locked soulmate <command>
 ```
 
 | Command | Purpose |

@@ -50,7 +50,7 @@ def credential_environment_name(connector_id: str, key: str) -> str:
     def normalize(value: str) -> str:
         return re.sub(r"[^A-Z0-9]", "_", value.upper())
 
-    return f"DECISION_TWIN_CONNECTOR__{normalize(connector_id)}__{normalize(key)}"
+    return f"SOULMATE_CONNECTOR__{normalize(connector_id)}__{normalize(key)}"
 
 
 class ConnectorHttpClient(ConnectorNetworkClient):

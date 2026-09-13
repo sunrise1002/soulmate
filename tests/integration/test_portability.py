@@ -37,7 +37,7 @@ def _storage(path: Path, revision: str = "head") -> tuple[Database, Repositories
 
 
 def test_import_is_atomic_and_source_deletion_removes_derivatives(tmp_path: Path) -> None:
-    database, repositories = _storage(tmp_path / "source" / "decision-twin.db")
+    database, repositories = _storage(tmp_path / "source" / "soulmate.db")
     result = ChatImportService(repositories.sources).import_content(
         DEFAULT_PROFILE_ID,
         "Synthetic transcript.md",

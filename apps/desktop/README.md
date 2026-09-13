@@ -34,7 +34,7 @@ the operating system credential store and are never returned to the webview.
 The External Agents screen creates scoped service identities, shows each new API
 key once, manages key rotation and revocation, defines exact delegated-action
 policies, approves or rejects pending actions, and displays the local audit trail.
-The packaged sidecar also exposes the MCP stdio adapter as `decision-twin mcp`.
+The packaged sidecar also exposes the MCP stdio adapter as `soulmate mcp`.
 
 The Data & Privacy screen creates consistent local backups, passphrase-encrypted
 portable exports, imports static JSON/Markdown/text histories, deletes imported

@@ -256,7 +256,7 @@ fn start_daemon_internal(app: &AppHandle) -> Result<ServiceStatus, String> {
 
     let mut command = app
         .shell()
-        .sidecar("decision-twin")
+        .sidecar("soulmate")
         .map_err(|_| "The packaged daemon sidecar is unavailable.".to_string())?
         .args(["serve"])
         .env("DATA_DIR", &data_dir)

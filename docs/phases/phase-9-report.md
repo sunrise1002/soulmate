@@ -28,7 +28,7 @@ preference mutation, and delegated decision making are not authorized.
 | P9-01 Service Identity | Each external application has an owner-created, separately revocable identity with a name, optional description, scopes, credentials, and timestamps |
 | P9-02 Scope System | Five normalized least-privilege scopes gate model summary, preference summary, prediction/similarity, decision recording, and outcome recording; no raw-memory or preference-write scope is exposed |
 | P9-03 API Keys | 256-bit URL-safe secrets are shown once; SQLite stores only SHA-256 hashes plus non-secret credential identifiers and usage/revocation timestamps; keys rotate and revoke independently |
-| P9-04 MCP Server | `decision-twin mcp` provides `predict_choice`, `rank_options`, `get_preference_summary`, `find_similar_decisions`, `record_decision`, and `record_outcome` over newline-delimited stdio JSON-RPC |
+| P9-04 MCP Server | `soulmate mcp` provides `predict_choice`, `rank_options`, `get_preference_summary`, `find_similar_decisions`, `record_decision`, and `record_outcome` over newline-delimited stdio JSON-RPC |
 | P9-05 Audit | Every authenticated, denied, validation-failed, or unexpected-failure external request records local identity/credential metadata, method, path, and status without request bodies or keys |
 | P9-06 Permission UI | Desktop External Agents creates identities and keys, shows allowed and denied capabilities, changes scopes, rotates/revokes keys and identities, and displays recent local audit events |
 

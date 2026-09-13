@@ -3,7 +3,7 @@
 Run the packaged synthetic benchmark with:
 
 ```sh
-uv run --locked decision-twin evaluate
+uv run --locked soulmate evaluate
 ```
 
 The command compares deterministic random, frozen LLM-only, memory-only, Personal

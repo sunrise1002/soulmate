@@ -128,7 +128,7 @@ def test_pairing_tokens_are_single_use_and_never_stored_in_plaintext(
     # Then: the replay fails and the database never holds the secret
     assert first.status_code == 201
     assert second.status_code == 401
-    stored = (tmp_path / "owner-data" / "decision-twin.db").read_bytes()
+    stored = (tmp_path / "owner-data" / "soulmate.db").read_bytes()
     assert token.encode("utf-8") not in stored
     assert first.json()["credential"].encode("utf-8") not in stored
 

@@ -11,7 +11,7 @@ def test_defaults_are_local_and_do_not_create_storage(tmp_path: Path) -> None:
     assert settings.server.host == "127.0.0.1"
     assert settings.server.port == 7432
     assert settings.privacy.mode == "strict_local"
-    assert settings.database_path == tmp_path / "data" / "decision-twin.db"
+    assert settings.database_path == tmp_path / "data" / "soulmate.db"
     assert not settings.database_path.parent.exists()
 
 
@@ -31,7 +31,7 @@ def test_data_directory_precedence(tmp_path: Path) -> None:
     settings = load_settings(
         config, environ={"DATA_DIR": "env-data", "SOULMATE_DATA_DIR": "prefixed-data"}
     )
-    assert settings.database_path == tmp_path / "prefixed-data" / "decision-twin.db"
+    assert settings.database_path == tmp_path / "prefixed-data" / "soulmate.db"
 
 
 def test_explicit_storage_path_overrides_derived_path(tmp_path: Path) -> None:

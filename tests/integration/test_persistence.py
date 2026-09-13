@@ -29,7 +29,7 @@ pytestmark = pytest.mark.integration
 
 
 def _storage(tmp_path: Path) -> tuple[Database, Repositories]:
-    database = Database(tmp_path / "data" / "decision-twin.db")
+    database = Database(tmp_path / "data" / "soulmate.db")
     database.migrate()
     assert database.session_factory is not None
     return database, Repositories(database.session_factory)
@@ -125,7 +125,7 @@ def test_base_repositories_round_trip_structured_records(tmp_path: Path) -> None
 
 
 def test_migration_is_idempotent_across_database_restart(tmp_path: Path) -> None:
-    path = tmp_path / "decision-twin.db"
+    path = tmp_path / "soulmate.db"
     first = Database(path)
     first.migrate()
     first.close()
@@ -136,7 +136,7 @@ def test_migration_is_idempotent_across_database_restart(tmp_path: Path) -> None
 
 
 def test_phase_1_database_upgrades_without_losing_base_records(tmp_path: Path) -> None:
-    path = tmp_path / "decision-twin.db"
+    path = tmp_path / "soulmate.db"
     database = Database(path)
     database.connect()
     command.upgrade(database.migration_config, "0001_phase_1")
@@ -154,7 +154,7 @@ def test_phase_1_database_upgrades_without_losing_base_records(tmp_path: Path) -
 
 
 def test_phase_2_database_upgrades_without_losing_evidence_or_model_state(tmp_path: Path) -> None:
-    path = tmp_path / "decision-twin.db"
+    path = tmp_path / "soulmate.db"
     database = Database(path)
     database.connect()
     command.upgrade(database.migration_config, "0002_phase_2")
@@ -226,7 +226,7 @@ def test_phase_2_database_upgrades_without_losing_evidence_or_model_state(tmp_pa
 
 
 def test_phase_3_database_upgrades_without_losing_conversation_provenance(tmp_path: Path) -> None:
-    path = tmp_path / "decision-twin.db"
+    path = tmp_path / "soulmate.db"
     database = Database(path)
     database.connect()
     command.upgrade(database.migration_config, "0003_phase_3")
@@ -440,7 +440,7 @@ def test_worker_reclaims_stale_job_after_restart(tmp_path: Path) -> None:
     )
     database.close()
 
-    restarted = Database(tmp_path / "data" / "decision-twin.db")
+    restarted = Database(tmp_path / "data" / "soulmate.db")
     restarted.migrate()
     assert restarted.session_factory is not None
     restarted_repositories = Repositories(restarted.session_factory)

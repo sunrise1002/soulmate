@@ -39,7 +39,7 @@ def _free_port() -> int:
 
 @contextmanager
 def _running_daemon(tmp_path: Path, port: int) -> Iterator[None]:
-    executable = shutil.which("decision-twin")
+    executable = shutil.which("soulmate")
     assert executable is not None, "Install the workspace before running tests."
     env = dict(os.environ, SOULMATE_SERVER__PORT=str(port), DATA_DIR=str(tmp_path / "data"))
     opener = build_opener(ProxyHandler({}))
@@ -205,7 +205,7 @@ def test_desktop_history_endpoints_return_local_owner_records(tmp_path: Path) ->
 
 
 def test_installed_cli_status_doctor_and_restart(tmp_path: Path) -> None:
-    executable = shutil.which("decision-twin")
+    executable = shutil.which("soulmate")
     assert executable is not None
     port = _free_port()
     env = dict(os.environ, SOULMATE_SERVER__PORT=str(port), DATA_DIR=str(tmp_path / "data"))
@@ -254,7 +254,7 @@ def test_installed_cli_status_doctor_and_restart(tmp_path: Path) -> None:
 
 
 def test_doctor_does_not_create_a_missing_database(tmp_path: Path) -> None:
-    executable = shutil.which("decision-twin")
+    executable = shutil.which("soulmate")
     assert executable is not None
     data_dir = tmp_path / "not-created"
     result = subprocess.run(
@@ -271,7 +271,7 @@ def test_doctor_does_not_create_a_missing_database(tmp_path: Path) -> None:
 
 
 def test_rebuild_model_cli_creates_versioned_snapshots(tmp_path: Path) -> None:
-    executable = shutil.which("decision-twin")
+    executable = shutil.which("soulmate")
     assert executable is not None
     env = dict(os.environ, DATA_DIR=str(tmp_path / "data"))
 
@@ -299,7 +299,7 @@ def test_rebuild_model_cli_creates_versioned_snapshots(tmp_path: Path) -> None:
 
 
 def test_portability_cli_imports_backs_up_exports_and_restores(tmp_path: Path) -> None:
-    executable = shutil.which("decision-twin")
+    executable = shutil.which("soulmate")
     assert executable is not None
     source_dir = tmp_path / "machine-a"
     target_dir = tmp_path / "machine-b"
@@ -357,7 +357,7 @@ def test_portability_cli_imports_backs_up_exports_and_restores(tmp_path: Path) -
     assert json.loads(backup.stdout)["encrypted"] is False
     assert json.loads(exported.stdout)["encrypted"] is True
     assert json.loads(restored.stdout)["schema_revision_after"] == "0010_phase_12"
-    target_database = Database(target_dir / "decision-twin.db")
+    target_database = Database(target_dir / "soulmate.db")
     target_database.migrate()
     target_repositories = Repositories(target_database.sessions())
     sources = target_repositories.sources.list_for_profile("profile_default")
@@ -366,7 +366,7 @@ def test_portability_cli_imports_backs_up_exports_and_restores(tmp_path: Path) -
 
 
 def test_cli_reports_bad_config_without_traceback(tmp_path: Path) -> None:
-    executable = shutil.which("decision-twin")
+    executable = shutil.which("soulmate")
     assert executable is not None
     result = subprocess.run(
         [executable, "serve", "--config", str(tmp_path / "missing.toml")],

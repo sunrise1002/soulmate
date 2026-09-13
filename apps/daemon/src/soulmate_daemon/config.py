@@ -129,7 +129,7 @@ class Settings(ConfigModel):
         """Resolve the future database location without creating anything."""
         path = self.storage.path
         if path is None:
-            path = self.data_dir.expanduser() / "decision-twin.db"
+            path = self.data_dir.expanduser() / "soulmate.db"
         return path.expanduser().resolve()
 
 
