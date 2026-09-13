@@ -1,0 +1,1021 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Soulmate — Project Guide</title>
+    <meta
+      name="description"
+      content="Soulmate is a local-first, self-hosted Personal Decision Model. Vision, architecture, technology, setup, and usage in one page."
+    />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #fbfbfd;
+        --bg-raised: #ffffff;
+        --bg-sunken: #f2f3f7;
+        --fg: #16181d;
+        --fg-muted: #5d6472;
+        --line: #e2e5ec;
+        --line-strong: #cbd1dc;
+        --accent: #3f5bd9;
+        --accent-soft: #eaeefc;
+        --ok: #1c7a52;
+        --ok-soft: #e6f4ed;
+        --warn: #8a5a00;
+        --warn-soft: #fbf1dd;
+        --danger: #a3342c;
+        --danger-soft: #fbeae8;
+        --radius: 10px;
+        --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+        --sans: system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1116;
+          --bg-raised: #161a21;
+          --bg-sunken: #1b2029;
+          --fg: #e7e9ee;
+          --fg-muted: #9aa3b2;
+          --line: #262c37;
+          --line-strong: #39414f;
+          --accent: #8aa0ff;
+          --accent-soft: #1c2440;
+          --ok: #5fd0a0;
+          --ok-soft: #14291f;
+          --warn: #e0b062;
+          --warn-soft: #2a2317;
+          --danger: #f08a80;
+          --danger-soft: #2d1a18;
+        }
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; scroll-padding-top: 1.5rem; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font-family: var(--sans);
+        font-size: 16px;
+        line-height: 1.65;
+        -webkit-font-smoothing: antialiased;
+      }
+      .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 0; }
+      /* ---------- sidebar ---------- */
+      nav.toc {
+        position: sticky;
+        top: 0;
+        align-self: start;
+        height: 100vh;
+        overflow-y: auto;
+        padding: 1.75rem 1.25rem 3rem;
+        border-right: 1px solid var(--line);
+        background: var(--bg-raised);
+      }
+      nav.toc .brand { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; }
+      nav.toc .brand strong { font-size: 1.05rem; letter-spacing: -0.01em; }
+      nav.toc .brand .dot {
+        width: 10px; height: 10px; border-radius: 50%;
+        background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft);
+      }
+      nav.toc .tag { font-size: 0.72rem; color: var(--fg-muted); margin-bottom: 1rem; }
+      nav.toc .lang-switch {
+        display: flex; align-items: center; gap: 0.4rem;
+        font-size: 0.78rem; color: var(--fg-muted);
+        margin-bottom: 1.25rem; padding: 0.25rem 0.55rem;
+        background: var(--bg-sunken); border-radius: 6px;
+        border: 1px solid var(--line);
+      }
+      nav.toc .lang-switch a { display: inline; padding: 0; color: var(--accent); }
+      nav.toc .lang-switch a::before { content: ""; }
+      nav.toc ol { list-style: none; margin: 0; padding: 0; counter-reset: sect; }
+      nav.toc li { counter-increment: sect; }
+      nav.toc a {
+        display: block; padding: 0.3rem 0.55rem; border-radius: 6px;
+        color: var(--fg-muted); text-decoration: none; font-size: 0.855rem; line-height: 1.35;
+      }
+      nav.toc a::before { content: counter(sect) ". "; opacity: 0.5; }
+      nav.toc a:hover { background: var(--bg-sunken); color: var(--fg); }
+      nav.toc a.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+      nav.toc hr { border: 0; border-top: 1px solid var(--line); margin: 1.1rem 0 0.8rem; }
+      nav.toc .extra { font-size: 0.8rem; color: var(--fg-muted); padding: 0 0.55rem; }
+      nav.toc .extra a { display: inline; padding: 0; color: var(--accent); }
+      nav.toc .extra a::before { content: ""; }
+      /* ---------- content ---------- */
+      main { max-width: 60rem; padding: 2.5rem 2.5rem 6rem; }
+      h1 { font-size: 2.35rem; line-height: 1.15; letter-spacing: -0.025em; margin: 0 0 0.5rem; }
+      h2 {
+        font-size: 1.45rem; letter-spacing: -0.015em; margin: 3.25rem 0 0.9rem;
+        padding-top: 1.25rem; border-top: 1px solid var(--line);
+      }
+      section:first-of-type h2 { border-top: 0; padding-top: 0; margin-top: 2rem; }
+      h3 { font-size: 1.05rem; margin: 1.9rem 0 0.5rem; letter-spacing: -0.005em; }
+      h4 { font-size: 0.93rem; margin: 1.3rem 0 0.4rem; color: var(--fg-muted); text-transform: uppercase; letter-spacing: 0.06em; }
+      p { margin: 0.7rem 0; }
+      ul, ol { margin: 0.7rem 0; padding-left: 1.3rem; }
+      li { margin: 0.28rem 0; }
+      a { color: var(--accent); text-underline-offset: 2px; }
+      .lede { font-size: 1.1rem; color: var(--fg-muted); max-width: 46rem; }
+      code {
+        font-family: var(--mono); font-size: 0.85em;
+        background: var(--bg-sunken); border: 1px solid var(--line);
+        border-radius: 5px; padding: 0.1em 0.35em;
+      }
+      pre {
+        background: var(--bg-sunken); border: 1px solid var(--line);
+        border-radius: var(--radius); padding: 0.9rem 1rem; overflow-x: auto;
+        font-size: 0.84rem; line-height: 1.6; margin: 0.9rem 0;
+      }
+      pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+      table {
+        width: 100%; border-collapse: collapse; margin: 1rem 0;
+        font-size: 0.875rem; display: block; overflow-x: auto;
+      }
+      th, td { text-align: left; padding: 0.5rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+      th { font-weight: 600; color: var(--fg-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+      tbody tr:hover { background: var(--bg-raised); }
+      td code { white-space: nowrap; }
+      /* ---------- components ---------- */
+      .badges { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 1.25rem 0 0; }
+      .badge {
+        font-size: 0.74rem; font-weight: 600; letter-spacing: 0.02em;
+        padding: 0.2rem 0.6rem; border-radius: 999px;
+        background: var(--bg-sunken); border: 1px solid var(--line); color: var(--fg-muted);
+      }
+      .badge.ok { background: var(--ok-soft); border-color: transparent; color: var(--ok); }
+      .badge.accent { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+      .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.85rem; margin: 1.1rem 0; }
+      .card {
+        background: var(--bg-raised); border: 1px solid var(--line);
+        border-radius: var(--radius); padding: 0.95rem 1.05rem;
+      }
+      .card h4 { margin: 0 0 0.35rem; color: var(--fg); text-transform: none; letter-spacing: 0; font-size: 0.95rem; }
+      .card p { margin: 0; font-size: 0.86rem; color: var(--fg-muted); line-height: 1.55; }
+      .note {
+        border-left: 3px solid var(--accent); background: var(--accent-soft);
+        border-radius: 0 var(--radius) var(--radius) 0; padding: 0.75rem 1rem; margin: 1.1rem 0;
+        font-size: 0.9rem;
+      }
+      .note.warn { border-color: var(--warn); background: var(--warn-soft); }
+      .note.danger { border-color: var(--danger); background: var(--danger-soft); }
+      .note strong { display: inline-block; }
+      .note p { margin: 0.35rem 0 0; }
+      .note p:first-child { margin-top: 0; }
+      /* pipeline / flow diagram */
+      .flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.5rem; margin: 1.2rem 0; }
+      .flow .step {
+        flex: 1 1 130px; background: var(--bg-raised); border: 1px solid var(--line);
+        border-radius: var(--radius); padding: 0.7rem 0.8rem; position: relative;
+      }
+      .flow .step b { display: block; font-size: 0.88rem; }
+      .flow .step span { font-size: 0.78rem; color: var(--fg-muted); }
+      .flow .arrow { align-self: center; color: var(--line-strong); font-size: 1.1rem; }
+      /* layered stack diagram */
+      .stack { margin: 1.2rem 0; display: grid; gap: 0.4rem; }
+      .stack .tier {
+        border: 1px solid var(--line); border-radius: var(--radius);
+        background: var(--bg-raised); padding: 0.7rem 0.95rem;
+      }
+      .stack .tier .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--fg-muted); }
+      .stack .tier .items { font-size: 0.88rem; margin-top: 0.15rem; }
+      .stack .tier.kernel { border: 2px solid var(--accent); background: var(--accent-soft); }
+      .stack .tier.kernel .label { color: var(--accent); }
+      .stack .down { text-align: center; color: var(--line-strong); font-size: 0.9rem; line-height: 1; }
+      .split { display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; margin: 1.1rem 0; }
+      .split > div { border: 1px solid var(--line); border-radius: var(--radius); padding: 0.95rem 1.05rem; background: var(--bg-raised); }
+      .split h4 { margin-top: 0; color: var(--fg); text-transform: none; letter-spacing: 0; font-size: 0.95rem; }
+      kbd {
+        font-family: var(--mono); font-size: 0.78rem; border: 1px solid var(--line-strong);
+        border-bottom-width: 2px; border-radius: 4px; padding: 0.05em 0.35em; background: var(--bg-raised);
+      }
+      footer { margin-top: 3.5rem; padding-top: 1.25rem; border-top: 1px solid var(--line); font-size: 0.84rem; color: var(--fg-muted); }
+      .anchor { color: var(--line-strong); text-decoration: none; font-weight: 400; opacity: 0; margin-left: 0.4rem; }
+      h2:hover .anchor, h3:hover .anchor { opacity: 1; }
+      @media (max-width: 940px) {
+        .layout { grid-template-columns: 1fr; }
+        nav.toc { position: static; height: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+        nav.toc ol { columns: 2; }
+        main { padding: 1.75rem 1.25rem 4rem; }
+        .split { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="layout">
+      <nav class="toc">
+        <div class="brand"><span class="dot"></span><strong>Soulmate</strong></div>
+        <div class="tag">Local-first Personal Decision Model</div>
+        <div class="lang-switch">
+          <span>🌐</span>
+          <strong>English</strong> · <a href="index.vi.html">Tiếng Việt</a>
+        </div>
+        <ol>
+          <li><a href="#overview">Overview</a></li>
+          <li><a href="#vision">Vision &amp; goals</a></li>
+          <li><a href="#non-goals">Non-goals</a></li>
+          <li><a href="#concepts">Core concepts</a></li>
+          <li><a href="#architecture">Architecture</a></li>
+          <li><a href="#stack">Technology stack</a></li>
+          <li><a href="#capabilities">Capability map</a></li>
+          <li><a href="#setup">Setup</a></li>
+          <li><a href="#usage">Using Soulmate</a></li>
+          <li><a href="#configuration">Configuration</a></li>
+          <li><a href="#api">HTTP API</a></li>
+          <li><a href="#agents">External agents &amp; MCP</a></li>
+          <li><a href="#connectors">Connectors</a></li>
+          <li><a href="#portability">Data portability</a></li>
+          <li><a href="#security">Privacy &amp; security</a></li>
+          <li><a href="#quality">Quality gates</a></li>
+          <li><a href="#status">Status &amp; limitations</a></li>
+          <li><a href="#map">Where to read next</a></li>
+        </ol>
+        <hr />
+        <div class="extra">
+          <a href="../README.md">README</a> ·
+          <a href="../CONTRIBUTING.md">Contributing</a> ·
+          <a href="phase-status.md">Phase status</a> ·
+          <a href="architecture/README.md">ADRs</a>
+        </div>
+      </nav>
+
+      <main>
+        <h1>Soulmate</h1>
+        <p class="lede">
+          An open-source, local-first personal AI system whose goal is not to be the smartest
+          general agent, but to understand <em>one specific person</em> as accurately as possible —
+          and to keep that understanding on that person's own machine.
+        </p>
+        <div class="badges">
+          <span class="badge accent">Local-first</span>
+          <span class="badge accent">Self-hosted</span>
+          <span class="badge">Python 3.12 · TypeScript · Rust</span>
+          <span class="badge">Apache-2.0</span>
+          <span class="badge ok">Phase 12 complete locally</span>
+        </div>
+
+        <!-- ================= 1 ================= -->
+        <section id="overview">
+          <h2>1. Overview <a class="anchor" href="#overview">#</a></h2>
+          <p>
+            Soulmate builds a <strong>Personal Decision Model</strong>: a versioned, inspectable
+            model of what its owner prefers, values, aims for, and is constrained by. It answers
+            questions such as <em>“What would I probably choose?”</em>, <em>“Knowing my long-term
+            goals, what should I choose?”</em>, and <em>“If another AI had to decide for me, what
+            would I want it to do?”</em>
+          </p>
+          <p>
+            There is no Soulmate cloud. Every user runs their own service; the database, the
+            embeddings, and the model live in a directory the user controls. LLM providers,
+            clients, and external agents are replaceable parts around that core.
+          </p>
+          <div class="cards">
+            <div class="card">
+              <h4>Owner-controlled data</h4>
+              <p>SQLite plus local files on the owner's machine. No telemetry, loopback-only by default.</p>
+            </div>
+            <div class="card">
+              <h4>Explainable beliefs</h4>
+              <p>Every belief traces back to the evidence and the raw event that produced it, and can be corrected or deleted.</p>
+            </div>
+            <div class="card">
+              <h4>Deterministic core</h4>
+              <p>Prediction, learning, and policy decisions are local and deterministic. LLMs propose; they never mutate the model.</p>
+            </div>
+            <div class="card">
+              <h4>Replaceable everything</h4>
+              <p>Ollama, OpenAI-compatible endpoints, desktop/web/mobile clients, MCP agents, and connectors all plug into stable ports.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================= 2 ================= -->
+        <section id="vision">
+          <h2>2. Vision &amp; goals <a class="anchor" href="#vision">#</a></h2>
+          <p>The system continuously learns, from evidence rather than assertions:</p>
+          <ul>
+            <li>what the owner likes and dislikes, and what they value;</li>
+            <li>their goals, constraints, and behavioral patterns;</li>
+            <li>how they weigh trade-offs, and how that changes with context;</li>
+            <li>which decisions they actually made, and whether they were satisfied afterwards;</li>
+            <li>how confident the system should be about each individual belief.</li>
+          </ul>
+          <h3>Product philosophy</h3>
+          <table>
+            <thead><tr><th>Principle</th><th>What it means in practice</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><strong>Local first</strong></td>
+                <td>All persistent personal data lives on infrastructure the owner controls: daemon, SQLite, embeddings, attachments, Personal Model, keys.</td>
+              </tr>
+              <tr>
+                <td><strong>Self-hosted</strong></td>
+                <td>Runs on Mac, Windows, Linux, a home server, a NAS, or a personal VPS. The non-technical path is “install desktop app → it starts its own daemon”.</td>
+              </tr>
+              <tr>
+                <td><strong>Agent ≠ Personal Model</strong></td>
+                <td>The Personalization Kernel is independent of any agent runtime, web framework, or model vendor. Conversation is an input channel, not the model.</td>
+              </tr>
+              <tr>
+                <td><strong>Evidence over assertion</strong></td>
+                <td>Nothing is stored as a bare fact. Claims are stored as evidence with provenance, strength, and confidence; the model is derived and rebuildable.</td>
+              </tr>
+              <tr>
+                <td><strong>Explicit consent</strong></td>
+                <td>Network access, other devices, external agents, and connectors are all off until the owner turns each one on, one scope at a time.</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- ================= 3 ================= -->
+        <section id="non-goals">
+          <h2>3. Non-goals <a class="anchor" href="#non-goals">#</a></h2>
+          <p>Knowing what this project refuses to become is as important as its goals. Soulmate is <strong>not</strong>:</p>
+          <div class="split">
+            <div>
+              <h4>Not a product shape</h4>
+              <ul>
+                <li>a SaaS personalization platform;</li>
+                <li>a multi-tenant cloud product;</li>
+                <li>a cloud synchronization service;</li>
+                <li>a general knowledge assistant;</li>
+                <li>a general autonomous agent framework.</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Not an infrastructure shape</h4>
+              <ul>
+                <li>no Kafka, Kubernetes, Redis cluster;</li>
+                <li>no Neo4j, Elasticsearch, dedicated vector DB;</li>
+                <li>no microservices, no distributed system;</li>
+                <li>nothing sized for millions of centralized users.</li>
+              </ul>
+            </div>
+          </div>
+          <div class="note">
+            <strong>Rule of thumb.</strong>
+            <p>New infrastructure is only justified by a clear <em>local</em> use case. Remote internet exposure is explicitly out of scope — use a VPN if you need access away from home.</p>
+          </div>
+        </section>
+
+        <!-- ================= 4 ================= -->
+        <section id="concepts">
+          <h2>4. Core concepts <a class="anchor" href="#concepts">#</a></h2>
+
+          <h3>4.1 The evidence pipeline</h3>
+          <p>
+            Conversation history is not the Personal Model. Everything flows one way, and derived
+            state can always be thrown away and rebuilt:
+          </p>
+          <div class="flow">
+            <div class="step"><b>RawEvent</b><span>Immutable captured input: a message, an import, a connector item, a recorded choice.</span></div>
+            <div class="arrow">→</div>
+            <div class="step"><b>Evidence</b><span>A provenance-bearing claim: target, value, strength, confidence, context, extractor version.</span></div>
+            <div class="arrow">→</div>
+            <div class="step"><b>Derived model</b><span>Preferences, facts, goals, constraints aggregated from all evidence.</span></div>
+            <div class="arrow">→</div>
+            <div class="step"><b>Snapshot</b><span>A versioned <code>UserModelSnapshot</code>. Every prediction records the snapshot it used.</span></div>
+          </div>
+          <p>Instead of storing a conclusion such as <code>{"likes_subscription": false}</code>, the system stores the claim that produced it:</p>
+<pre><code>{
+  "target_type": "preference",
+  "target_key": "payment.subscription",
+  "value": -0.6,
+  "strength": 0.7,
+  "confidence": 0.72,
+  "context": { "domain": "software" },
+  "source_type": "explicit_statement",
+  "source_event_id": "evt_...",
+  "extractor_version": "preference-extractor-v1"
+}</code></pre>
+          <p>
+            Contradicting evidence is <strong>preserved, not overwritten</strong>. The aggregate may
+            conclude “subscriptions: negative overall, neutral-to-positive for developer tools when
+            the productivity gain is high”. Because the chain is intact, the owner can ask
+            <em>why</em> the system believes something and get the supporting evidence back — and
+            deleting a source deletes its evidence and rebuilds the model.
+          </p>
+
+          <h3>4.2 Evidence reliability</h3>
+          <p>Not all evidence is equal. Weighting is configurable and versioned rather than hardcoded as truth:</p>
+          <table>
+            <thead><tr><th>Source</th><th>Weight</th><th>Source</th><th>Weight</th></tr></thead>
+            <tbody>
+              <tr><td>Casual inference</td><td>low</td><td>Actual decision</td><td>high</td></tr>
+              <tr><td>Explicit statement</td><td>medium</td><td>Repeated actual decisions</td><td>very high</td></tr>
+              <tr><td>Hypothetical scenario</td><td>medium</td><td>User correction</td><td>very high</td></tr>
+              <tr><td>Pairwise calibration</td><td>medium/high</td><td>Outcome / regret feedback</td><td>very high</td></tr>
+            </tbody>
+          </table>
+
+          <h3>4.3 Two decision modes, never merged</h3>
+          <div class="split">
+            <div>
+              <h4>Predict Me — descriptive</h4>
+              <p><em>“What would I choose?”</em> Models actual behavior: <code>P(choice | user, context)</code>. Local, deterministic scoring combining global, domain, and matching-context preferences with online pairwise learning from prior resolutions.</p>
+            </div>
+            <div>
+              <h4>Advise Me — normative</h4>
+              <p><em>“Knowing me, what should I choose?”</em> Independently combines the prediction with satisfaction and regret history, similar resolved decisions, and matching goals or constraints.</p>
+            </div>
+          </div>
+          <div class="note">
+            <strong>Why separate?</strong>
+            <p>It is valid — and useful — for the system to say “I predict you would choose A, but based on your stated long-term goal I recommend B.” Both results report their model snapshot and algorithm version, and clients display them as two distinct answers.</p>
+          </div>
+
+          <h3>4.4 The role of the LLM</h3>
+          <p>
+            A model provider is a text interface, not an authority. It can <strong>propose</strong>
+            structured evidence from a conversation; proposals are schema-validated by the daemon and
+            pass a review policy before acceptance. A provider can never mutate derived Personal Model
+            state, and only lexically relevant context is compiled and sent — never the whole database.
+          </p>
+        </section>
+
+        <!-- ================= 5 ================= -->
+        <section id="architecture">
+          <h2>5. Architecture <a class="anchor" href="#architecture">#</a></h2>
+          <p>
+            Soulmate is a <strong>local-first modular monolith</strong> with hexagonal (ports and
+            adapters) boundaries. All dependencies point inward; the innermost layer knows nothing
+            about HTTP, UI, storage engines, or vendors.
+          </p>
+          <div class="stack">
+            <div class="tier">
+              <div class="label">Clients</div>
+              <div class="items">Tauri desktop shell · React web client · Expo mobile client · MCP-capable external agents</div>
+            </div>
+            <div class="down">↓ REST over loopback / TLS · stdio MCP</div>
+            <div class="tier">
+              <div class="label">Daemon composition root &amp; adapters</div>
+              <div class="items">FastAPI routes · single authorization boundary · prompts &amp; proposal validation · durable job worker · SQLite adapter · provider adapters · egress policy · TLS &amp; pairing · archives &amp; imports · connector host</div>
+            </div>
+            <div class="down">↓ application services and ports</div>
+            <div class="tier kernel">
+              <div class="label">Personalization Kernel (infrastructure-independent)</div>
+              <div class="items">Memory · Evidence · User Model · Preference Learner · Decision Predictor · Advisor · Context Compiler · Active Learning · Evaluation · Policy Engine · Pairing &amp; access rules</div>
+            </div>
+            <div class="down">↓ driven ports</div>
+            <div class="tier">
+              <div class="label">Infrastructure</div>
+              <div class="items">SQLite + Alembic migrations · local object/index/model files · model APIs (Ollama, OpenAI-compatible) · OS credential store</div>
+            </div>
+          </div>
+          <p>
+            The kernel must not import FastAPI, MCP, any UI, any vendor SDK, or any agent framework —
+            and it does not import the connector SDK or any plugin either. That constraint is what
+            makes the model portable across every replaceable part above it.
+          </p>
+
+          <h3>Repository map</h3>
+          <table>
+            <thead><tr><th>Path</th><th>Responsibility</th></tr></thead>
+            <tbody>
+              <tr><td><code>packages/core-python/</code></td><td><strong>The kernel.</strong> Entities, repository ports, deterministic algorithms: preferences, decisions, learning, delegation policy, evaluation, access rules.</td></tr>
+              <tr><td><code>packages/storage-sqlite/</code></td><td>SQLAlchemy adapter, schema, repositories, packaged Alembic migrations.</td></tr>
+              <tr><td><code>packages/llm-providers/</code></td><td>Provider protocol, egress policy, fake provider, Ollama and OpenAI-compatible adapters.</td></tr>
+              <tr><td><code>packages/connector-sdk/</code></td><td>Dependency-free permission manifest, event, sync, discovery, and persistence contracts for plugins.</td></tr>
+              <tr><td><code>packages/connectors-local/</code></td><td>Local Notes reference connector, packaged independently of the daemon.</td></tr>
+              <tr><td><code>packages/sdk-typescript/</code></td><td>Typed REST client and pairing rules shared by web and mobile.</td></tr>
+              <tr><td><code>packages/sdk-python/</code></td><td>Reserved placeholder for a future Python SDK.</td></tr>
+              <tr><td><code>apps/daemon/</code></td><td>Composition root: configuration, API, authorization, worker, diagnostics, CLI.</td></tr>
+              <tr><td><code>apps/desktop/</code></td><td>Tauri shell (Rust) + React UI, native service management, installer configuration.</td></tr>
+              <tr><td><code>apps/web/</code>, <code>apps/mobile/</code></td><td>Browser client served by the daemon; Expo client with QR pairing and pinned service identity.</td></tr>
+              <tr><td><code>apps/mcp/</code></td><td>Scoped stdio MCP adapter that calls daemon REST — never local persistence.</td></tr>
+              <tr><td><code>tests/</code></td><td>Unit, integration, and evaluation suites on synthetic data only.</td></tr>
+              <tr><td><code>docs/</code></td><td>ADRs, phase reports, contributor guide, security boundaries, this page.</td></tr>
+            </tbody>
+          </table>
+
+          <h3>Architecture Decision Records</h3>
+          <p>Thirteen ADRs record the binding decisions; each states whether it is architectural only or already implemented.</p>
+          <table>
+            <thead><tr><th>ADR</th><th>Decision</th><th>ADR</th><th>Decision</th></tr></thead>
+            <tbody>
+              <tr><td><a href="architecture/decisions/ADR-001-local-first.md">001</a></td><td>Local-first architecture</td><td><a href="architecture/decisions/ADR-008-rest-and-mcp.md">008</a></td><td>REST and MCP integration</td></tr>
+              <tr><td><a href="architecture/decisions/ADR-002-sqlite.md">002</a></td><td>SQLite as default persistence</td><td><a href="architecture/decisions/ADR-009-lan-pairing.md">009</a></td><td>LAN access via device pairing</td></tr>
+              <tr><td><a href="architecture/decisions/ADR-003-independent-kernel.md">003</a></td><td>Independent Personalization Kernel</td><td><a href="architecture/decisions/ADR-010-behavioral-wellbeing.md">010</a></td><td>Prediction separate from advice</td></tr>
+              <tr><td><a href="architecture/decisions/ADR-004-evidence-derived-model.md">004</a></td><td>Evidence-based derived model</td><td><a href="architecture/decisions/ADR-011-portable-archives.md">011</a></td><td>Credential-free authenticated archives</td></tr>
+              <tr><td><a href="architecture/decisions/ADR-005-provider-abstraction.md">005</a></td><td>LLM provider abstraction</td><td><a href="architecture/decisions/ADR-012-connector-plugins.md">012</a></td><td>Permissioned connector plugins</td></tr>
+              <tr><td><a href="architecture/decisions/ADR-006-no-default-telemetry.md">006</a></td><td>No cloud telemetry by default</td><td><a href="architecture/decisions/ADR-013-delegated-action-policy.md">013</a></td><td>Prediction-bound delegated actions</td></tr>
+              <tr><td><a href="architecture/decisions/ADR-007-desktop-daemon.md">007</a></td><td>Desktop daemon model</td><td></td><td></td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- ================= 6 ================= -->
+        <section id="stack">
+          <h2>6. Technology stack <a class="anchor" href="#stack">#</a></h2>
+          <table>
+            <thead><tr><th>Layer</th><th>Technology</th><th>Notes</th></tr></thead>
+            <tbody>
+              <tr><td>Core &amp; daemon</td><td>Python 3.12+, FastAPI, Uvicorn, Pydantic v2</td><td>Kernel is plain Python with no framework dependency.</td></tr>
+              <tr><td>Persistence</td><td>SQLite (WAL), SQLAlchemy, Alembic</td><td>Migrations are packaged and applied automatically on <code>serve</code>.</td></tr>
+              <tr><td>Crypto</td><td><code>cryptography</code></td><td>Self-signed TLS, scrypt + AES-256-GCM archives, SHA-256 credential hashes.</td></tr>
+              <tr><td>Model providers</td><td>Ollama (default), generic OpenAI-compatible HTTP</td><td>No vendor SDK required; every call passes the central egress policy.</td></tr>
+              <tr><td>Desktop</td><td>Tauri 2 (Rust 1.88+), React 19, Vite, TypeScript</td><td>Ships the daemon as a platform-specific sidecar; webview talks through a fixed loopback proxy.</td></tr>
+              <tr><td>Web / mobile</td><td>React 19 + Vite; Expo React Native</td><td>Both built on the shared <code>@soulmate/sdk</code> TypeScript client.</td></tr>
+              <tr><td>Integration</td><td>REST <code>/v1</code>, stdio MCP</td><td>MCP adapter is a REST consumer, not a second data path.</td></tr>
+              <tr><td>Tooling</td><td>uv (Python), pnpm 11 (Node 24), Cargo, Ruff, mypy strict, pytest, Vitest, ESLint, Prettier, pre-commit</td><td>One root command runs the whole gate: <code>pnpm check</code>.</td></tr>
+            </tbody>
+          </table>
+          <div class="note">
+            <strong>Deliberately absent.</strong>
+            <p>No message broker, no container orchestration, no external vector database. Vector search is deferred; embeddings default to a local provider.</p>
+          </div>
+        </section>
+
+        <!-- ================= 7 ================= -->
+        <section id="capabilities">
+          <h2>7. Capability map <a class="anchor" href="#capabilities">#</a></h2>
+          <p>
+            The product was built in twelve authorized phases. The table doubles as a feature index —
+            each row links to a durable report containing its plan, verification, and known issues.
+          </p>
+          <table>
+            <thead><tr><th>Phase</th><th>Capability delivered</th></tr></thead>
+            <tbody>
+              <tr><td><a href="phases/phase-0-report.md">0</a></td><td>Repository, workspace, and hexagonal architecture foundation.</td></tr>
+              <tr><td><a href="phases/phase-1-report.md">1</a></td><td>Local daemon, SQLite persistence, migrations, diagnostics, durable job worker.</td></tr>
+              <tr><td><a href="phases/phase-2-report.md">2</a></td><td>Evidence store, derived Personal Model, deterministic rebuild, corrections.</td></tr>
+              <tr><td><a href="phases/phase-3-report.md">3</a></td><td>Conversation, minimal context compilation, provider-proposed evidence extraction.</td></tr>
+              <tr><td><a href="phases/phase-4-report.md">4</a></td><td>Decision MVP: options, Predict Me scoring, resolution as high-weight evidence.</td></tr>
+              <tr><td><a href="phases/phase-5-report.md">5</a></td><td>Pairwise preference learning and a reproducible offline evaluation harness.</td></tr>
+              <tr><td><a href="phases/phase-6-report.md">6</a></td><td>Desktop product: Tauri shell, managed daemon sidecar, native installers.</td></tr>
+              <tr><td><a href="phases/phase-7-report.md">7</a></td><td>Web and mobile clients, opt-in LAN TLS, one-time pairing, single auth boundary.</td></tr>
+              <tr><td><a href="phases/phase-8-report.md">8</a></td><td>Active learning questions, outcome feedback, and independent Advise Me.</td></tr>
+              <tr><td><a href="phases/phase-9-report.md">9</a></td><td>Scoped external service identities, API keys, audit trail, MCP adapter.</td></tr>
+              <tr><td><a href="phases/phase-10-report.md">10</a></td><td>Import, credential-free backup, encrypted portable export, fresh-install restore.</td></tr>
+              <tr><td><a href="phases/phase-11-report.md">11</a></td><td>Connector SDK, permissioned plugin discovery, durable sync jobs.</td></tr>
+              <tr><td><a href="phases/phase-12-report.md">12</a></td><td>Deterministic Policy Engine and prediction-bound delegated actions.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <!-- ================= 8 ================= -->
+        <section id="setup">
+          <h2>8. Setup <a class="anchor" href="#setup">#</a></h2>
+
+          <h3>8.1 Path A — desktop application (recommended for owners)</h3>
+          <p>
+            The installed application starts and supervises its own loopback daemon, stores data in
+            the platform application-data directory, and requires no separately installed Python,
+            Node.js, database, or Docker runtime.
+          </p>
+<pre><code># build a native installer plus its bundled daemon sidecar
+pnpm --filter @soulmate/desktop tauri build</code></pre>
+
+          <h3>8.2 Path B — run the service directly</h3>
+<pre><code>uv run --locked decision-twin serve</code></pre>
+          <p>
+            The process listens on <code>127.0.0.1:7432</code>, applies packaged Alembic migrations,
+            creates <code>DATA_DIR/decision-twin.db</code>, and starts the durable local job worker.
+            Stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd>. It enables no telemetry, and model calls happen
+            only when <code>/v1/chat</code> is used and the configured egress policy allows them.
+          </p>
+
+          <h3>8.3 Path C — development environment</h3>
+          <p>
+            Install <a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a>, Node.js 24,
+            pnpm 11.21.0, and Rust 1.88+. <code>uv</code> manages the Python 3.12 interpreter.
+          </p>
+<pre><code># if uv lives in ~/.local/bin and your shell cannot find it
+export PATH="$HOME/.local/bin:$PATH"
+
+uv sync --locked --all-packages
+pnpm install --frozen-lockfile
+uv run --locked pre-commit install
+
+pnpm check                                   # lint, format, typecheck, test — everything
+rustup component add rustfmt clippy
+pnpm --filter @soulmate/desktop tauri dev    # desktop product in dev mode</code></pre>
+          <div class="note warn">
+            <strong>PATH matters for hooks.</strong>
+            <p>Your editor's Git environment also needs <code>uv</code> on <code>PATH</code>, otherwise the pre-commit hook fails when committing from the editor.</p>
+          </div>
+
+          <h3>8.4 First run checklist</h3>
+          <ol>
+            <li>Copy <code>config.example.toml</code> to <code>config.toml</code> (optional; local config is git-ignored).</li>
+            <li>Point the provider at a local model, e.g. <code>SOULMATE_LLM__OLLAMA__MODEL=llama3.2</code>. The daemon starts fine without one; <code>/v1/chat</code> simply reports the provider as unavailable.</li>
+            <li>Run <code>decision-twin doctor</code> — it checks storage permissions, database integrity, WAL, foreign keys, migration state, port availability, and whether the selected provider has a model.</li>
+            <li>Start chatting and deciding. Optionally import existing history with <code>decision-twin import ./history.json</code>.</li>
+          </ol>
+        </section>
+
+        <!-- ================= 9 ================= -->
+        <section id="usage">
+          <h2>9. Using Soulmate <a class="anchor" href="#usage">#</a></h2>
+
+          <h3>9.1 Screens</h3>
+          <table>
+            <thead><tr><th>Screen</th><th>What it does</th><th>Desktop</th><th>Web / mobile</th></tr></thead>
+            <tbody>
+              <tr><td><strong>Chat</strong></td><td>Conversation that persists messages and proposes evidence for review.</td><td>✓</td><td>✓</td></tr>
+              <tr><td><strong>Decide</strong></td><td>Create a decision, get separate Predict Me and Advise Me results, resolve it, record the outcome.</td><td>✓</td><td>✓</td></tr>
+              <tr><td><strong>My Model</strong></td><td>Inspect preferences and provenance, add corrections, delete evidence, answer uncertainty-targeting pairwise questions.</td><td>✓</td><td>✓</td></tr>
+              <tr><td><strong>History</strong></td><td>Past conversations and decisions.</td><td>✓</td><td>✓</td></tr>
+              <tr><td><strong>Devices</strong></td><td>Enable access from other devices, issue one-time pairing codes, revoke devices.</td><td>✓</td><td>—</td></tr>
+              <tr><td><strong>External Agents</strong></td><td>Create service identities, grant scopes, issue API keys (shown once), manage delegation policies.</td><td>✓</td><td>—</td></tr>
+              <tr><td><strong>Connections</strong></td><td>Review a plugin's declared permissions, register it, run and monitor syncs.</td><td>✓</td><td>—</td></tr>
+              <tr><td><strong>Data &amp; Privacy</strong></td><td>One-click backup, encrypted export, staged restore, import, and source deletion.</td><td>✓</td><td>—</td></tr>
+              <tr><td><strong>Settings</strong></td><td>Provider, privacy mode, data directory, LAN toggle.</td><td>✓</td><td>—</td></tr>
+            </tbody>
+          </table>
+          <p>Owner-only capabilities are deliberately restricted to the owner's own machine; a paired phone or browser can chat, decide, resolve, read the model, correct it, answer questions, record outcomes, and request advice — nothing more.</p>
+
+          <h3>9.2 CLI reference</h3>
+          <p>Every command accepts <code>--config PATH</code> where a configuration file is meaningful. <code>status</code> and <code>doctor</code> emit machine-readable JSON and exit nonzero when required checks fail.</p>
+          <table>
+            <thead><tr><th>Command</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>decision-twin serve</code></td><td>Start the local daemon (migrations, database creation, job worker).</td></tr>
+              <tr><td><code>decision-twin status</code></td><td>Query <code>/v1/health</code> and <code>/v1/system/info</code> of a running daemon.</td></tr>
+              <tr><td><code>decision-twin doctor</code></td><td>Inspect configuration, storage, integrity, migrations, port, and provider readiness.</td></tr>
+              <tr><td><code>decision-twin rebuild-model</code></td><td>Deterministically replace derived state from all stored evidence; writes a new snapshot.</td></tr>
+              <tr><td><code>decision-twin evaluate [--dataset PATH]</code></td><td>Run the packaged synthetic decision dataset with no database, network, or provider.</td></tr>
+              <tr><td><code>decision-twin import PATH [--format …] [--name …]</code></td><td>Import chat history: <code>auto</code>, <code>json</code>, <code>markdown</code>, <code>text</code>, <code>chatgpt</code>, <code>claude</code>.</td></tr>
+              <tr><td><code>decision-twin backup [--output PATH]</code></td><td>Write a credential-free <code>.dtwb</code> archive (default <code>DATA_DIR/backups</code>).</td></tr>
+              <tr><td><code>decision-twin export [--output PATH] [--passphrase-file PATH]</code></td><td>Write an AES-256-GCM encrypted portable <code>.dtw</code> archive.</td></tr>
+              <tr><td><code>decision-twin restore ARCHIVE [--passphrase-file PATH]</code></td><td>Restore into a <em>fresh</em> installation while the daemon is stopped.</td></tr>
+              <tr><td><code>decision-twin connectors</code></td><td>List installed connector plugins discovered via entry points.</td></tr>
+              <tr><td><code>decision-twin mcp</code></td><td>Run the scoped stdio MCP adapter against the daemon.</td></tr>
+            </tbody>
+          </table>
+
+          <h3>9.3 Evaluation</h3>
+          <p>
+            <code>evaluate</code> is the project's honesty check. It reports accuracy, Top-2 accuracy,
+            log loss, multiclass Brier score, and confidence-calibration error for five comparable
+            systems: <strong>random</strong>, a <strong>frozen LLM-only</strong> baseline,
+            <strong>memory-only</strong>, the <strong>Personal Model</strong>, and the full
+            <strong>Decision Model</strong>. Run it against your own dataset with the same validated
+            schema via <code>--dataset</code>.
+          </p>
+        </section>
+
+        <!-- ================= 10 ================= -->
+        <section id="configuration">
+          <h2>10. Configuration <a class="anchor" href="#configuration">#</a></h2>
+          <p>Configuration belongs to the daemon: standard-library TOML parsing plus Pydantic v2 validation. Loading settings alone creates no files and calls no providers.</p>
+          <h4>Precedence, lowest to highest</h4>
+          <ol>
+            <li>Typed defaults.</li>
+            <li>TOML file: <code>serve --config PATH</code>, else <code>SOULMATE_CONFIG_FILE</code>, else <code>./config.toml</code>.</li>
+            <li><code>DATA_DIR</code>, which overrides TOML <code>data_dir</code>.</li>
+            <li><code>SOULMATE_*</code> environment variables, using <code>__</code> for nested fields.</li>
+          </ol>
+          <p>An explicitly selected config file must exist; a missing implicit <code>./config.toml</code> just uses defaults. Invalid TOML, unknown keys, and unreadable files fail loudly. <code>.env</code> files are <strong>not</strong> loaded automatically.</p>
+          <table>
+            <thead><tr><th>Variable</th><th>Field</th><th>Default</th></tr></thead>
+            <tbody>
+              <tr><td><code>DATA_DIR</code> / <code>SOULMATE_DATA_DIR</code></td><td><code>data_dir</code></td><td><code>./data</code></td></tr>
+              <tr><td><code>SOULMATE_SERVER__HOST</code></td><td><code>server.host</code></td><td><code>127.0.0.1</code> (only loopback accepted)</td></tr>
+              <tr><td><code>SOULMATE_SERVER__PORT</code></td><td><code>server.port</code></td><td><code>7432</code></td></tr>
+              <tr><td><code>SOULMATE_PRIVACY__MODE</code></td><td><code>privacy.mode</code></td><td><code>strict_local</code></td></tr>
+              <tr><td><code>SOULMATE_LLM__PROVIDER</code></td><td><code>llm.provider</code></td><td><code>ollama</code></td></tr>
+              <tr><td><code>SOULMATE_LLM__OLLAMA__MODEL</code></td><td><code>llm.ollama.model</code></td><td>empty</td></tr>
+              <tr><td><code>SOULMATE_LLM__OPENAI_COMPATIBLE__BASE_URL</code></td><td>compatible endpoint</td><td>loopback <code>/v1</code></td></tr>
+              <tr><td><code>SOULMATE_LLM__OPENAI_COMPATIBLE__API_KEY</code></td><td>provider secret</td><td>unset — supply via environment, never TOML</td></tr>
+              <tr><td><code>SOULMATE_NETWORK__LAN_ENABLED</code></td><td><code>network.lan_enabled</code></td><td><code>false</code></td></tr>
+              <tr><td><code>SOULMATE_NETWORK__LAN_HOST</code> / <code>__LAN_PORT</code></td><td>explicit LAN address</td><td>detected / <code>7433</code></td></tr>
+              <tr><td><code>SOULMATE_NETWORK__PAIRING_TTL_SECONDS</code></td><td>pairing code lifetime</td><td><code>300</code> (30–3600)</td></tr>
+              <tr><td><code>SOULMATE_WEB__ENABLED</code></td><td><code>web.enabled</code></td><td><code>true</code></td></tr>
+              <tr><td><code>SOULMATE_STORAGE__PATH</code></td><td><code>storage.path</code></td><td>unset → <code>DATA_DIR/decision-twin.db</code></td></tr>
+            </tbody>
+          </table>
+
+          <h3>Privacy modes</h3>
+          <div class="cards">
+            <div class="card">
+              <h4><code>strict_local</code> — default</h4>
+              <p>All data, embeddings, and inference stay local. Model requests are restricted to literal loopback endpoints.</p>
+            </div>
+            <div class="card">
+              <h4><code>hybrid</code></h4>
+              <p>External HTTPS providers allowed; plaintext external HTTP never is. Only minimal compiled context leaves the machine, and the UI indicates when it will.</p>
+            </div>
+            <div class="card">
+              <h4><code>offline</code></h4>
+              <p>No network access at all, including for connectors. Local inference only.</p>
+            </div>
+          </div>
+          <p>The egress policy is central: it is enforced inside both HTTP adapters immediately before every request, so no component can quietly make its own calls.</p>
+          <p>Full details, including desktop settings storage and connector credential variables, live in the <a href="contributor-guide/configuration.md">configuration reference</a>.</p>
+        </section>
+
+        <!-- ================= 11 ================= -->
+        <section id="api">
+          <h2>11. HTTP API <a class="anchor" href="#api">#</a></h2>
+          <p>All routes are versioned under <code>/v1</code>. <strong>Every request passes one authorization boundary before any handler sees personal data.</strong></p>
+          <table>
+            <thead><tr><th>Caller</th><th>Credential</th><th>Reach</th></tr></thead>
+            <tbody>
+              <tr><td>Owner (loopback)</td><td>none required</td><td>Everything, including owner-only management routes.</td></tr>
+              <tr><td>Paired device</td><td>bearer credential issued by pairing</td><td>Chat, decide, resolve, read model, correct, answer questions, record outcomes, request advice.</td></tr>
+              <tr><td>External service identity</td><td>API key — required even on loopback</td><td>Only the scoped <code>/v1/external/*</code> surface; never raw evidence, memories, outcomes, or notes.</td></tr>
+              <tr><td>Public</td><td>none</td><td><code>/v1/health</code> and <code>/v1/pairing/complete</code> only.</td></tr>
+            </tbody>
+          </table>
+
+          <h4>Model &amp; evidence</h4>
+          <table>
+            <thead><tr><th>Route</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>GET /v1/model/summary</code></td><td>Current derived model summary.</td></tr>
+              <tr><td><code>GET /v1/model/uncertainties</code></td><td>Where the model is least confident.</td></tr>
+              <tr><td><code>GET /v1/preferences</code> · <code>GET /v1/preferences/{key}/evidence</code></td><td>Derived preferences and their supporting evidence.</td></tr>
+              <tr><td><code>POST /v1/preferences/corrections</code></td><td>Record a correction as new evidence — history is never overwritten.</td></tr>
+              <tr><td><code>GET</code> / <code>DELETE /v1/evidence/{id}</code></td><td>Inspect or remove one piece of evidence, then rebuild.</td></tr>
+              <tr><td><code>GET /v1/active-questions</code> · <code>/generate</code> · <code>/{id}/answer</code></td><td>Persistent active-learning questions; answers create preference evidence.</td></tr>
+            </tbody>
+          </table>
+
+          <h4>Conversation &amp; decisions</h4>
+          <table>
+            <thead><tr><th>Route</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td><code>POST /v1/chat</code> · <code>GET /v1/conversations</code></td><td>Chat with evidence proposal and review; conversation history.</td></tr>
+              <tr><td><code>POST</code> / <code>GET /v1/decisions</code></td><td>Create a decision with options (structured features or provider-extracted).</td></tr>
+              <tr><td><code>POST /v1/decisions/{id}/predict</code></td><td>Predict Me: probabilities plus evidence-backed factors.</td></tr>
+              <tr><td><code>POST /v1/decisions/{id}/advise</code></td><td>Advise Me: independent goal- and outcome-aware recommendation.</td></tr>
+              <tr><td><code>POST /v1/decisions/{id}/resolve</code></td><td>Record the actual choice as high-weight evidence and rebuild.</td></tr>
+              <tr><td><code>POST</code> / <code>DELETE /v1/decisions/{id}/outcome</code></td><td>Record or remove satisfaction/regret feedback and its source event.</td></tr>
+            </tbody>
+          </table>
+
+          <h4>Owner-only management</h4>
+          <table>
+            <thead><tr><th>Area</th><th>Routes</th></tr></thead>
+            <tbody>
+              <tr><td>Devices</td><td><code>POST /v1/pairing/start</code>, <code>POST /v1/pairing/complete</code>, <code>GET</code>/<code>DELETE /v1/devices[/{id}]</code>, <code>GET /v1/network/state</code>, <code>GET /v1/session</code></td></tr>
+              <tr><td>Service identities</td><td><code>GET</code>/<code>POST</code>/<code>DELETE /v1/service-identities[/{id}]</code>, <code>…/scopes</code>, <code>…/credentials[/{id}]</code></td></tr>
+              <tr><td>Data</td><td><code>GET</code>/<code>DELETE /v1/data/sources[/{id}]</code>, <code>POST /v1/data/imports|backups|exports|restores</code></td></tr>
+              <tr><td>Connectors</td><td><code>GET /v1/connectors/catalog</code>, <code>GET</code>/<code>POST /v1/connectors</code>, <code>PATCH</code>/<code>DELETE /v1/connectors/{id}</code>, <code>POST /v1/connectors/{id}/sync</code>, <code>GET /v1/connectors/syncs/{job_id}</code></td></tr>
+              <tr><td>Delegation</td><td><code>GET</code>/<code>POST</code>/<code>DELETE /v1/delegation-policies[/{id}]</code>, <code>GET /v1/delegation-requests</code>, <code>POST /v1/delegation-requests/{id}/approve|reject</code></td></tr>
+              <tr><td>Audit</td><td><code>GET /v1/audit/events</code> — metadata only, never keys or payloads.</td></tr>
+            </tbody>
+          </table>
+
+          <h4>Scoped external surface</h4>
+<pre><code>GET  /v1/external/model-summary          POST /v1/external/predict-choice
+GET  /v1/external/preference-summary     POST /v1/external/rank-options
+POST /v1/external/record-decision        POST /v1/external/find-similar-decisions
+POST /v1/external/record-outcome
+POST /v1/external/delegation-requests
+GET  /v1/external/delegation-requests/{id}
+POST /v1/external/delegation-requests/{id}/complete</code></pre>
+        </section>
+
+        <!-- ================= 12 ================= -->
+        <section id="agents">
+          <h2>12. External agents &amp; MCP <a class="anchor" href="#agents">#</a></h2>
+          <p>
+            Other AI systems can consult the Personal Model without ever reading it. An external
+            application uses a <strong>separate service-identity boundary even on loopback</strong>;
+            it never inherits owner authority.
+          </p>
+
+          <h3>12.1 Scopes</h3>
+          <p>Least privilege is enforced per identity. Implemented scopes:</p>
+          <table>
+            <thead><tr><th>Scope</th><th>Grants</th></tr></thead>
+            <tbody>
+              <tr><td><code>model:summary:read</code></td><td>Derived model summary.</td></tr>
+              <tr><td><code>preference:summary:read</code></td><td>Derived preference summary.</td></tr>
+              <tr><td><code>decision:predict</code></td><td>Predict a choice, rank options, find similar decisions.</td></tr>
+              <tr><td><code>decision:record</code></td><td>Record a decision.</td></tr>
+              <tr><td><code>outcome:record</code></td><td>Record an outcome.</td></tr>
+              <tr><td><code>agent:delegate</code></td><td>Request, read, and complete prediction-bound delegated actions.</td></tr>
+            </tbody>
+          </table>
+          <p>Each identity carries one or more independently revocable high-entropy API keys. Only SHA-256 hashes are stored, the usable key is shown exactly once, and scope or revocation changes take effect on the next request.</p>
+
+          <h3>12.2 MCP adapter</h3>
+<pre><code>SOULMATE_API_KEY='&lt;key-shown-once&gt;' uv run --locked decision-twin mcp</code></pre>
+          <p>Set <code>SOULMATE_BASE_URL</code> only when the daemon is not on the default <code>http://127.0.0.1:7432</code>. Nine tools are exposed:</p>
+<pre><code>predict_choice        rank_options            get_preference_summary
+find_similar_decisions  record_decision       record_outcome
+request_delegation    get_delegation          complete_delegation</code></pre>
+          <p>Example MCP client configuration:</p>
+<pre><code>{
+  "command": "uv",
+  "args": ["run", "decision-twin", "mcp"],
+  "env": {
+    "SOULMATE_BASE_URL": "http://127.0.0.1:7432",
+    "SOULMATE_API_KEY": "&lt;key-shown-once&gt;"
+  }
+}</code></pre>
+          <p>The adapter is a REST consumer: it never opens the SQLite database and passes exactly the same authorization boundary and application services as HTTP callers.</p>
+
+          <h3>12.3 Delegated decisions</h3>
+          <p>
+            A deterministic <strong>Policy Engine</strong> — part of the kernel, not the agent —
+            decides whether an external action may proceed. The owner grants
+            <code>agent:delegate</code> and creates a policy for <em>one exact action type</em>,
+            assigning an impact level and a confidence threshold. <strong>Impact is never accepted
+            from the agent.</strong>
+          </p>
+          <table>
+            <thead><tr><th>Impact</th><th>Automatic approval requires</th></tr></thead>
+            <tbody>
+              <tr><td>Low</td><td>confidence ≥ 0.90</td></tr>
+              <tr><td>Medium</td><td>confidence ≥ 0.95</td></tr>
+              <tr><td>High / safety-critical</td><td>never automatic — always owner confirmation</td></tr>
+            </tbody>
+          </table>
+          <p>
+            Every request binds to the latest persisted prediction from the current model snapshot,
+            carries a per-agent idempotency key, expires after 24 hours, and survives restart.
+            Soulmate returns <em>authority</em> and the predicted option — it never performs the
+            external side effect itself.
+          </p>
+        </section>
+
+        <!-- ================= 13 ================= -->
+        <section id="connectors">
+          <h2>13. Connectors <a class="anchor" href="#connectors">#</a></h2>
+          <p>
+            Connectors bring outside data in without adding dependencies to the kernel. They are
+            installed as separate Python packages and discovered through entry points.
+          </p>
+          <div class="flow">
+            <div class="step"><b>Install</b><span>A separate Python package declaring a connector entry point.</span></div>
+            <div class="arrow">→</div>
+            <div class="step"><b>Review</b><span>The Connections screen shows the manifest's declared data, network, credential, and learning permissions.</span></div>
+            <div class="arrow">→</div>
+            <div class="step"><b>Register</b><span>Grants must match the declaration exactly. Credentials come only from process variables.</span></div>
+            <div class="arrow">→</div>
+            <div class="step"><b>Sync</b><span>A durable local job deduplicates external item identities and writes source-linked RawEvents.</span></div>
+          </div>
+          <ul>
+            <li>Credentials are read only from <code>DECISION_TWIN_CONNECTOR__&lt;CONNECTOR_ID&gt;__&lt;KEY&gt;</code> — never accepted by the API, persisted, logged, or included in archives.</li>
+            <li>Network-capable plugins get a host-allowlisted HTTP client behind the central privacy policy; <code>offline</code> mode denies all connector network calls.</li>
+            <li>Jobs persist only sanitized status and audit metadata.</li>
+            <li>Removing a connector deletes its RawEvents and derivative Evidence, then rebuilds the model.</li>
+            <li>The bundled <strong>Local Notes</strong> reference connector reads only UTF-8 Markdown and text files under one configured directory, and makes no network calls.</li>
+          </ul>
+          <div class="note danger">
+            <strong>Trust boundary.</strong>
+            <p>Installed Python plugins execute as trusted owner-selected code, not inside a security sandbox. Read <a href="architecture/decisions/ADR-012-connector-plugins.md">ADR-012</a> before installing a third-party connector.</p>
+          </div>
+        </section>
+
+        <!-- ================= 14 ================= -->
+        <section id="portability">
+          <h2>14. Data portability <a class="anchor" href="#portability">#</a></h2>
+          <div class="cards">
+            <div class="card">
+              <h4>Import</h4>
+              <p>UTF-8 generic JSON, Markdown, plain text, ChatGPT exports, and Claude exports. Creates provenance-linked conversations and RawEvents locally, with no hidden provider egress.</p>
+            </div>
+            <div class="card">
+              <h4>Backup — <code>.dtwb</code></h4>
+              <p>Credential-free local archive using SQLite's online backup, so committed WAL data is captured. Defaults to <code>DATA_DIR/backups</code>.</p>
+            </div>
+            <div class="card">
+              <h4>Export — <code>.dtw</code></h4>
+              <p>Portable archive with scrypt key derivation and AES-256-GCM authenticated encryption. Prompts for a passphrase, or reads <code>--passphrase-file</code>.</p>
+            </div>
+            <div class="card">
+              <h4>Restore</h4>
+              <p>Validates paths, checksums, and versions; refuses non-fresh installations; migrates known schemas forward; issues a new installation identity; rebuilds the model from Evidence.</p>
+            </div>
+          </div>
+          <p>Archives include the database and any local <code>objects</code>, <code>indexes</code>, and <code>models</code> files. They <strong>exclude</strong> pairing state, API credentials, installation identity, TLS keys, provider secrets, logs, configuration, and existing backups.</p>
+<pre><code># restore only while the daemon is stopped, and only into a fresh installation
+DATA_DIR=./fresh-data uv run --locked decision-twin restore ./backup.dtwb
+DATA_DIR=./fresh-data uv run --locked decision-twin restore ./personal-model.dtw</code></pre>
+          <div class="note warn">
+            <strong>Restore never merges.</strong>
+            <p>It will not overwrite or blend into owner-created data. Deleting an imported source removes its messages, RawEvents, and derivative Evidence before the model is rebuilt.</p>
+          </div>
+        </section>
+
+        <!-- ================= 15 ================= -->
+        <section id="security">
+          <h2>15. Privacy &amp; security <a class="anchor" href="#security">#</a></h2>
+          <table>
+            <thead><tr><th>Boundary</th><th>Guarantee</th></tr></thead>
+            <tbody>
+              <tr><td>Network</td><td>Loopback by default, no telemetry. LAN access is off until enabled; when on, the loopback listener stays and one explicit TLS address is added. Wildcard binds are rejected by both configuration and resolver.</td></tr>
+              <tr><td>Pairing</td><td>256-bit single-use tokens, five-minute expiry, claimed atomically so a token can never be redeemed twice. Only hashes of tokens and device credentials are stored; failed auth returns one generic message; revocation applies on the next request.</td></tr>
+              <tr><td>Transport</td><td>Self-signed certificate with an owner-only private key, renewed near expiry or on address change. The QR payload carries the fingerprint so a phone pins the exact service it paired with.</td></tr>
+              <tr><td>External identities</td><td>Separate boundary even on loopback; explicit scopes; SHA-256-hashed keys; responses omit raw memories, evidence, outcome history, and notes.</td></tr>
+              <tr><td>Audit</td><td>Local, metadata-only: identity, credential id, method, path, status. Never the key, never the payload. Pairing issue, device pairing, and revocation are audited.</td></tr>
+              <tr><td>Secrets</td><td>Provider secrets come from the environment or the OS credential store — never TOML, never archives. The desktop UI only learns <em>whether</em> a key exists.</td></tr>
+              <tr><td>Egress</td><td>One central policy enforced inside both HTTP adapters immediately before every request — for model calls and connector calls alike.</td></tr>
+              <tr><td>Errors</td><td>Configuration errors name the offending field without printing its rejected value.</td></tr>
+            </tbody>
+          </table>
+          <div class="note danger">
+            <strong>Known limits.</strong>
+            <p>Browsers warn on the self-signed certificate until the owner accepts it. There is no per-address rate limit on pairing attempts. Connector plugins are not sandboxed. Remote internet exposure is unsupported by design.</p>
+          </div>
+          <p>Never put personal data or secrets into issues, logs, fixtures, source control, or CI artifacts. Use synthetic fixtures; keep runtime data out of tracked source. See <a href="security/README.md">privacy and security boundaries</a> and <a href="../SECURITY.md">SECURITY.md</a>.</p>
+        </section>
+
+        <!-- ================= 16 ================= -->
+        <section id="quality">
+          <h2>16. Quality gates <a class="anchor" href="#quality">#</a></h2>
+<pre><code>pnpm check       # lint + format check + typecheck + tests, across Python, TS, and Rust
+pnpm check:all   # adds lockfile checks, Git hooks, and Python/web/desktop builds</code></pre>
+          <table>
+            <thead><tr><th>Gate</th><th>Tooling</th></tr></thead>
+            <tbody>
+              <tr><td>Lint</td><td>Ruff (broad rule set, line length 100), ESLint with zero warnings, Clippy with <code>-D warnings</code>.</td></tr>
+              <tr><td>Types</td><td><code>mypy</code> in strict mode over every Python source tree and the tests; <code>tsc -b</code> per package.</td></tr>
+              <tr><td>Tests</td><td>pytest (<code>unit</code>, <code>integration</code>, <code>evaluation</code> markers), Vitest, <code>cargo test</code>.</td></tr>
+              <tr><td>Hooks &amp; CI</td><td>pre-commit runs the same locked tools; GitHub Actions additionally validates branch names, PR titles, and commit messages through the single <code>scripts/validate_contribution.py</code> policy.</td></tr>
+            </tbody>
+          </table>
+          <p>
+            Unit tests avoid network and real LLMs. Integration tests start a temporary loopback daemon
+            and clean it up. Desktop tests mock the Tauri IPC boundary. Native packaging runs in the
+            OS matrix because sidecars and installers are target-specific. Use synthetic data and
+            temporary directories, always.
+          </p>
+          <p>Details: <a href="contributor-guide/quality-gates.md">quality gates</a>, <a href="contributor-guide/conventions.md">conventions</a>, <a href="contributor-guide/workflow.md">workflow</a>.</p>
+        </section>
+
+        <!-- ================= 17 ================= -->
+        <section id="status">
+          <h2>17. Status &amp; limitations <a class="anchor" href="#status">#</a></h2>
+          <p>
+            <span class="badge ok">Phase 12 complete locally</span>
+            Phases 0–12 are implemented and verified locally on macOS arm64. No later product phase is
+            defined or authorized — do not infer a Phase 13. Any further autonomous execution,
+            notifications, policy language, or safety-critical behavior needs newly specified,
+            explicitly authorized scope.
+          </p>
+          <h4>Honest unknowns</h4>
+          <ul>
+            <li>Remote CI has never been confirmed green; local checks are not a substitute.</li>
+            <li>Cross-platform installers, code signing, and packaged connector discovery are unverified outside macOS arm64.</li>
+            <li>Native mobile builds and browser trust of the self-signed certificate are unverified.</li>
+            <li>Confidence calibration against broad real-world data, and external action verification, remain open.</li>
+            <li>Vector search and vector diagnostics are deliberately deferred; the Python SDK is a documented placeholder; Docker packaging is a placeholder.</li>
+            <li>Connector plugin sandboxing/signing and scheduled syncs are not implemented.</li>
+          </ul>
+          <p>The authoritative, always-current version of this list is <a href="phase-status.md">docs/phase-status.md</a> plus the individual <a href="phases/README.md">phase reports</a>.</p>
+        </section>
+
+        <!-- ================= 18 ================= -->
+        <section id="map">
+          <h2>18. Where to read next <a class="anchor" href="#map">#</a></h2>
+          <table>
+            <thead><tr><th>You want to…</th><th>Read</th></tr></thead>
+            <tbody>
+              <tr><td>Understand the full product specification</td><td><a href="../Open%20Personal%20Decision%20Agent%20%E2%80%94%20Technical%20Product%20Specification%20%26%20Implementation%20Plan.md">Technical Product Specification &amp; Implementation Plan</a> — authoritative</td></tr>
+              <tr><td>Know what is built and what is open</td><td><a href="phase-status.md">Phase status</a> → <a href="phases/README.md">phase reports</a></td></tr>
+              <tr><td>Understand why the architecture is what it is</td><td><a href="architecture/README.md">Architecture &amp; ADR index</a></td></tr>
+              <tr><td>Contribute code</td><td><a href="../CONTRIBUTING.md">CONTRIBUTING.md</a> → <a href="contributor-guide/README.md">contributor guide</a></td></tr>
+              <tr><td>Work on this repo as an AI agent</td><td><a href="../AGENTS.md">AGENTS.md</a></td></tr>
+              <tr><td>Configure a local installation</td><td><a href="contributor-guide/configuration.md">Configuration reference</a></td></tr>
+              <tr><td>Review privacy and security boundaries</td><td><a href="security/README.md">Security boundaries</a> · <a href="../SECURITY.md">SECURITY.md</a></td></tr>
+              <tr><td>See what changed</td><td><a href="../CHANGELOG.md">CHANGELOG.md</a></td></tr>
+            </tbody>
+          </table>
+          <div class="note">
+            <strong>Conflict resolution order.</strong>
+            <p>Specification → explicit user instructions → current phase gate → most specific contributor rule. Documentation describes intent; executable configuration is the final authority on exact tool behavior.</p>
+          </div>
+          <h4>Language</h4>
+          <p>Contributors may talk to AI agents in any language. Code, comments, identifiers, and maintained technical documentation are in English. User content and localization keep their original language.</p>
+        </section>
+
+        <footer>
+          Soulmate · licensed under <a href="../LICENSE">Apache-2.0</a> ·
+          this page summarizes the repository; the specification and phase reports remain authoritative.
+        </footer>
+      </main>
+    </div>
+
+    <script>
+      (function () {
+        var links = Array.prototype.slice.call(document.querySelectorAll("nav.toc a[href^='#']"));
+        var sections = links
+          .map(function (link) { return document.getElementById(link.getAttribute("href").slice(1)); })
+          .filter(Boolean);
+        if (!sections.length || !("IntersectionObserver" in window)) return;
+        var visible = new Set();
+        var observer = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              if (entry.isIntersecting) visible.add(entry.target.id);
+              else visible.delete(entry.target.id);
+            });
+            var current = sections.filter(function (s) { return visible.has(s.id); })[0];
+            if (!current) return;
+            links.forEach(function (link) {
+              link.classList.toggle("active", link.getAttribute("href") === "#" + current.id);
+            });
+          },
+          { rootMargin: "0px 0px -70% 0px", threshold: 0 }
+        );
+        sections.forEach(function (section) { observer.observe(section); });
+      })();
+    </script>
+  </body>
+</html>

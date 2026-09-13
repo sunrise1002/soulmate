@@ -4,6 +4,11 @@
 
 ### Added
 
+- Consolidated single-page project guide at `docs/index.html` covering vision,
+  core concepts, architecture, technology stack, setup, usage, configuration,
+  API surface, external agents, connectors, portability, privacy, and status.
+- `docs/README.md` documentation index describing every document and the
+  precedence order between them.
 - Phase 12 deterministic Policy Engine with owner-assigned low, medium, high, and
   safety-critical impact classes, enforced confidence floors, current-snapshot
   prediction binding, and 24-hour authorization expiry.
@@ -137,3 +142,9 @@ service connector has been implemented. Delegation grants authorization but does
 not execute or verify third-party side effects. Imported and connector sources are
 normalized locally but do not automatically invoke an LLM or create derived
 Evidence.
+
+### Changed
+
+- Shortened `README.md` to orientation, quick start, CLI, device access,
+  repository map, and a documentation index; the per-phase narrative now lives in
+  `docs/index.html` and the phase reports.
