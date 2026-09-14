@@ -4,6 +4,10 @@
 
 ### Added
 
+- A recorded post-MVP roadmap and detailed Phase 13 Decision I/O and trusted
+  provenance plan, including scope, architecture invariants, implementation
+  increments, migration and compatibility requirements, test perspectives, exit
+  criteria, and an explicit pre-implementation authorization gate.
 - Consolidated single-page project guide at `docs/index.html` covering vision,
   core concepts, architecture, technology stack, setup, usage, configuration,
   API surface, external agents, connectors, portability, privacy, and status.

@@ -33,3 +33,9 @@ Available reports:
 - [Phase 10](phase-10-report.md)
 - [Phase 11](phase-11-report.md)
 - [Phase 12](phase-12-report.md)
+
+Planned work:
+
+- [Phase 13 — Decision I/O and trusted provenance](phase-13-plan.md). Planning is
+  recorded, implementation has not started, and a separate explicit owner
+  instruction is required before work begins.

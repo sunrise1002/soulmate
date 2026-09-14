@@ -5,9 +5,10 @@ the previous phase before planning or implementing the current phase.
 
 ## Authorized scope
 
-Phase 12 — Delegated Decision Agent is complete locally. No later product phase is
-defined or authorized. Stop at the Phase 12 boundary until the user explicitly
-defines and authorizes further scope.
+Phase 12 — Delegated Decision Agent is complete locally. Phase 13 — Decision I/O
+and trusted provenance has a recorded plan, but implementation has not started and
+requires a separate explicit owner instruction. No Phase 14 or later work is
+defined or authorized for implementation.
 
 ## Reports
 
@@ -26,6 +27,7 @@ defines and authorizes further scope.
 | Phase 10 | Complete locally | [Phase 10 report](phases/phase-10-report.md) | Remote CI, cross-platform restore, large archives, and native mobile builds unverified |
 | Phase 11 | Complete locally | [Phase 11 report](phases/phase-11-report.md) | Remote CI, plugin sandboxing/signing, scheduled sync, real service connectors, and cross-platform packaged discovery unverified |
 | Phase 12 | Complete locally | [Phase 12 report](phases/phase-12-report.md) | Remote CI, broad real-world confidence calibration, external action verification, notifications, and cross-platform packaged behavior unverified |
+| Phase 13 | Planned; not started | [Phase 13 plan](phases/phase-13-plan.md) | Implementation requires explicit owner instruction; ADR and contracts are not yet accepted |
 
 ## Phase 12 exit criteria
 
@@ -36,10 +38,12 @@ and complete one durable authorization without receiving raw Personal Model data
 
 ## Next action
 
-Do not infer a Phase 13. Any further autonomous execution, notifications, policy
-language, or safety-critical behavior requires newly specified and explicitly
-authorized scope. Before planning it, read the complete
-[Phase 12 report](phases/phase-12-report.md) and inspect current repository state.
+When the owner explicitly authorizes implementation, execute only the recorded
+[Phase 13 plan](phases/phase-13-plan.md), beginning with ADR-014 and the contract
+freeze. Follow specification section 74, validate the complete phase, update its
+report and this status, then stop. Do not infer authorization for agent hooks,
+Git observation, shadow prediction, later autonomous execution, notifications,
+policy expansion, or safety-critical behavior.
 
 ## Repository governance
 
