@@ -18,6 +18,9 @@ pnpm --filter @soulmate/mobile start   # Expo development server
 pnpm --filter @soulmate/mobile check   # lint, format, typecheck, test
 ```
 
+See the root [setup guide](../../docs/contributor-guide/setup.md) for workspace
+installation and the daemon/LAN prerequisites required by a physical device.
+
 Transport-level certificate pinning is installed by the native network security
 configuration produced during `expo prebuild` from the stored fingerprint. That
 native build is not produced by the repository checks; the automated tests cover

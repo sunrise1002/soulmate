@@ -4,41 +4,78 @@ Configuration belongs to the daemon and uses standard-library TOML parsing with
 Pydantic v2 validation. Loading settings alone does not create files or call
 providers; `serve` creates and migrates the configured SQLite database.
 
+For a normal source checkout, copy `config.example.toml` to `config.toml` and use
+TOML for non-secret settings. Use process environment variables for secrets and
+temporary overrides. The desktop application manages a separate configuration
+through its Settings screen; root `config.toml` does not configure its managed
+sidecar.
+
 ## Sources and precedence
 
 From lowest to highest priority:
 
 1. Typed defaults.
-2. TOML file selected by `serve --config PATH`, otherwise `SOULMATE_CONFIG_FILE`,
+2. TOML file selected by `<command> --config PATH`, otherwise `SOULMATE_CONFIG_FILE`,
    otherwise `./config.toml`.
 3. `DATA_DIR`, which overrides TOML `data_dir`.
 4. `SOULMATE_*` variables, using `__` for nested fields.
 
-An explicitly selected config file must exist. Missing implicit `./config.toml`
-uses defaults. Invalid TOML, unknown keys, invalid values, and unreadable files
-fail with a configuration error. `.env` files are not loaded automatically.
+An explicitly selected config file must exist. This includes a path selected by
+`SOULMATE_CONFIG_FILE`, even when that variable came from a manually loaded
+`.env`. Missing implicit `./config.toml` uses defaults. Invalid TOML, unknown keys,
+invalid values, and unreadable files fail with a configuration error.
 
-Examples of environment variables:
+`.env` files are not loaded automatically. See [development setup](setup.md) for
+explicit POSIX and PowerShell loading examples. Copying `.env.example` alone has
+no effect.
 
-| Variable | Field | Default |
-| --- | --- | --- |
-| `SOULMATE_DATA_DIR` or `DATA_DIR` | `data_dir` | `./data` |
-| `SOULMATE_SERVER__HOST` | `server.host` | `127.0.0.1` |
-| `SOULMATE_SERVER__PORT` | `server.port` | `7432` |
-| `SOULMATE_PRIVACY__MODE` | `privacy.mode` | `strict_local` |
-| `SOULMATE_NETWORK__LAN_ENABLED` | `network.lan_enabled` | `false` |
-| `SOULMATE_NETWORK__LAN_HOST` | `network.lan_host` | empty, detected |
-| `SOULMATE_NETWORK__LAN_PORT` | `network.lan_port` | `7433` |
-| `SOULMATE_NETWORK__TLS_DIR` | `network.tls_dir` | `DATA_DIR/tls` |
-| `SOULMATE_NETWORK__PAIRING_TTL_SECONDS` | `network.pairing_ttl_seconds` | `300` |
-| `SOULMATE_WEB__ENABLED` | `web.enabled` | `true` |
-| `SOULMATE_WEB__CLIENT_DIR` | `web.client_dir` | packaged bundle |
-| `SOULMATE_STORAGE__PATH` | `storage.path` | unset |
-| `SOULMATE_LLM__OLLAMA__MODEL` | `llm.ollama.model` | empty |
-| `SOULMATE_LLM__PROVIDER` | `llm.provider` | `ollama` |
-| `SOULMATE_LLM__OPENAI_COMPATIBLE__BASE_URL` | compatible endpoint | loopback `/v1` |
-| `SOULMATE_LLM__OPENAI_COMPATIBLE__MODEL` | compatible model | empty |
-| `SOULMATE_LLM__OPENAI_COMPATIBLE__API_KEY` | provider secret | unset |
+## Setting reference
+
+Every TOML field maps to an environment variable by prefixing `SOULMATE_`, using
+uppercase, and separating nested names with two underscores. For example,
+`llm.ollama.base_url` becomes `SOULMATE_LLM__OLLAMA__BASE_URL`.
+
+### Files, service, and web client
+
+| TOML field | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `data_dir` | `DATA_DIR` or `SOULMATE_DATA_DIR` | `./data` | Root for the default database, backups, generated TLS files, and other local runtime data. `SOULMATE_DATA_DIR` wins if both variables are set. |
+| — | `SOULMATE_CONFIG_FILE` | unset | Selects a TOML file. Unlike implicit `./config.toml`, the selected file must exist. |
+| `server.host` | `SOULMATE_SERVER__HOST` | `127.0.0.1` | Owner listener. Only literal `127.0.0.1` and `::1` are valid; this is never a LAN bind. |
+| `server.port` | `SOULMATE_SERVER__PORT` | `7432` | Owner HTTP port, from 1 through 65535. All CLI clients must use the same value. |
+| `web.enabled` | `SOULMATE_WEB__ENABLED` | `true` | Enables static browser-client serving when a bundle is available. |
+| `web.client_dir` | `SOULMATE_WEB__CLIENT_DIR` | packaged bundle | Overrides the static bundle directory. For source development, use `apps/web/dist` after `pnpm build:web`. |
+
+### Storage and currently reserved backends
+
+| TOML field | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `storage.backend` | `SOULMATE_STORAGE__BACKEND` | `sqlite` | Persistent storage backend. `sqlite` is the only accepted value. |
+| `storage.path` | `SOULMATE_STORAGE__PATH` | unset | Explicit database file. When unset, uses `DATA_DIR/soulmate.db`. |
+| `vector.backend` | `SOULMATE_VECTOR__BACKEND` | `sqlite_vec` | Accepts `sqlite_vec` or `cosine`; vector storage/search remains deferred, so this currently records intent rather than enabling a working vector index. |
+| `embedding.provider` | `SOULMATE_EMBEDDING__PROVIDER` | `local` | Embedding provider selector. `local` is the only accepted value; embedding execution remains deferred. |
+
+### Privacy and model provider
+
+| TOML field | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `privacy.mode` | `SOULMATE_PRIVACY__MODE` | `strict_local` | `strict_local` permits policy-approved loopback calls; `hybrid` also permits external HTTPS; `offline` still permits loopback model endpoints but denies connector network access and external inference. |
+| `llm.provider` | `SOULMATE_LLM__PROVIDER` | `ollama` | Selects `ollama` or `openai_compatible`. |
+| `llm.ollama.base_url` | `SOULMATE_LLM__OLLAMA__BASE_URL` | `http://127.0.0.1:11434` | Local Ollama HTTP endpoint. It must remain literal loopback. |
+| `llm.ollama.model` | `SOULMATE_LLM__OLLAMA__MODEL` | empty | Exact installed Ollama model name. Empty means chat provider unavailable. |
+| `llm.openai_compatible.base_url` | `SOULMATE_LLM__OPENAI_COMPATIBLE__BASE_URL` | `http://127.0.0.1:8000/v1` | Generic OpenAI-compatible base URL. A remote URL requires `hybrid` and HTTPS. |
+| `llm.openai_compatible.model` | `SOULMATE_LLM__OPENAI_COMPATIBLE__MODEL` | empty | Model identifier sent to the compatible provider. Empty means chat provider unavailable. |
+| `llm.openai_compatible.api_key` | `SOULMATE_LLM__OPENAI_COMPATIBLE__API_KEY` | unset | Optional bearer secret. Supply only through the process environment; never commit it or put it in TOML. |
+
+### Opt-in LAN listener
+
+| TOML field | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `network.lan_enabled` | `SOULMATE_NETWORK__LAN_ENABLED` | `false` | Adds a separate TLS LAN listener while preserving loopback. Requires a restart. |
+| `network.lan_host` | `SOULMATE_NETWORK__LAN_HOST` | empty | Explicit LAN address. Empty asks the daemon to detect the default-route address; wildcard and loopback values are rejected. |
+| `network.lan_port` | `SOULMATE_NETWORK__LAN_PORT` | `7433` | TLS LAN port, from 1 through 65535. |
+| `network.tls_dir` | `SOULMATE_NETWORK__TLS_DIR` | unset | Directory for the generated certificate and owner-only private key; unset means `DATA_DIR/tls`. |
+| `network.pairing_ttl_seconds` | `SOULMATE_NETWORK__PAIRING_TTL_SECONDS` | `300` | One-time pairing lifetime, from 30 through 3600 seconds. |
 
 Only `127.0.0.1` and `::1` are accepted for `server.host`. Ports must be between 1
 and 65535.
@@ -64,7 +101,7 @@ access is a startup decision, so the service must restart to apply it.
 `web.enabled` controls whether the daemon serves a web client. Without
 `web.client_dir`, it serves the bundle packaged inside the daemon, when present.
 
-## Paths and future settings
+## Paths, archives, and deferred settings
 
 Relative paths resolve against the process working directory, including when the
 TOML file is elsewhere. `~` is expanded when resolving the database path. Without
@@ -101,6 +138,32 @@ committed to TOML. The OpenAI-compatible adapter is generic and does not require
 specific vendor SDK. Provider configuration is lazy: the daemon can start without
 a model, while `/v1/chat` returns a provider-unavailable response until a model is
 configured. Vector search remains deferred.
+
+## Complete examples
+
+Run local Ollama while keeping every model request on the machine:
+
+```sh
+SOULMATE_LLM__OLLAMA__MODEL=llama3.2 uv run --locked soulmate serve
+```
+
+Run a daemon-served web bundle from a source checkout:
+
+```sh
+pnpm build:web
+SOULMATE_WEB__CLIENT_DIR=apps/web/dist uv run --locked soulmate serve
+```
+
+Select an alternate file and absolute data location:
+
+```sh
+DATA_DIR=/srv/soulmate/data \
+  uv run --locked soulmate serve --config /etc/soulmate/config.toml
+```
+
+Use the same configuration selection for `serve`, `status`, `doctor`, backup,
+restore, import, and rebuild commands so they resolve the same listener and
+database.
 
 ## Desktop configuration
 

@@ -207,7 +207,7 @@
         <div class="tag">Local-first Personal Decision Model</div>
         <div class="lang-switch">
           <span>🌐</span>
-          <strong>English</strong> · <a href="index.vi.html">Tiếng Việt</a>
+          <strong>English</strong>
         </div>
         <ol>
           <li><a href="#overview">Overview</a></li>
@@ -557,6 +557,11 @@
         <section id="setup">
           <h2>8. Setup <a class="anchor" href="#setup">#</a></h2>
 
+          <div class="note">
+            <strong>Working from source?</strong>
+            <p>The <a href="contributor-guide/setup.md">setup, build, and run guide</a> is the operational reference for OS prerequisites, explicit <code>.env</code> loading, provider recipes, daemon/web/desktop/mobile run modes, artifact locations, and troubleshooting.</p>
+          </div>
+
           <h3>8.1 Path A — desktop application (recommended for owners)</h3>
           <p>
             The installed application starts and supervises its own loopback daemon, stores data in
@@ -578,17 +583,18 @@ pnpm --filter @soulmate/desktop tauri build</code></pre>
           <h3>8.3 Path C — development environment</h3>
           <p>
             Install <a href="https://docs.astral.sh/uv/getting-started/installation/">uv</a>, Node.js 24,
-            pnpm 11.21.0, and Rust 1.88+. <code>uv</code> manages the Python 3.12 interpreter.
+            pnpm 11.21.0, Rust 1.88+, and the <a href="https://v2.tauri.app/start/prerequisites/">native Tauri prerequisites</a>. <code>uv</code> manages the Python 3.12 interpreter.
           </p>
 <pre><code># if uv lives in ~/.local/bin and your shell cannot find it
 export PATH="$HOME/.local/bin:$PATH"
 
 uv sync --locked --all-packages
 pnpm install --frozen-lockfile
-uv run --locked pre-commit install
+rustup component add rustfmt clippy
+uv run --locked pre-commit install --install-hooks \
+  --hook-type pre-commit --hook-type commit-msg --hook-type pre-push
 
 pnpm check                                   # lint, format, typecheck, test — everything
-rustup component add rustfmt clippy
 pnpm --filter @soulmate/desktop tauri dev    # desktop product in dev mode</code></pre>
           <div class="note warn">
             <strong>PATH matters for hooks.</strong>
@@ -598,10 +604,19 @@ pnpm --filter @soulmate/desktop tauri dev    # desktop product in dev mode</code
           <h3>8.4 First run checklist</h3>
           <ol>
             <li>Copy <code>config.example.toml</code> to <code>config.toml</code> (optional; local config is git-ignored).</li>
+            <li>If you copy <code>.env.example</code>, explicitly load it into the process environment. Soulmate never reads <code>.env</code> by itself, and an uncommented <code>SOULMATE_CONFIG_FILE</code> must name an existing file.</li>
             <li>Point the provider at a local model, e.g. <code>SOULMATE_LLM__OLLAMA__MODEL=llama3.2</code>. The daemon starts fine without one; <code>/v1/chat</code> simply reports the provider as unavailable.</li>
-            <li>Run <code>soulmate doctor</code> — it checks storage permissions, database integrity, WAL, foreign keys, migration state, port availability, and whether the selected provider has a model.</li>
+            <li>After the first start has created the database, stop the daemon and run <code>soulmate doctor</code>. Use <code>soulmate status</code> while it is running; <code>doctor</code> expects the configured port to be free.</li>
             <li>Start chatting and deciding. Optionally import existing history with <code>soulmate import ./history.json</code>.</li>
           </ol>
+
+          <h3>8.5 Builds and output</h3>
+<pre><code>pnpm build:python                              # Python packages → dist/
+pnpm build:web                                # browser bundle → apps/web/dist/
+pnpm build:desktop                            # web + desktop frontend assets
+pnpm --filter @soulmate/desktop sidecar:build # daemon executable → src-tauri/binaries/
+pnpm --filter @soulmate/desktop tauri build   # native installer → src-tauri/target/release/bundle/</code></pre>
+          <p><code>tauri build</code> produces an unsigned artifact for the current operating system. Build each target on that target OS. <code>build:desktop</code> does not create an installer.</p>
         </section>
 
         <!-- ================= 9 ================= -->
@@ -662,11 +677,11 @@ pnpm --filter @soulmate/desktop tauri dev    # desktop product in dev mode</code
           <h4>Precedence, lowest to highest</h4>
           <ol>
             <li>Typed defaults.</li>
-            <li>TOML file: <code>serve --config PATH</code>, else <code>SOULMATE_CONFIG_FILE</code>, else <code>./config.toml</code>.</li>
+            <li>TOML file: <code>&lt;command&gt; --config PATH</code>, else <code>SOULMATE_CONFIG_FILE</code>, else <code>./config.toml</code>.</li>
             <li><code>DATA_DIR</code>, which overrides TOML <code>data_dir</code>.</li>
             <li><code>SOULMATE_*</code> environment variables, using <code>__</code> for nested fields.</li>
           </ol>
-          <p>An explicitly selected config file must exist; a missing implicit <code>./config.toml</code> just uses defaults. Invalid TOML, unknown keys, and unreadable files fail loudly. <code>.env</code> files are <strong>not</strong> loaded automatically.</p>
+          <p>An explicitly selected config file must exist; a missing implicit <code>./config.toml</code> just uses defaults. Invalid TOML, unknown keys, and unreadable files fail loudly. <code>.env</code> files are <strong>not</strong> loaded automatically; copying the example alone changes nothing. Explicit loading commands and the complete field-by-field reference live in the <a href="contributor-guide/setup.md">setup guide</a> and <a href="contributor-guide/configuration.md">configuration reference</a>.</p>
           <table>
             <thead><tr><th>Variable</th><th>Field</th><th>Default</th></tr></thead>
             <tbody>

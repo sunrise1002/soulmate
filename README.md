@@ -9,17 +9,20 @@ replaceable.
 There is no Soulmate cloud. Each owner runs their own service.
 
 📖 **[Read the project guide → `docs/index.html`](docs/index.html)** — vision,
-architecture, technology, setup, usage, API, and privacy boundaries in one page.
+architecture, technology, usage, API, and privacy boundaries in one page. For a
+source checkout, use the dedicated [setup, build, and run guide](docs/contributor-guide/setup.md).
 
 **Current status:** Phases 0–12 are complete locally; Phase 12 is the Delegated
 Decision Agent. See [phase status](docs/phase-status.md) and the
 [Phase 12 report](docs/phases/phase-12-report.md). Remote CI remains unverified.
 
-## Quick start
+## Source quick start
 
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), Node.js 24,
-pnpm 11.21.0, and Rust 1.88 or later. `uv` manages the Python 3.12 development
-interpreter; Python packages support Python 3.12 and later.
+For only the daemon and CLI, install
+[uv](https://docs.astral.sh/uv/getting-started/installation/). For the complete
+desktop workspace, also install Node.js 24, pnpm 11.21.0, Rust 1.88+, and the
+[native Tauri prerequisites](https://v2.tauri.app/start/prerequisites/). `uv`
+manages the Python 3.12+ interpreter.
 
 ```sh
 # if uv is in ~/.local/bin and your shell cannot find it
@@ -27,29 +30,51 @@ export PATH="$HOME/.local/bin:$PATH"
 
 uv sync --locked --all-packages
 pnpm install --frozen-lockfile
-uv run --locked pre-commit install
+rustup component add rustfmt clippy
+uv run --locked pre-commit install --install-hooks \
+  --hook-type pre-commit --hook-type commit-msg --hook-type pre-push
 
 pnpm check    # lint, format check, typecheck, and tests across Python, TS, and Rust
 ```
 
 Your editor's Git environment also needs `uv` on PATH for the pre-commit hook.
 
-Run the service:
+Configuration is optional for the first start. The recommended non-secret setup
+is:
+
+```sh
+cp config.example.toml config.toml
+```
+
+`.env.example` is also provided, but `.env` files are **not loaded
+automatically**. Either export the required variables in your shell or explicitly
+load the file before starting:
+
+```sh
+cp .env.example .env
+set -a
+. ./.env
+set +a
+```
+
+Run and verify the service:
 
 ```sh
 uv run --locked soulmate serve
+# in another terminal, with the same configuration environment
+uv run --locked soulmate status
 ```
 
 It listens on `127.0.0.1:7432`, applies packaged Alembic migrations, creates
 `DATA_DIR/soulmate.db`, and starts the durable local job worker. It enables
 no telemetry; model calls happen only when `/v1/chat` is used and must pass the
-configured egress policy.
+configured egress policy. Chat remains unavailable until a model is configured;
+the daemon itself and deterministic features still work.
 
-Run the desktop product, or build a native installer with its bundled daemon
-sidecar:
+Run the complete desktop product, or build a native installer with its bundled
+daemon sidecar:
 
 ```sh
-rustup component add rustfmt clippy
 pnpm --filter @soulmate/desktop tauri dev
 pnpm --filter @soulmate/desktop tauri build
 ```
@@ -58,9 +83,11 @@ The installed application starts and monitors its own loopback daemon, stores da
 in the platform application-data directory, and needs no separately installed
 Python, Node.js, database, or Docker runtime.
 
-Optionally copy `config.example.toml` to `config.toml` and edit it; local config is
-git-ignored. See the [configuration reference](docs/contributor-guide/configuration.md)
-for environment overrides, `DATA_DIR`, and path semantics.
+Both local config files and `./data` are git-ignored. See the
+[setup guide](docs/contributor-guide/setup.md) for prerequisite and OS-specific
+instructions, provider examples, separate daemon/web/mobile flows, build artifact
+locations, and troubleshooting. The [configuration reference](docs/contributor-guide/configuration.md)
+defines every parameter, precedence, valid value, and path/security behavior.
 
 ## CLI
 
@@ -123,7 +150,8 @@ loopback. Device and data management stay on the owner's machine.
 
 | Document | Use it for |
 | --- | --- |
-| [`docs/index.html`](docs/index.html) ([Tiếng Việt](docs/index.vi.html)) | The consolidated project guide — start here |
+| [`docs/index.html`](docs/index.html) | The consolidated project guide — start here |
+| [Setup, build, and run](docs/contributor-guide/setup.md) | Source prerequisites, installation, `.env`, providers, run modes, artifacts, and troubleshooting |
 | [Technical specification](<Open Personal Decision Agent — Technical Product Specification & Implementation Plan.md>) | Authoritative product definition and phase order |
 | [Phase status](docs/phase-status.md) | What is built and what is authorized |
 | [Architecture & ADRs](docs/architecture/README.md) | Layering rules and ADR-001 through ADR-013 |

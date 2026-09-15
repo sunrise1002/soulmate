@@ -4,6 +4,10 @@
 
 ### Added
 
+- A source-checkout setup, build, and run guide covering toolchain and native OS
+  prerequisites, locked workspace installation, explicit POSIX/PowerShell `.env`
+  loading, local and compatible model providers, daemon/desktop/web/mobile run
+  modes, build artifacts, verification, and troubleshooting.
 - A recorded post-MVP roadmap and detailed Phase 13 Decision I/O and trusted
   provenance plan, including scope, architecture invariants, implementation
   increments, migration and compatibility requirements, test perspectives, exit
@@ -149,6 +153,12 @@ Evidence.
 
 ### Changed
 
+- Expanded the configuration reference with every supported TOML/environment
+  field, precedence, valid values, defaults, purpose, security behavior, and
+  runnable examples; made `.env.example` safe when `config.toml` does not exist.
+- Corrected the browser development instructions to use a daemon-served bundle
+  for end-to-end flows, documented native installer output, clarified the Docker
+  and mobile limitations, and removed links to a nonexistent translated guide.
 - Standardized the remaining legacy product identifiers on Soulmate across the
   CLI executable, default database filename, connector credential variables,
   packaged desktop sidecar, tests, configuration examples, and documentation.

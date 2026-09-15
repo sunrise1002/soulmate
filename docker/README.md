@@ -1,5 +1,7 @@
 # Docker placeholder
 
-Compose is an advanced installation option in the specification. Container
-packaging is deferred until a persistent daemon exists; Phase 0 needs no services
-or Docker runtime. No nonfunctional Compose manifest is provided.
+Compose is an advanced installation option in the specification, but container
+packaging has not been implemented. No Dockerfile or Compose manifest is provided,
+so use the daemon or native desktop instructions in the root
+[setup guide](../docs/contributor-guide/setup.md). SQLite is embedded and needs no
+separate database container.

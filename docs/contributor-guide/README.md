@@ -3,15 +3,17 @@
 This directory is the operational source of truth for humans and AI agents making
 changes to Soulmate. Read the documents in this order:
 
-1. [Engineering conventions](conventions.md) — language, architecture, code, test,
+1. [Development setup, build, and run](setup.md) — toolchains, dependency
+   installation, configuration, providers, runtime modes, artifacts, and troubleshooting.
+2. [Engineering conventions](conventions.md) — language, architecture, code, test,
    privacy, and documentation rules.
-2. [Contribution workflow](workflow.md) — issue selection, branches, commits, pull
+3. [Contribution workflow](workflow.md) — issue selection, branches, commits, pull
    requests, reviews, and merges.
-3. [Quality gates](quality-gates.md) — local commands, Git hooks, CI checks, and the
+4. [Quality gates](quality-gates.md) — local commands, Git hooks, CI checks, and the
    policy for justified exceptions.
-4. [Repository settings](repository-settings.md) — maintainer-side GitHub rules that
+5. [Repository settings](repository-settings.md) — maintainer-side GitHub rules that
    cannot be enforced by files in this repository alone.
-5. [Configuration](configuration.md) — local daemon configuration and environment
+6. [Configuration](configuration.md) — local daemon configuration and environment
    overrides.
 
 The root [agent instructions](../../AGENTS.md), [phase status](../phase-status.md),

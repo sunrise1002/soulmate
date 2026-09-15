@@ -10,7 +10,8 @@ verification, limitations, and handoff state inform the plan.
 
 Use Python 3.12 via `uv`, Node.js 24, pnpm 11.21.0, and Rust 1.88 or later. Install
 `rustfmt` and `clippy` through rustup. Install dependencies and the local Git hook
-using the README commands. Python, pnpm, and desktop Cargo lockfiles belong in Git. Prefer
+using the [setup, build, and run guide](docs/contributor-guide/setup.md). Python,
+pnpm, and desktop Cargo lockfiles belong in Git. Prefer
 `uv add --package <name> <dependency>` for Python changes and `pnpm --filter <name>
 add <dependency>` once client packages exist. Review lockfile changes.
 

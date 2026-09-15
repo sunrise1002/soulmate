@@ -55,6 +55,17 @@ phase boundary above. Remote CI and GitHub ruleset activation remain unverified.
 
 ## Repository maintenance
 
+On 2026-09-15, source onboarding documentation was expanded with explicit
+prerequisites, `.env` loading semantics, complete configuration meanings,
+provider and runtime recipes, build outputs, and troubleshooting. Python lint,
+formatting, strict typing, 285 tests, seven Python package builds, TypeScript
+lint/formatting/typing and 86 tests, web/desktop frontend builds, configuration
+tests, documentation hooks, and a daemon-served web smoke test passed locally on
+macOS arm64. `pnpm check:all` could not complete because Rust was not installed in
+the verification environment, so native Rust checks, sidecar/installer builds,
+and remote CI remain unverified for this maintenance change. No product phase or
+runtime behavior changed.
+
 On 2026-09-14, remaining legacy product identifiers were standardized on
 Soulmate across runtime defaults, packaging, tests, configuration, and
 documentation. `pnpm check:all` passed locally on macOS arm64; remote CI remains

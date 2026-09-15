@@ -6,7 +6,9 @@ and proxies only fixed loopback `/v1/` API paths from the webview.
 
 ## Development
 
-Install the root workspace first, including Rust with `rustfmt` and `clippy`:
+Install the root workspace first, including Rust with `rustfmt` and `clippy`.
+Platform-specific WebView and native build dependencies are listed in the root
+[setup guide](../../docs/contributor-guide/setup.md):
 
 ```sh
 uv sync --locked --all-packages
@@ -59,8 +61,8 @@ pnpm --filter @soulmate/desktop tauri build
 
 Packaging is native: build macOS artifacts on macOS, Windows artifacts on Windows,
 and Linux artifacts on Linux. The CI matrix produces unsigned DMG, MSI/NSIS, DEB,
-and AppImage artifacts. Signing, notarization, and automatic updates are not part
-of Phase 6.
+and AppImage artifacts under `src-tauri/target/release/bundle/`. Signing,
+notarization, and automatic updates are not implemented.
 
 ## Security boundary
 
