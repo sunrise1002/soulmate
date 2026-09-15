@@ -8,7 +8,7 @@ replaceable.
 
 There is no Soulmate cloud. Each owner runs their own service.
 
-📖 **[Read the project guide → `docs/index.html`](docs/index.html)** ([Tiếng Việt](docs/index.vi.html)) — vision,
+📖 **[Read the project guide → `docs/index.html`](docs/index.html)** — vision,
 architecture, technology, setup, usage, API, and privacy boundaries in one page.
 
 **Current status:** Phases 0–12 are complete locally; Phase 12 is the Delegated
