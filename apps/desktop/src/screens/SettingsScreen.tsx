@@ -1,5 +1,6 @@
 import {
   CircleStop,
+  CloudUpload,
   KeyRound,
   Play,
   RefreshCw,
@@ -12,9 +13,11 @@ import type { SyntheticEvent } from "react";
 
 import {
   getDesktopSettings,
+  getRemoteBackupSettings,
   getServiceLogs,
   restartService,
   saveDesktopSettings,
+  saveRemoteBackupSettings,
   startService,
   stopService,
 } from "../runtime.ts";
@@ -22,6 +25,7 @@ import type {
   DesktopSettings,
   PrivacyMode,
   ProviderKind,
+  RemoteBackupDesktopSettings,
   ServiceStatus,
 } from "../types.ts";
 
@@ -41,13 +45,31 @@ const defaultSettings: DesktopSettings = {
   lanEnabled: false,
 };
 
+const defaultRemoteBackupSettings: RemoteBackupDesktopSettings = {
+  enabled: false,
+  automaticDaily: false,
+  intervalHours: 24,
+  endpointUrl: "",
+  region: "auto",
+  bucket: "",
+  prefix: "soulmate",
+  hasPassphrase: false,
+  hasAccessKeyId: false,
+  hasSecretAccessKey: false,
+};
+
 export function SettingsScreen({
   serviceStatus,
   onServiceChanged,
 }: SettingsScreenProps) {
   const [settings, setSettings] = useState(defaultSettings);
+  const [remoteBackup, setRemoteBackup] = useState(defaultRemoteBackupSettings);
   const [apiKey, setApiKey] = useState("");
   const [clearApiKey, setClearApiKey] = useState(false);
+  const [backupPassphrase, setBackupPassphrase] = useState("");
+  const [backupAccessKeyId, setBackupAccessKeyId] = useState("");
+  const [backupSecretAccessKey, setBackupSecretAccessKey] = useState("");
+  const [clearBackupCredentials, setClearBackupCredentials] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -55,11 +77,13 @@ export function SettingsScreen({
 
   const load = useCallback(async () => {
     try {
-      const [configuration, output] = await Promise.all([
+      const [configuration, backupConfiguration, output] = await Promise.all([
         getDesktopSettings(),
+        getRemoteBackupSettings(),
         getServiceLogs(),
       ]);
       setSettings(configuration);
+      setRemoteBackup(backupConfiguration);
       setLogs(output);
       setError(null);
     } catch (reason) {
@@ -105,6 +129,52 @@ export function SettingsScreen({
         reason instanceof Error
           ? reason.message
           : "Settings could not be saved.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveBackup(event: SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const saved = await saveRemoteBackupSettings({
+        enabled: remoteBackup.enabled,
+        automaticDaily: remoteBackup.automaticDaily,
+        intervalHours: remoteBackup.intervalHours,
+        endpointUrl: remoteBackup.endpointUrl,
+        region: remoteBackup.region,
+        bucket: remoteBackup.bucket,
+        prefix: remoteBackup.prefix,
+        ...(backupPassphrase ? { passphrase: backupPassphrase } : {}),
+        ...(backupAccessKeyId ? { accessKeyId: backupAccessKeyId } : {}),
+        ...(backupSecretAccessKey
+          ? { secretAccessKey: backupSecretAccessKey }
+          : {}),
+        clearCredentials: clearBackupCredentials,
+      });
+      setRemoteBackup(saved);
+      setBackupPassphrase("");
+      setBackupAccessKeyId("");
+      setBackupSecretAccessKey("");
+      setClearBackupCredentials(false);
+      await restartService();
+      await onServiceChanged();
+      setNotice(
+        saved.enabled
+          ? "Encrypted remote backup is configured. The local service restarted."
+          : "Remote backup is disabled. Your data remains local.",
+      );
+      await load();
+    } catch (reason) {
+      setError(
+        reason instanceof Error
+          ? reason.message
+          : "Remote backup settings could not be saved.",
       );
     } finally {
       setBusy(false);
@@ -277,6 +347,7 @@ export function SettingsScreen({
                       ? "Leave blank to keep current key"
                       : "Optional for local endpoints"
                   }
+                  required={!remoteBackup.hasAccessKeyId}
                   type="password"
                   value={apiKey}
                   onChange={(event) => {
@@ -364,6 +435,217 @@ export function SettingsScreen({
           </article>
         </div>
       </div>
+      <form
+        className="card settings-card remote-backup-settings"
+        onSubmit={(event) => void saveBackup(event)}
+      >
+        <div className="settings-section-heading">
+          <CloudUpload size={19} />
+          <div>
+            <span className="section-label">Off-device recovery</span>
+            <h2>Encrypted remote backup</h2>
+          </div>
+        </div>
+        <p className="setting-help remote-backup-help">
+          Works with Cloudflare R2 and other S3-compatible private buckets.
+          Create a bucket and a token with object read/write access, then paste
+          the values below. Soulmate encrypts the archive before uploading it.
+        </p>
+        <label className="check-label">
+          <input
+            aria-label="Enable encrypted remote backup"
+            checked={remoteBackup.enabled}
+            type="checkbox"
+            onChange={(event) =>
+              setRemoteBackup({
+                ...remoteBackup,
+                enabled: event.target.checked,
+              })
+            }
+          />
+          <span>Enable encrypted remote backup</span>
+        </label>
+        {remoteBackup.enabled ? (
+          <>
+            <p className="setting-help remote-backup-help">
+              An external endpoint automatically enables Hybrid privacy mode so
+              the encrypted archive can leave this device.
+            </p>
+            <div className="settings-fields-grid">
+              <label>
+                <span>S3 endpoint URL</span>
+                <input
+                  required
+                  placeholder="https://ACCOUNT_ID.r2.cloudflarestorage.com"
+                  type="url"
+                  value={remoteBackup.endpointUrl}
+                  onChange={(event) =>
+                    setRemoteBackup({
+                      ...remoteBackup,
+                      endpointUrl: event.target.value,
+                    })
+                  }
+                />
+              </label>
+              <label>
+                <span>Private bucket name</span>
+                <input
+                  required
+                  placeholder="soulmate-backups"
+                  value={remoteBackup.bucket}
+                  onChange={(event) =>
+                    setRemoteBackup({
+                      ...remoteBackup,
+                      bucket: event.target.value,
+                    })
+                  }
+                />
+              </label>
+              <label>
+                <span>
+                  Access key ID
+                  {remoteBackup.hasAccessKeyId ? " · stored in keychain" : ""}
+                </span>
+                <input
+                  autoComplete="off"
+                  placeholder={
+                    remoteBackup.hasAccessKeyId
+                      ? "Leave blank to keep the saved key"
+                      : "Required"
+                  }
+                  required={!remoteBackup.hasSecretAccessKey}
+                  type="password"
+                  value={backupAccessKeyId}
+                  onChange={(event) => {
+                    setBackupAccessKeyId(event.target.value);
+                    setClearBackupCredentials(false);
+                  }}
+                />
+              </label>
+              <label>
+                <span>
+                  Secret access key
+                  {remoteBackup.hasSecretAccessKey
+                    ? " · stored in keychain"
+                    : ""}
+                </span>
+                <input
+                  autoComplete="off"
+                  placeholder={
+                    remoteBackup.hasSecretAccessKey
+                      ? "Leave blank to keep the saved key"
+                      : "Required"
+                  }
+                  type="password"
+                  value={backupSecretAccessKey}
+                  onChange={(event) => {
+                    setBackupSecretAccessKey(event.target.value);
+                    setClearBackupCredentials(false);
+                  }}
+                />
+              </label>
+              <label>
+                <span>
+                  Encryption passphrase · at least 12 characters
+                  {remoteBackup.hasPassphrase ? " · stored in keychain" : ""}
+                </span>
+                <input
+                  autoComplete="new-password"
+                  minLength={12}
+                  placeholder={
+                    remoteBackup.hasPassphrase
+                      ? "Leave blank to keep the saved passphrase"
+                      : "Required — keep a separate copy"
+                  }
+                  required={!remoteBackup.hasPassphrase}
+                  type="password"
+                  value={backupPassphrase}
+                  onChange={(event) => {
+                    setBackupPassphrase(event.target.value);
+                    setClearBackupCredentials(false);
+                  }}
+                />
+              </label>
+              <label>
+                <span>Backup every (hours)</span>
+                <input
+                  disabled={!remoteBackup.automaticDaily}
+                  max={168}
+                  min={1}
+                  type="number"
+                  value={remoteBackup.intervalHours}
+                  onChange={(event) =>
+                    setRemoteBackup({
+                      ...remoteBackup,
+                      intervalHours: Number(event.target.value),
+                    })
+                  }
+                />
+              </label>
+            </div>
+            <label className="check-label">
+              <input
+                checked={remoteBackup.automaticDaily}
+                type="checkbox"
+                onChange={(event) =>
+                  setRemoteBackup({
+                    ...remoteBackup,
+                    automaticDaily: event.target.checked,
+                  })
+                }
+              />
+              <span>Back up automatically while Soulmate is running</span>
+            </label>
+            <details className="advanced-settings">
+              <summary>Advanced S3 settings</summary>
+              <div className="settings-fields-grid">
+                <label>
+                  <span>Signing region</span>
+                  <input
+                    required
+                    value={remoteBackup.region}
+                    onChange={(event) =>
+                      setRemoteBackup({
+                        ...remoteBackup,
+                        region: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  <span>Object prefix</span>
+                  <input
+                    value={remoteBackup.prefix}
+                    onChange={(event) =>
+                      setRemoteBackup({
+                        ...remoteBackup,
+                        prefix: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+              </div>
+            </details>
+          </>
+        ) : null}
+        {remoteBackup.hasPassphrase ||
+        remoteBackup.hasAccessKeyId ||
+        remoteBackup.hasSecretAccessKey ? (
+          <label className="check-label">
+            <input
+              checked={clearBackupCredentials}
+              type="checkbox"
+              onChange={(event) =>
+                setClearBackupCredentials(event.target.checked)
+              }
+            />
+            <span>Remove saved backup credentials</span>
+          </label>
+        ) : null}
+        <button className="primary-button" disabled={busy} type="submit">
+          <Save size={16} /> Save backup settings and restart
+        </button>
+      </form>
     </section>
   );
 }

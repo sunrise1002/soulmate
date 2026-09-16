@@ -20,6 +20,29 @@ export interface DesktopSettingsInput extends Omit<
   clearApiKey: boolean;
 }
 
+export interface RemoteBackupDesktopSettings {
+  enabled: boolean;
+  automaticDaily: boolean;
+  intervalHours: number;
+  endpointUrl: string;
+  region: string;
+  bucket: string;
+  prefix: string;
+  hasPassphrase: boolean;
+  hasAccessKeyId: boolean;
+  hasSecretAccessKey: boolean;
+}
+
+export interface RemoteBackupDesktopSettingsInput extends Omit<
+  RemoteBackupDesktopSettings,
+  "hasPassphrase" | "hasAccessKeyId" | "hasSecretAccessKey"
+> {
+  passphrase?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
+  clearCredentials: boolean;
+}
+
 export interface ServiceStatus {
   state: "starting" | "running" | "stopped" | "failed";
   pid: number | null;

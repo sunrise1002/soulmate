@@ -4,6 +4,9 @@
 
 ### Added
 
+- Desktop remote-backup setup for non-technical users, including R2/S3 endpoint,
+  private bucket, schedule, and write-only keychain storage for access keys and
+  the archive passphrase; no `.env` file is required for the managed daemon.
 - Optional encrypted remote backups behind a vendor-neutral storage port, with an
   S3-compatible adapter for R2, S3, B2, MinIO, and compatible private stores;
   local SQLite remains the default and live database files are never uploaded.

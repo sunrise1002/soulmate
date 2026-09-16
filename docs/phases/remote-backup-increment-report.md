@@ -35,8 +35,8 @@ than changing the Personalization Kernel or archive format.
 | Automatic operation | An opt-in durable job is enqueued immediately when no prior run exists and then once per configured interval, defaulting to 24 hours |
 | Machine handoff | CLI/API download the newest remote version and reuse fresh-install validation, migration, new installation identity, and deterministic model rebuild |
 | Privacy | External storage requires explicit hybrid mode and HTTPS; loopback S3-compatible storage remains possible under strict-local mode |
-| Secrets | Archive passphrase, access identifier, and secret key are rejected in TOML and accepted through process environment overrides |
-| Product surface | Data & Privacy reports configuration/last success and offers Upload now and Restore latest controls |
+| Secrets | Archive passphrase, access identifier, and secret key are rejected in TOML; daemon/CLI accepts process environment overrides and Desktop uses the operating-system credential store |
+| Product surface | Desktop Settings configures an R2/S3-compatible endpoint, private bucket, secure credentials, encryption passphrase, and schedule; Data & Privacy reports status/last success and offers Upload now and Restore latest controls |
 | Architecture | ADR-015 records local SQLite ownership, pre-egress encryption, provider neutrality, and non-merge semantics; ADR-014 remains reserved for Phase 13 |
 
 No persistent schema migration was required. Durable scheduling uses the existing
@@ -68,11 +68,11 @@ Local verification on macOS arm64 with Python 3.12.14, Node.js 24.19.0, and pnpm
 | Strict mypy | Passed; 116 source files checked |
 | Python unit, integration, and evaluation tests | Passed; 302 tests with 7 upstream/deprecation warnings |
 | TypeScript lint, formatting, and strict typing | Passed across desktop, SDK, web, and mobile |
-| TypeScript tests | Passed; 86 tests |
+| TypeScript tests | Passed; 87 tests |
 | Repository hooks | Passed |
 | Python package builds | Passed; seven packages |
 | Web and desktop frontend production builds | Passed |
-| Native Rust desktop checks | Not run; `cargo` is unavailable in this environment |
+| Native Rust desktop checks | Passed; formatting, Clippy with warnings denied, and six tests on macOS arm64 |
 | Live R2 request | Not run; no owner credentials or bucket were available and tests must remain offline |
 | Remote CI | Unconfirmed |
 
@@ -92,8 +92,9 @@ Local verification on macOS arm64 with Python 3.12.14, Node.js 24.19.0, and pnpm
 - The Phase 10 512 MiB archive bound and fresh-install-only restore rule remain.
 - The desktop proxy retains its existing 30-second request timeout; large or slow
   remote transfers should use the CLI.
-- Remote backup credentials are configured through the daemon process environment;
-  a desktop credential-store settings workflow is not implemented.
+- Desktop users can configure remote backup without a terminal. Secrets are
+  write-only from the UI and remain in the operating-system credential store;
+  daemon/CLI deployments continue to use process environment variables.
 - Real R2 interoperability, large archives, packaged cross-platform behavior, and
   remote CI remain unverified.
 

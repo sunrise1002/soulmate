@@ -9,10 +9,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App.tsx";
 
-const invoke = vi.fn<(command: string) => Promise<unknown>>();
+const invoke = vi.fn<(command: string, args?: unknown) => Promise<unknown>>();
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: (command: string) => invoke(command),
+  invoke: (command: string, args?: unknown) => invoke(command, args),
 }));
 
 describe("desktop navigation", () => {
@@ -40,6 +40,42 @@ describe("desktop navigation", () => {
           openaiModel: "",
           hasApiKey: false,
           lanEnabled: false,
+        });
+      }
+      if (command === "get_remote_backup_settings") {
+        return Promise.resolve({
+          enabled: false,
+          automaticDaily: false,
+          intervalHours: 24,
+          endpointUrl: "",
+          region: "auto",
+          bucket: "",
+          prefix: "soulmate",
+          hasPassphrase: false,
+          hasAccessKeyId: false,
+          hasSecretAccessKey: false,
+        });
+      }
+      if (command === "daemon_logs") return Promise.resolve([]);
+      if (command === "save_remote_backup_settings") {
+        return Promise.resolve({
+          enabled: true,
+          automaticDaily: true,
+          intervalHours: 24,
+          endpointUrl: "https://account.r2.cloudflarestorage.com",
+          region: "auto",
+          bucket: "soulmate-backups",
+          prefix: "soulmate",
+          hasPassphrase: true,
+          hasAccessKeyId: true,
+          hasSecretAccessKey: true,
+        });
+      }
+      if (command === "daemon_restart") {
+        return Promise.resolve({
+          state: "starting",
+          pid: 43,
+          message: "The private local service is starting.",
         });
       }
       return Promise.reject(new Error(`Unexpected command: ${command}`));
@@ -97,6 +133,14 @@ describe("desktop navigation", () => {
       screen.getByRole("heading", { name: "Data & Privacy" }),
     ).not.toBeNull();
     expect(screen.getByRole("button", { name: "Back up now" })).not.toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("heading", { name: "Settings" })).not.toBeNull();
+    await waitFor(() =>
+      expect(
+        screen.getByLabelText("Enable encrypted remote backup"),
+      ).not.toBeNull(),
+    );
   });
 
   it("keeps access from other devices off until the owner enables it", async () => {
@@ -116,5 +160,52 @@ describe("desktop navigation", () => {
         .getByRole("button", { name: /Create pairing code/ })
         .hasAttribute("disabled"),
     ).toBe(true);
+  });
+
+  it("configures encrypted remote backup without environment variables", async () => {
+    render(<App />);
+    await waitFor(() =>
+      expect(screen.getByText("Private & local")).not.toBeNull(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    const enabled = await screen.findByLabelText(
+      "Enable encrypted remote backup",
+    );
+    fireEvent.click(enabled);
+    fireEvent.change(screen.getByLabelText("S3 endpoint URL"), {
+      target: { value: "https://account.r2.cloudflarestorage.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Private bucket name"), {
+      target: { value: "soulmate-backups" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Access key ID/), {
+      target: { value: "access-key" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Secret access key/), {
+      target: { value: "secret-key" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Encryption passphrase/), {
+      target: { value: "long-safe-passphrase" },
+    });
+    fireEvent.click(
+      screen.getByLabelText("Back up automatically while Soulmate is running"),
+    );
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Save backup settings and restart",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(
+        invoke.mock.calls.some(
+          ([command, args]) =>
+            command === "save_remote_backup_settings" &&
+            (args as { settings?: { enabled?: boolean } }).settings?.enabled ===
+              true,
+        ),
+      ).toBe(true),
+    );
   });
 });

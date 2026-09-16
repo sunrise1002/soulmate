@@ -1096,6 +1096,29 @@ select {
   justify-self: start;
   margin-top: 6px;
 }
+.remote-backup-settings {
+  margin-top: 18px;
+}
+.remote-backup-help {
+  min-height: 0;
+  margin: 0;
+}
+.settings-fields-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+.advanced-settings {
+  padding: 12px 0 2px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+.advanced-settings summary {
+  margin-bottom: 14px;
+  cursor: pointer;
+  font-weight: 600;
+}
 .settings-side {
   display: grid;
   gap: 18px;
@@ -1167,6 +1190,9 @@ select {
   }
   .result-grid,
   .settings-grid {
+    grid-template-columns: 1fr;
+  }
+  .settings-fields-grid {
     grid-template-columns: 1fr;
   }
   .chat-layout {

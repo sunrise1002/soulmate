@@ -11,8 +11,56 @@ use url::{Host, Url};
 
 const API_ORIGIN: &str = "http://127.0.0.1:7432";
 const KEYRING_SERVICE: &str = "app.soulmate.desktop";
-const KEYRING_USER: &str = "openai-compatible-api-key";
+const API_KEY_USER: &str = "openai-compatible-api-key";
+const REMOTE_BACKUP_PASSPHRASE_USER: &str = "remote-backup-passphrase";
+const REMOTE_BACKUP_ACCESS_KEY_USER: &str = "remote-backup-access-key-id";
+const REMOTE_BACKUP_SECRET_KEY_USER: &str = "remote-backup-secret-access-key";
 const MAX_LOG_LINES: usize = 250;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct StoredRemoteBackupSettings {
+    #[serde(default)]
+    enabled: bool,
+    #[serde(default)]
+    automatic_daily: bool,
+    #[serde(default = "default_remote_backup_interval")]
+    interval_hours: u16,
+    #[serde(default)]
+    endpoint_url: String,
+    #[serde(default = "default_remote_backup_region")]
+    region: String,
+    #[serde(default)]
+    bucket: String,
+    #[serde(default = "default_remote_backup_prefix")]
+    prefix: String,
+}
+
+fn default_remote_backup_interval() -> u16 {
+    24
+}
+
+fn default_remote_backup_region() -> String {
+    "auto".into()
+}
+
+fn default_remote_backup_prefix() -> String {
+    "soulmate".into()
+}
+
+impl Default for StoredRemoteBackupSettings {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            automatic_daily: false,
+            interval_hours: default_remote_backup_interval(),
+            endpoint_url: String::new(),
+            region: default_remote_backup_region(),
+            bucket: String::new(),
+            prefix: default_remote_backup_prefix(),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +73,8 @@ struct StoredSettings {
     openai_model: String,
     #[serde(default)]
     lan_enabled: bool,
+    #[serde(default)]
+    remote_backup: StoredRemoteBackupSettings,
 }
 
 impl Default for StoredSettings {
@@ -37,6 +87,7 @@ impl Default for StoredSettings {
             openai_base_url: "http://127.0.0.1:8000/v1".into(),
             openai_model: String::new(),
             lan_enabled: false,
+            remote_backup: StoredRemoteBackupSettings::default(),
         }
     }
 }
@@ -67,6 +118,44 @@ struct DesktopSettingsInput {
     clear_api_key: bool,
     #[serde(default)]
     lan_enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoteBackupDesktopSettings {
+    enabled: bool,
+    automatic_daily: bool,
+    interval_hours: u16,
+    endpoint_url: String,
+    region: String,
+    bucket: String,
+    prefix: String,
+    has_passphrase: bool,
+    has_access_key_id: bool,
+    has_secret_access_key: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoteBackupDesktopSettingsInput {
+    enabled: bool,
+    automatic_daily: bool,
+    interval_hours: u16,
+    endpoint_url: String,
+    region: String,
+    bucket: String,
+    prefix: String,
+    passphrase: Option<String>,
+    access_key_id: Option<String>,
+    secret_access_key: Option<String>,
+    clear_credentials: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RemoteBackupCredentialState {
+    has_passphrase: bool,
+    has_access_key_id: bool,
+    has_secret_access_key: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -145,16 +234,46 @@ fn write_stored_settings(app: &AppHandle, settings: &StoredSettings) -> Result<(
         .map_err(|_| "Desktop configuration could not be finalized.".to_string())
 }
 
-fn api_key_entry() -> Result<keyring::Entry, String> {
-    keyring::Entry::new(KEYRING_SERVICE, KEYRING_USER)
+fn credential_entry(user: &str) -> Result<keyring::Entry, String> {
+    keyring::Entry::new(KEYRING_SERVICE, user)
         .map_err(|_| "The operating-system credential store is unavailable.".to_string())
 }
 
-fn stored_api_key() -> Option<String> {
-    api_key_entry()
+fn stored_credential(user: &str) -> Option<String> {
+    credential_entry(user)
         .ok()
         .and_then(|entry| entry.get_password().ok())
         .filter(|value| !value.is_empty())
+}
+
+fn stored_api_key() -> Option<String> {
+    stored_credential(API_KEY_USER)
+}
+
+fn remote_backup_credential_state() -> RemoteBackupCredentialState {
+    RemoteBackupCredentialState {
+        has_passphrase: stored_credential(REMOTE_BACKUP_PASSPHRASE_USER).is_some(),
+        has_access_key_id: stored_credential(REMOTE_BACKUP_ACCESS_KEY_USER).is_some(),
+        has_secret_access_key: stored_credential(REMOTE_BACKUP_SECRET_KEY_USER).is_some(),
+    }
+}
+
+fn remote_backup_desktop_settings(
+    stored: StoredRemoteBackupSettings,
+) -> RemoteBackupDesktopSettings {
+    let credentials = remote_backup_credential_state();
+    RemoteBackupDesktopSettings {
+        enabled: stored.enabled,
+        automatic_daily: stored.automatic_daily,
+        interval_hours: stored.interval_hours,
+        endpoint_url: stored.endpoint_url,
+        region: stored.region,
+        bucket: stored.bucket,
+        prefix: stored.prefix,
+        has_passphrase: credentials.has_passphrase,
+        has_access_key_id: credentials.has_access_key_id,
+        has_secret_access_key: credentials.has_secret_access_key,
+    }
 }
 
 fn desktop_settings(stored: StoredSettings) -> DesktopSettings {
@@ -209,6 +328,66 @@ fn validate_settings(settings: &StoredSettings) -> Result<(), String> {
     }
     if !is_loopback(&compatible) && compatible.scheme() != "https" {
         return Err("External model endpoints must use HTTPS.".into());
+    }
+    Ok(())
+}
+
+fn validate_remote_backup_settings(
+    settings: &StoredRemoteBackupSettings,
+    privacy_mode: &str,
+    credentials: RemoteBackupCredentialState,
+) -> Result<(), String> {
+    if !settings.enabled {
+        return Ok(());
+    }
+    if !(1..=168).contains(&settings.interval_hours) {
+        return Err("The backup interval must be between 1 and 168 hours.".into());
+    }
+    let endpoint = Url::parse(&settings.endpoint_url)
+        .map_err(|_| "The S3-compatible endpoint URL is invalid.".to_string())?;
+    if endpoint.host().is_none() || !matches!(endpoint.scheme(), "http" | "https") {
+        return Err("The S3-compatible endpoint URL is invalid.".into());
+    }
+    if !is_loopback(&endpoint) && endpoint.scheme() != "https" {
+        return Err("External backup endpoints must use HTTPS.".into());
+    }
+    if !is_loopback(&endpoint) && privacy_mode != "hybrid" {
+        return Err("External backups require Hybrid privacy mode.".into());
+    }
+    if settings.bucket.trim().is_empty() {
+        return Err("A backup bucket is required.".into());
+    }
+    if settings.region.trim().is_empty() {
+        return Err("A signing region is required.".into());
+    }
+    if settings
+        .prefix
+        .split('/')
+        .any(|part| matches!(part, "." | ".."))
+    {
+        return Err("The backup prefix cannot contain dot path segments.".into());
+    }
+    if !credentials.has_passphrase {
+        return Err("An encryption passphrase of at least 12 characters is required.".into());
+    }
+    if !credentials.has_access_key_id || !credentials.has_secret_access_key {
+        return Err("Both storage access keys are required.".into());
+    }
+    Ok(())
+}
+
+fn save_credential(user: &str, value: &str, label: &str) -> Result<(), String> {
+    credential_entry(user)?
+        .set_password(value)
+        .map_err(|_| format!("The {label} could not be saved securely."))
+}
+
+fn remove_credential(user: &str, label: &str) -> Result<(), String> {
+    let entry = credential_entry(user)?;
+    if entry.get_password().is_ok() {
+        entry
+            .delete_credential()
+            .map_err(|_| format!("The saved {label} could not be removed."))?;
     }
     Ok(())
 }
@@ -285,6 +464,59 @@ fn start_daemon_internal(app: &AppHandle) -> Result<ServiceStatus, String> {
         );
     if let Some(api_key) = stored_api_key() {
         command = command.env("SOULMATE_LLM__OPENAI_COMPATIBLE__API_KEY", api_key);
+    }
+    command = command
+        .env(
+            "SOULMATE_REMOTE_BACKUP__BACKEND",
+            if settings.remote_backup.enabled {
+                "s3"
+            } else {
+                "disabled"
+            },
+        )
+        .env(
+            "SOULMATE_REMOTE_BACKUP__AUTOMATIC_DAILY",
+            (settings.remote_backup.enabled && settings.remote_backup.automatic_daily).to_string(),
+        )
+        .env(
+            "SOULMATE_REMOTE_BACKUP__INTERVAL_HOURS",
+            settings.remote_backup.interval_hours.to_string(),
+        );
+    if settings.remote_backup.enabled {
+        validate_remote_backup_settings(
+            &settings.remote_backup,
+            &settings.privacy_mode,
+            remote_backup_credential_state(),
+        )?;
+        let passphrase = stored_credential(REMOTE_BACKUP_PASSPHRASE_USER)
+            .ok_or_else(|| "The remote backup passphrase is unavailable.".to_string())?;
+        let access_key_id = stored_credential(REMOTE_BACKUP_ACCESS_KEY_USER)
+            .ok_or_else(|| "The remote backup access key is unavailable.".to_string())?;
+        let secret_access_key = stored_credential(REMOTE_BACKUP_SECRET_KEY_USER)
+            .ok_or_else(|| "The remote backup secret key is unavailable.".to_string())?;
+        command = command
+            .env(
+                "SOULMATE_REMOTE_BACKUP__S3__ENDPOINT_URL",
+                &settings.remote_backup.endpoint_url,
+            )
+            .env(
+                "SOULMATE_REMOTE_BACKUP__S3__REGION",
+                &settings.remote_backup.region,
+            )
+            .env(
+                "SOULMATE_REMOTE_BACKUP__S3__BUCKET",
+                &settings.remote_backup.bucket,
+            )
+            .env(
+                "SOULMATE_REMOTE_BACKUP__S3__PREFIX",
+                &settings.remote_backup.prefix,
+            )
+            .env("SOULMATE_REMOTE_BACKUP__PASSPHRASE", passphrase)
+            .env("SOULMATE_REMOTE_BACKUP__S3__ACCESS_KEY_ID", access_key_id)
+            .env(
+                "SOULMATE_REMOTE_BACKUP__S3__SECRET_ACCESS_KEY",
+                secret_access_key,
+            );
     }
     let (mut receiver, child) = command
         .spawn()
@@ -418,10 +650,17 @@ fn get_desktop_settings(app: AppHandle) -> Result<DesktopSettings, String> {
 }
 
 #[tauri::command]
+fn get_remote_backup_settings(app: AppHandle) -> Result<RemoteBackupDesktopSettings, String> {
+    load_stored_settings(&app)
+        .map(|settings| remote_backup_desktop_settings(settings.remote_backup))
+}
+
+#[tauri::command]
 fn save_desktop_settings(
     app: AppHandle,
     settings: DesktopSettingsInput,
 ) -> Result<DesktopSettings, String> {
+    let remote_backup = load_stored_settings(&app)?.remote_backup;
     let stored = StoredSettings {
         privacy_mode: settings.privacy_mode,
         provider: settings.provider,
@@ -430,23 +669,93 @@ fn save_desktop_settings(
         openai_base_url: settings.openai_base_url,
         openai_model: settings.openai_model,
         lan_enabled: settings.lan_enabled,
+        remote_backup,
     };
     validate_settings(&stored)?;
+    validate_remote_backup_settings(
+        &stored.remote_backup,
+        &stored.privacy_mode,
+        remote_backup_credential_state(),
+    )?;
     if settings.clear_api_key {
-        let entry = api_key_entry()?;
-        if entry.get_password().is_ok() {
-            entry
-                .delete_credential()
-                .map_err(|_| "The saved provider credential could not be removed.".to_string())?;
-        }
+        remove_credential(API_KEY_USER, "provider credential")?;
     }
     if let Some(api_key) = settings.api_key.filter(|value| !value.trim().is_empty()) {
-        api_key_entry()?
-            .set_password(api_key.trim())
-            .map_err(|_| "The provider credential could not be saved securely.".to_string())?;
+        save_credential(API_KEY_USER, api_key.trim(), "provider credential")?;
     }
     write_stored_settings(&app, &stored)?;
     Ok(desktop_settings(stored))
+}
+
+#[tauri::command]
+fn save_remote_backup_settings(
+    app: AppHandle,
+    settings: RemoteBackupDesktopSettingsInput,
+) -> Result<RemoteBackupDesktopSettings, String> {
+    let passphrase = settings
+        .passphrase
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let access_key_id = settings
+        .access_key_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let secret_access_key = settings
+        .secret_access_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    if passphrase.is_some_and(|value| value.len() < 12) {
+        return Err("The encryption passphrase must contain at least 12 characters.".into());
+    }
+
+    let existing = remote_backup_credential_state();
+    let credentials = RemoteBackupCredentialState {
+        has_passphrase: passphrase.is_some()
+            || (!settings.clear_credentials && existing.has_passphrase),
+        has_access_key_id: access_key_id.is_some()
+            || (!settings.clear_credentials && existing.has_access_key_id),
+        has_secret_access_key: secret_access_key.is_some()
+            || (!settings.clear_credentials && existing.has_secret_access_key),
+    };
+    let remote_backup = StoredRemoteBackupSettings {
+        enabled: settings.enabled,
+        automatic_daily: settings.enabled && settings.automatic_daily,
+        interval_hours: settings.interval_hours,
+        endpoint_url: settings.endpoint_url.trim().into(),
+        region: settings.region.trim().into(),
+        bucket: settings.bucket.trim().into(),
+        prefix: settings.prefix.trim().trim_matches('/').into(),
+    };
+    let mut stored = load_stored_settings(&app)?;
+    if remote_backup.enabled {
+        if let Ok(endpoint) = Url::parse(&remote_backup.endpoint_url) {
+            if !is_loopback(&endpoint) {
+                stored.privacy_mode = "hybrid".into();
+            }
+        }
+    }
+    validate_remote_backup_settings(&remote_backup, &stored.privacy_mode, credentials)?;
+
+    if settings.clear_credentials {
+        remove_credential(REMOTE_BACKUP_PASSPHRASE_USER, "backup passphrase")?;
+        remove_credential(REMOTE_BACKUP_ACCESS_KEY_USER, "storage access key")?;
+        remove_credential(REMOTE_BACKUP_SECRET_KEY_USER, "storage secret key")?;
+    }
+    if let Some(value) = passphrase {
+        save_credential(REMOTE_BACKUP_PASSPHRASE_USER, value, "backup passphrase")?;
+    }
+    if let Some(value) = access_key_id {
+        save_credential(REMOTE_BACKUP_ACCESS_KEY_USER, value, "storage access key")?;
+    }
+    if let Some(value) = secret_access_key {
+        save_credential(REMOTE_BACKUP_SECRET_KEY_USER, value, "storage secret key")?;
+    }
+    stored.remote_backup = remote_backup.clone();
+    write_stored_settings(&app, &stored)?;
+    Ok(remote_backup_desktop_settings(remote_backup))
 }
 
 #[tauri::command]
@@ -529,7 +838,9 @@ pub fn run() {
             daemon_status,
             daemon_stop,
             get_desktop_settings,
+            get_remote_backup_settings,
             save_desktop_settings,
+            save_remote_backup_settings,
         ])
         .setup(|app| {
             if let Err(error) = start_daemon_internal(app.handle()) {
@@ -553,7 +864,10 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{desktop_settings, is_loopback, validate_settings, StoredSettings};
+    use super::{
+        desktop_settings, is_loopback, validate_remote_backup_settings, validate_settings,
+        RemoteBackupCredentialState, StoredRemoteBackupSettings, StoredSettings,
+    };
     use url::Url;
 
     #[test]
@@ -597,6 +911,8 @@ mod tests {
         )
         .expect("settings saved before Phase 7 must still load");
         assert!(!stored.lan_enabled);
+        assert!(!stored.remote_backup.enabled);
+        assert_eq!(stored.remote_backup.interval_hours, 24);
     }
 
     #[test]
@@ -606,5 +922,43 @@ mod tests {
         assert!(!is_loopback(
             &Url::parse("https://127.0.0.1.example.test").unwrap()
         ));
+    }
+
+    #[test]
+    fn external_remote_backup_requires_hybrid_mode_and_complete_credentials() {
+        let settings = StoredRemoteBackupSettings {
+            enabled: true,
+            automatic_daily: true,
+            endpoint_url: "https://account.r2.cloudflarestorage.com".into(),
+            bucket: "soulmate-backups".into(),
+            ..StoredRemoteBackupSettings::default()
+        };
+        let complete = RemoteBackupCredentialState {
+            has_passphrase: true,
+            has_access_key_id: true,
+            has_secret_access_key: true,
+        };
+        assert!(validate_remote_backup_settings(&settings, "strict_local", complete).is_err());
+        assert!(validate_remote_backup_settings(&settings, "hybrid", complete).is_ok());
+
+        let missing_secret = RemoteBackupCredentialState {
+            has_secret_access_key: false,
+            ..complete
+        };
+        assert!(validate_remote_backup_settings(&settings, "hybrid", missing_secret).is_err());
+    }
+
+    #[test]
+    fn disabled_remote_backup_keeps_the_local_only_default() {
+        assert!(validate_remote_backup_settings(
+            &StoredRemoteBackupSettings::default(),
+            "strict_local",
+            RemoteBackupCredentialState {
+                has_passphrase: false,
+                has_access_key_id: false,
+                has_secret_access_key: false,
+            },
+        )
+        .is_ok());
     }
 }

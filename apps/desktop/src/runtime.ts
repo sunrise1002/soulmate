@@ -4,6 +4,8 @@ import type {
   ApiResponse,
   DesktopSettings,
   DesktopSettingsInput,
+  RemoteBackupDesktopSettings,
+  RemoteBackupDesktopSettingsInput,
   ServiceStatus,
 } from "./types.ts";
 
@@ -47,6 +49,18 @@ export function saveDesktopSettings(
   settings: DesktopSettingsInput,
 ): Promise<DesktopSettings> {
   return invoke<DesktopSettings>("save_desktop_settings", { settings });
+}
+
+export function getRemoteBackupSettings(): Promise<RemoteBackupDesktopSettings> {
+  return invoke<RemoteBackupDesktopSettings>("get_remote_backup_settings");
+}
+
+export function saveRemoteBackupSettings(
+  settings: RemoteBackupDesktopSettingsInput,
+): Promise<RemoteBackupDesktopSettings> {
+  return invoke<RemoteBackupDesktopSettings>("save_remote_backup_settings", {
+    settings,
+  });
 }
 
 export function getServiceStatus(): Promise<ServiceStatus> {

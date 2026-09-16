@@ -330,7 +330,7 @@ export function DataScreen({
           <p>
             {remoteStatus?.configured
               ? `${remoteStatus.backend} is configured${remoteStatus.automatic_daily ? ` with a ${String(remoteStatus.interval_hours)}-hour schedule` : " for manual backups"}.`
-              : "Disabled by default. Configure an S3-compatible backend to enable it."}
+              : "Disabled by default. Open Settings to connect a private R2 or S3-compatible bucket."}
           </p>
           {remoteStatus?.last_success_at ? (
             <p className="muted">

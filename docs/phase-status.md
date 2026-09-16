@@ -62,6 +62,16 @@ phase boundary above. Remote CI and GitHub ruleset activation remain unverified.
 
 ## Repository maintenance
 
+On 2026-09-16, the Desktop remote-backup workflow was expanded for non-technical
+owners. Settings now captures R2/S3-compatible connection details and scheduling,
+stores access keys and the encryption passphrase in the operating-system
+credential store, injects them only into the managed daemon, and keeps remote
+backup disabled by default. Python lint, formatting, strict typing, and 302 tests;
+TypeScript lint, formatting, strict typing, and 87 tests; plus six native Rust
+tests, formatting, and Clippy with warnings denied passed on macOS arm64. Live R2
+interoperability, packaged cross-platform behavior, and remote CI remain
+unverified.
+
 On 2026-09-16, optional encrypted remote backup was added as an explicitly
 authorized portability increment. Local-only SQLite remains the default; external
 storage is behind a vendor-neutral port, with R2 represented through the included

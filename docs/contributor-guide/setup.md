@@ -203,7 +203,10 @@ pnpm --filter @soulmate/desktop tauri dev
 
 This command builds a target-suffixed PyInstaller daemon sidecar, starts the Vite
 frontend, launches the native shell, and supervises its own daemon. Desktop
-settings are separate from root `config.toml`; use the app's Settings screen.
+settings are separate from root `config.toml`; use the app's Settings screen for
+model providers, privacy mode, and optional encrypted R2/S3-compatible backup.
+Desktop backup credentials and its encryption passphrase are stored in the
+operating-system credential store, so no `.env` file is required.
 
 `pnpm --filter @soulmate/desktop dev` starts only the Vite webview and does not
 start the sidecar or provide the native IPC boundary.

@@ -25,10 +25,12 @@ compatible private stores can reuse it. Other protocols can implement the same
 port without changing archive creation, scheduling, or restore validation.
 
 Remote backup is disabled by default. External HTTPS storage requires explicit
-`hybrid` privacy mode and complete environment-supplied credentials and
-passphrase. Automatic backup uses the existing durable job repository, records
-only operational timestamps locally, and defaults to a 24-hour interval. Manual
-CLI, owner-only REST, typed SDK, and desktop operations use the same service.
+`hybrid` privacy mode and complete credentials and passphrase. Daemon and CLI
+deployments supply secrets through the process environment; Desktop stores them
+in the operating-system credential store and passes them only to its managed
+daemon. Automatic backup uses the existing durable job repository, records only
+operational timestamps locally, and defaults to a 24-hour interval. Manual CLI,
+owner-only REST, typed SDK, and desktop operations use the same service.
 
 Restore downloads the newest versioned encrypted object and reuses the existing
 fresh-install-only restore path. It does not merge databases, synchronize live

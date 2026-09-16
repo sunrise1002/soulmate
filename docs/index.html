@@ -904,7 +904,7 @@ request_delegation    get_delegation          complete_delegation</code></pre>
             </div>
             <div class="card">
               <h4>Optional remote backup</h4>
-              <p>Encrypts locally before upload through a vendor-neutral storage port. The included S3-compatible adapter supports R2, S3, B2, and MinIO endpoints; local-only remains the default.</p>
+              <p>Encrypts locally before upload through a vendor-neutral storage port. The included S3-compatible adapter supports R2, S3, B2, and MinIO endpoints; local-only remains the default. Desktop users configure the endpoint, bucket, schedule, and keychain-protected secrets in Settings without a <code>.env</code> file.</p>
             </div>
           </div>
           <p>Archives include the database and any local <code>objects</code>, <code>indexes</code>, and <code>models</code> files. They <strong>exclude</strong> pairing state, API credentials, installation identity, TLS keys, provider secrets, logs, configuration, and existing backups.</p>

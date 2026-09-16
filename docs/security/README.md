@@ -46,8 +46,11 @@ It creates the same credential-free snapshot, encrypts it locally as `.dtw`, and
 then sends only ciphertext through a configured storage adapter. The first
 adapter uses S3-compatible private buckets. It is disabled by default, external
 HTTPS requires explicit hybrid mode, and its passphrase and access credentials
-must come from the process environment. Remote restore remains owner-only and
-fresh-install-only; it does not merge two writable installations. See ADR-015.
+must come from the process environment for daemon/CLI use or the operating-system
+credential store for Desktop use. The Desktop UI receives only secret-presence
+flags and injects credentials directly into its managed daemon. Remote restore
+remains owner-only and fresh-install-only; it does not merge two writable
+installations. See ADR-015.
 
 Connector discovery and management are owner-only. Each plugin must declare its
 data, network, credential, and learning capabilities, and registration grants must

@@ -100,7 +100,8 @@ installation, upload a final backup, then restore it on the replacement machine.
 
 For Cloudflare R2, create a private bucket and an R2 API token scoped to that
 bucket with object read/write permission. Use the S3 endpoint shown by the R2
-dashboard and export the secrets only in the daemon process:
+dashboard. When running the daemon directly, export the secrets only in its
+process:
 
 ```sh
 export SOULMATE_PRIVACY__MODE=hybrid
@@ -234,10 +235,18 @@ the managed daemon. Settings saved before Phase 7 keep access from other devices
 off.
 
 Non-secret desktop settings are stored as `desktop-settings.json` in the platform
-application-configuration directory. A compatible-provider API key is stored separately in
-the operating system credential store. The UI receives only a boolean indicating
-whether a key exists. Saving an empty key preserves the existing credential;
-explicit removal deletes it. Restart the managed daemon to apply changed settings.
+application-configuration directory. The Settings screen also configures optional
+R2 or S3-compatible encrypted backup without a `.env` file. Enabling an external
+HTTPS endpoint explicitly switches the desktop privacy mode to `hybrid` and
+restarts the managed daemon.
+
+A compatible-provider API key, remote-backup passphrase, S3 access identifier,
+and S3 secret are stored separately in the operating system credential store.
+The UI receives only booleans indicating whether each secret exists. Leaving a
+secret field empty preserves the existing credential; explicit removal deletes
+it. The bucket, endpoint, region, prefix, schedule, and enabled state are
+non-secret desktop settings. Keep a separate copy of the backup passphrase;
+losing it makes existing archives unrecoverable.
 
 ## Tool references
 
