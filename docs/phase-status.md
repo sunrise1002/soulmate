@@ -62,6 +62,17 @@ phase boundary above. Remote CI and GitHub ruleset activation remain unverified.
 
 ## Repository maintenance
 
+On 2026-09-16, desktop daemon restart and application-exit cleanup were corrected
+for the PyInstaller one-file sidecar. The shell now uses a private graceful
+shutdown pipe, waits for full process termination before restart, rejects an
+occupied port before spawn, and packages a two-cycle restart smoke test. This
+maintenance does not change the public API, persistence, privacy boundary, or
+authorized phase scope. `pnpm check:all`, 304 Python tests, 87 TypeScript tests,
+seven native Rust tests, a clean macOS arm64 sidecar build with two managed
+restart cycles, package builds, repository hooks, and web/desktop production
+builds passed locally. Remote CI and packaged Windows/Linux behavior remain
+unverified; details are recorded in the Phase 6 report.
+
 On 2026-09-16, the Desktop remote-backup workflow was expanded for non-technical
 owners. Settings now captures R2/S3-compatible connection details and scheduling,
 stores access keys and the encryption passphrase in the operating-system

@@ -567,7 +567,8 @@
           <p>
             The installed application starts and supervises its own loopback daemon, stores data in
             the platform application-data directory, and requires no separately installed Python,
-            Node.js, database, or Docker runtime.
+            Node.js, database, or Docker runtime. Managed restart waits for the complete packaged
+            sidecar to stop and release its loopback port before starting the replacement.
           </p>
 <pre><code># build a native installer plus its bundled daemon sidecar
 pnpm --filter @soulmate/desktop tauri build</code></pre>

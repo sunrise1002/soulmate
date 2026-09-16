@@ -32,6 +32,10 @@ The Tauri command builds a target-suffixed daemon sidecar before starting. Data 
 stored in the operating system's application-data directory. Provider settings
 are stored in a local JSON file; model-provider API keys are stored separately in
 the operating system credential store and are never returned to the webview.
+The native shell stops the complete PyInstaller one-file process through its
+private control pipe and waits for the loopback listener to close before a
+restart. Closing the desktop also closes that pipe, so its managed daemon cannot
+remain behind as an orphan process.
 
 The External Agents screen creates scoped service identities, shows each new API
 key once, manages key rotation and revocation, defines exact delegated-action

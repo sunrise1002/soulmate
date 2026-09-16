@@ -165,6 +165,11 @@ Evidence.
 
 ### Changed
 
+- Corrected managed desktop daemon restart and exit cleanup for the PyInstaller
+  one-file sidecar: the shell now requests graceful shutdown over a private stdin
+  control pipe, waits for the complete sidecar process to exit before restarting,
+  rejects an already occupied port before spawning, and smoke-tests two
+  consecutive packaged start/stop cycles.
 - Expanded the configuration reference with every supported TOML/environment
   field, precedence, valid values, defaults, purpose, security behavior, and
   runnable examples; made `.env.example` safe when `config.toml` does not exist.

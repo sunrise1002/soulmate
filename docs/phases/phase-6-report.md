@@ -83,6 +83,30 @@ Local results do not imply remote GitHub Actions passed.
   and secure multi-device access belong to Phase 7.
 - The two upstream Starlette test-client compatibility warnings remain unchanged.
 
+## Maintenance correction — 2026-09-16
+
+The original stop path used the shell plugin's force-kill operation against the
+PID returned for the PyInstaller one-file bootloader. On macOS, that could kill
+the bootloader while leaving its Python child serving port 7432, so a subsequent
+Save and restart failed with `address already in use`.
+
+The managed sidecar now listens for a private stdin shutdown command and treats
+control-pipe closure as desktop exit. The shell waits for the complete sidecar to
+terminate before starting its replacement, checks for an occupied port before it
+spawns, and no longer force-kills the one-file bootloader after a health timeout.
+The sidecar build smoke test runs two consecutive start/clean-stop cycles on the
+same loopback port. No public API, persistent schema, privacy boundary, or phase
+scope changed.
+
+Verification passed locally on macOS arm64: `pnpm check:all`, 304 Python tests,
+87 TypeScript tests, seven native Rust tests, Ruff formatting/lint, strict mypy,
+Prettier/ESLint/TypeScript checks, Rustfmt, Clippy with warnings denied, all
+repository hooks, seven Python package builds, and the web/desktop production
+builds. A clean PyInstaller sidecar rebuild passed the new two-cycle managed
+restart smoke test, and the development desktop loaded the saved Hybrid provider
+configuration with a healthy daemon. Remote CI and packaged Windows/Linux
+behavior remain unverified.
+
 ## Phase 7 handoff
 
 Phase 6 exit criteria pass locally: the platform installer includes both the

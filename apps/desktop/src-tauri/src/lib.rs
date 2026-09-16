@@ -1,4 +1,11 @@
-use std::{collections::VecDeque, fs, path::PathBuf, sync::Mutex};
+use std::{
+    collections::VecDeque,
+    fs,
+    net::{SocketAddr, TcpStream},
+    path::PathBuf,
+    sync::{Condvar, Mutex},
+    time::{Duration, Instant},
+};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -16,6 +23,8 @@ const REMOTE_BACKUP_PASSPHRASE_USER: &str = "remote-backup-passphrase";
 const REMOTE_BACKUP_ACCESS_KEY_USER: &str = "remote-backup-access-key-id";
 const REMOTE_BACKUP_SECRET_KEY_USER: &str = "remote-backup-secret-access-key";
 const MAX_LOG_LINES: usize = 250;
+const DAEMON_SHUTDOWN_COMMAND: &[u8] = b"shutdown\n";
+const DAEMON_SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -181,10 +190,20 @@ impl Default for DaemonProcess {
     }
 }
 
-#[derive(Default)]
 struct ServiceState {
     process: Mutex<DaemonProcess>,
+    process_changed: Condvar,
     logs: Mutex<VecDeque<String>>,
+}
+
+impl Default for ServiceState {
+    fn default() -> Self {
+        Self {
+            process: Mutex::new(DaemonProcess::default()),
+            process_changed: Condvar::new(),
+            logs: Mutex::new(VecDeque::new()),
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -413,6 +432,10 @@ fn current_status(state: &ServiceState) -> Result<ServiceStatus, String> {
     })
 }
 
+fn port_in_use(address: SocketAddr) -> bool {
+    TcpStream::connect_timeout(&address, Duration::from_millis(200)).is_ok()
+}
+
 fn start_daemon_internal(app: &AppHandle) -> Result<ServiceStatus, String> {
     let state = app.state::<ServiceState>();
     let already_running = {
@@ -424,6 +447,12 @@ fn start_daemon_internal(app: &AppHandle) -> Result<ServiceStatus, String> {
     };
     if already_running {
         return current_status(&state);
+    }
+    if port_in_use(SocketAddr::from(([127, 0, 0, 1], 7432))) {
+        return Err(
+            "Port 7432 is already in use. Stop the existing Soulmate daemon before starting the desktop service."
+                .into(),
+        );
     }
     let settings = load_stored_settings(app)?;
     let data_dir = app
@@ -439,6 +468,7 @@ fn start_daemon_internal(app: &AppHandle) -> Result<ServiceStatus, String> {
         .map_err(|_| "The packaged daemon sidecar is unavailable.".to_string())?
         .args(["serve"])
         .env("DATA_DIR", &data_dir)
+        .env("_SOULMATE_DESKTOP_MANAGED", "1")
         .env("SOULMATE_SERVER__HOST", "127.0.0.1")
         .env("SOULMATE_SERVER__PORT", "7432")
         .env("SOULMATE_PRIVACY__MODE", &settings.privacy_mode)
@@ -554,14 +584,17 @@ fn start_daemon_internal(app: &AppHandle) -> Result<ServiceStatus, String> {
                             .is_some_and(|child| child.pid() == pid);
                         if is_current {
                             process.child = None;
-                            process.state = if payload.code == Some(0) {
-                                "stopped".into()
-                            } else {
-                                "failed".into()
-                            };
-                            process.message = "The private local service exited.".into();
+                            if process.state != "failed" {
+                                process.state = if payload.code == Some(0) {
+                                    "stopped".into()
+                                } else {
+                                    "failed".into()
+                                };
+                                process.message = "The private local service exited.".into();
+                            }
                         }
                     }
+                    state.process_changed.notify_all();
                     push_log(
                         &state,
                         format!("daemon exited with code {:?}", payload.code),
@@ -602,7 +635,7 @@ fn start_daemon_internal(app: &AppHandle) -> Result<ServiceStatus, String> {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
         let state = health_handle.state::<ServiceState>();
-        let child = if let Ok(mut process) = state.process.lock() {
+        let shutdown_result = if let Ok(mut process) = state.process.lock() {
             let is_current = process
                 .child
                 .as_ref()
@@ -610,15 +643,23 @@ fn start_daemon_internal(app: &AppHandle) -> Result<ServiceStatus, String> {
             if is_current && process.state == "starting" {
                 process.state = "failed".into();
                 process.message = "The private local service did not become healthy.".into();
-                process.child.take()
+                Some(
+                    process
+                        .child
+                        .as_mut()
+                        .is_some_and(|child| child.write(DAEMON_SHUTDOWN_COMMAND).is_ok()),
+                )
             } else {
                 None
             }
         } else {
-            None
+            Some(false)
         };
-        if let Some(child) = child {
-            let _ = child.kill();
+        if shutdown_result == Some(false) {
+            push_log(
+                &state,
+                "daemon shutdown request failed after health timeout".into(),
+            );
         }
         push_log(&state, "daemon health check timed out".into());
     });
@@ -626,22 +667,64 @@ fn start_daemon_internal(app: &AppHandle) -> Result<ServiceStatus, String> {
 }
 
 fn stop_daemon_internal(state: &ServiceState) -> Result<ServiceStatus, String> {
-    let child = {
-        let mut process = state
-            .process
-            .lock()
-            .map_err(|_| "The daemon process state is unavailable.".to_string())?;
+    let mut process = state
+        .process
+        .lock()
+        .map_err(|_| "The daemon process state is unavailable.".to_string())?;
+    let pid = if let Some(child) = process.child.as_mut() {
+        let pid = child.pid();
+        child
+            .write(DAEMON_SHUTDOWN_COMMAND)
+            .map_err(|_| "The private local service could not be asked to stop.".to_string())?;
+        pid
+    } else {
         process.state = "stopped".into();
         process.message = "The private local service is stopped.".into();
-        process.child.take()
+        return Ok(ServiceStatus {
+            state: process.state.clone(),
+            pid: None,
+            message: process.message.clone(),
+        });
     };
-    if let Some(child) = child {
-        child
-            .kill()
-            .map_err(|_| "The private local service could not be stopped.".to_string())?;
-        push_log(state, "daemon stopped by desktop".into());
+    process.state = "stopping".into();
+    process.message = "The private local service is stopping.".into();
+    push_log(state, "daemon shutdown requested by desktop".into());
+
+    let deadline = Instant::now() + DAEMON_SHUTDOWN_TIMEOUT;
+    while process
+        .child
+        .as_ref()
+        .is_some_and(|child| child.pid() == pid)
+    {
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            process.state = "failed".into();
+            process.message = "The private local service did not stop in time.".into();
+            return Err(process.message.clone());
+        }
+        let (next, timeout) = state
+            .process_changed
+            .wait_timeout(process, remaining)
+            .map_err(|_| "The daemon process state is unavailable.".to_string())?;
+        process = next;
+        if timeout.timed_out()
+            && process
+                .child
+                .as_ref()
+                .is_some_and(|child| child.pid() == pid)
+        {
+            process.state = "failed".into();
+            process.message = "The private local service did not stop in time.".into();
+            return Err(process.message.clone());
+        }
     }
-    current_status(state)
+    process.state = "stopped".into();
+    process.message = "The private local service is stopped.".into();
+    Ok(ServiceStatus {
+        state: process.state.clone(),
+        pid: None,
+        message: process.message.clone(),
+    })
 }
 
 #[tauri::command]
@@ -865,9 +948,10 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        desktop_settings, is_loopback, validate_remote_backup_settings, validate_settings,
-        RemoteBackupCredentialState, StoredRemoteBackupSettings, StoredSettings,
+        desktop_settings, is_loopback, port_in_use, validate_remote_backup_settings,
+        validate_settings, RemoteBackupCredentialState, StoredRemoteBackupSettings, StoredSettings,
     };
+    use std::net::TcpListener;
     use url::Url;
 
     #[test]
@@ -922,6 +1006,16 @@ mod tests {
         assert!(!is_loopback(
             &Url::parse("https://127.0.0.1.example.test").unwrap()
         ));
+    }
+
+    #[test]
+    fn occupied_port_is_detected_before_a_sidecar_is_started() {
+        let listener = TcpListener::bind("127.0.0.1:0").expect("test listener must bind");
+        let address = listener
+            .local_addr()
+            .expect("test listener must have an address");
+
+        assert!(port_in_use(address));
     }
 
     #[test]

@@ -1,11 +1,14 @@
 """Build and smoke-test the platform-specific desktop daemon sidecar."""
 
 import argparse
+import os
 import shutil
+import socket
 import stat
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 
@@ -35,6 +38,75 @@ def _stage_web_client(root: Path) -> bool:
         return False
     shutil.copytree(source, destination)
     return True
+
+
+def _unused_loopback_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
+        listener.bind(("127.0.0.1", 0))
+        return int(listener.getsockname()[1])
+
+
+def _port_is_open(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        probe.settimeout(0.1)
+        return probe.connect_ex(("127.0.0.1", port)) == 0
+
+
+def _smoke_test_managed_shutdown(executable: Path) -> None:
+    """Verify that desktop shutdown exits the full one-file process tree."""
+    port = _unused_loopback_port()
+    with tempfile.TemporaryDirectory(prefix="soulmate-managed-sidecar-") as temporary:
+        temporary_path = Path(temporary)
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "DATA_DIR": str(temporary_path / "data"),
+                "_SOULMATE_DESKTOP_MANAGED": "1",
+                "SOULMATE_NETWORK__LAN_ENABLED": "false",
+                "SOULMATE_REMOTE_BACKUP__BACKEND": "disabled",
+                "SOULMATE_SERVER__HOST": "127.0.0.1",
+                "SOULMATE_SERVER__PORT": str(port),
+            }
+        )
+        environment.pop("SOULMATE_CONFIG_FILE", None)
+        for _ in range(2):
+            process = subprocess.Popen(  # noqa: S603 -- executable is built above.
+                [str(executable), "serve"],
+                cwd=temporary_path,
+                env=environment,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+            try:
+                deadline = time.monotonic() + 30
+                while not _port_is_open(port):
+                    if process.poll() is not None:
+                        output = process.stdout.read() if process.stdout is not None else ""
+                        raise RuntimeError(f"Managed sidecar exited during startup:\n{output}")
+                    if time.monotonic() >= deadline:
+                        raise TimeoutError("Managed sidecar did not bind its loopback port.")
+                    time.sleep(0.05)
+
+                if process.stdin is None:
+                    raise RuntimeError("Managed sidecar stdin pipe is unavailable.")
+                process.stdin.write("shutdown\n")
+                process.stdin.flush()
+                process.wait(timeout=15)
+                output = process.stdout.read() if process.stdout is not None else ""
+                if process.returncode != 0:
+                    raise RuntimeError(f"Managed sidecar did not stop cleanly:\n{output}")
+                if _port_is_open(port):
+                    raise RuntimeError("Managed sidecar left its loopback listener running.")
+            finally:
+                if process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait(timeout=5)
 
 
 def main() -> None:
@@ -100,6 +172,7 @@ def main() -> None:
     subprocess.run(  # noqa: S603 -- verifies bundled connector metadata and imports.
         [str(destination), "connectors"], check=True, capture_output=True, text=True, timeout=30
     )
+    _smoke_test_managed_shutdown(destination)
     print(destination.relative_to(root))
 
 

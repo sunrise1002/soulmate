@@ -281,7 +281,10 @@ Use the focused commands and CI expectations in [quality gates](quality-gates.md
   ensure the model service is running. `doctor` reports `provider_check` as
   `not_configured` when the model name is empty.
 - Port 7432 is already in use: stop the existing daemon or set the same alternate
-  `server.port` for every CLI command and client.
+  `server.port` for every CLI command and client. A daemon orphaned by a desktop
+  development build from before the managed-shutdown fix must be stopped once;
+  on macOS/Linux, identify it with
+  `lsof -nP -iTCP:7432 -sTCP:LISTEN` and send that verified Soulmate PID `TERM`.
 - The daemon root returns JSON/404 instead of the web UI: build `apps/web/dist`
   and set `web.client_dir` or `SOULMATE_WEB__CLIENT_DIR`.
 - Tauri fails before compiling Rust: install the platform-specific native

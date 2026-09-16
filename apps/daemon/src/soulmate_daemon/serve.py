@@ -3,8 +3,12 @@
 import asyncio
 import contextlib
 import logging
+import os
 import signal
+import sys
+import threading
 from collections.abc import Iterable, Iterator
+from typing import TextIO
 
 import uvicorn
 from fastapi import FastAPI
@@ -17,6 +21,8 @@ from soulmate_daemon.tls import CertificateError
 LOGGER = logging.getLogger("soulmate.serve")
 RUNTIME_READY_TIMEOUT = 30.0
 RUNTIME_POLL_INTERVAL = 0.05
+DESKTOP_MANAGED_ENV = "_SOULMATE_DESKTOP_MANAGED"
+DESKTOP_SHUTDOWN_COMMAND = "shutdown"
 
 
 class _ManagedServer(uvicorn.Server):
@@ -69,8 +75,31 @@ def _request_shutdown(servers: Iterable[uvicorn.Server]) -> None:
         server.should_exit = True
 
 
+def _listen_for_desktop_shutdown(servers: Iterable[uvicorn.Server], input_stream: TextIO) -> None:
+    """Stop managed listeners when the desktop closes their private stdin pipe."""
+    try:
+        for line in input_stream:
+            if line.strip() == DESKTOP_SHUTDOWN_COMMAND:
+                break
+    except (OSError, ValueError):
+        pass
+    _request_shutdown(servers)
+
+
+def _start_desktop_shutdown_listener(servers: Iterable[uvicorn.Server]) -> None:
+    if os.environ.get(DESKTOP_MANAGED_ENV) != "1":
+        return
+    threading.Thread(
+        target=_listen_for_desktop_shutdown,
+        args=(servers, sys.stdin),
+        name="soulmate-desktop-shutdown",
+        daemon=True,
+    ).start()
+
+
 async def _run_listeners(app: FastAPI, configs: list[uvicorn.Config]) -> None:
     servers = [_ManagedServer(config) for config in configs]
+    _start_desktop_shutdown_listener(servers)
     loop = asyncio.get_running_loop()
     for name in (signal.SIGINT, signal.SIGTERM):
         with contextlib.suppress(NotImplementedError, ValueError):
@@ -98,6 +127,8 @@ def serve(settings: Settings) -> None:
     if endpoint is not None:
         configs.append(_lan_config(app, endpoint))
     if len(configs) == 1:
-        uvicorn.Server(configs[0]).run()
+        server = uvicorn.Server(configs[0])
+        _start_desktop_shutdown_listener([server])
+        server.run()
         return
     asyncio.run(_run_listeners(app, configs))
