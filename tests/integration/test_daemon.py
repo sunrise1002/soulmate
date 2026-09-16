@@ -380,6 +380,29 @@ def test_cli_reports_bad_config_without_traceback(tmp_path: Path) -> None:
     assert "Traceback" not in result.stderr
 
 
+@pytest.mark.parametrize("command", ["remote-backup", "remote-restore-latest"])
+def test_remote_backup_cli_is_explicitly_disabled_by_default(tmp_path: Path, command: str) -> None:
+    executable = shutil.which("soulmate")
+    assert executable is not None
+
+    result = subprocess.run(
+        [executable, command],
+        cwd=tmp_path,
+        env=dict(os.environ, DATA_DIR=str(tmp_path / "data")),
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert json.loads(result.stdout) in (
+        {"uploaded": False, "error": "Remote backup is not configured."},
+        {"restored": False, "error": "Remote backup is not configured."},
+    )
+    assert "Traceback" not in result.stderr
+
+
 def test_chat_extracts_preferences_and_persists_context_across_restart(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "owner-data")
     first_provider = FakeLLMProvider(

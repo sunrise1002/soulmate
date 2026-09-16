@@ -41,6 +41,14 @@ AES-256-GCM authenticated encryption. Restore validates archive paths, checksums
 format and database versions, refuses non-fresh installations, migrates known
 schemas, and rebuilds derived state from Evidence. See ADR-011.
 
+Optional remote backup never uploads a live database or plaintext `.dtwb` file.
+It creates the same credential-free snapshot, encrypts it locally as `.dtw`, and
+then sends only ciphertext through a configured storage adapter. The first
+adapter uses S3-compatible private buckets. It is disabled by default, external
+HTTPS requires explicit hybrid mode, and its passphrase and access credentials
+must come from the process environment. Remote restore remains owner-only and
+fresh-install-only; it does not merge two writable installations. See ADR-015.
+
 Connector discovery and management are owner-only. Each plugin must declare its
 data, network, credential, and learning capabilities, and registration grants must
 match that declaration exactly. Connector credentials use dedicated process
@@ -59,5 +67,5 @@ internet exposure is not supported.
 
 Do not put personal data or secrets into issue reports, logs, fixtures, source
 control, or CI artifacts. Use synthetic fixtures and keep runtime data outside
-tracked source. See ADR-001, ADR-005, ADR-006, ADR-008, ADR-009, ADR-010, and
-ADR-011, and ADR-012.
+tracked source. See ADR-001, ADR-005, ADR-006, ADR-008, ADR-009, ADR-010,
+ADR-011, ADR-012, and ADR-015.

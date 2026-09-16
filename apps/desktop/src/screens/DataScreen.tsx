@@ -1,5 +1,7 @@
 import {
   ArchiveRestore,
+  CloudDownload,
+  CloudUpload,
   DatabaseBackup,
   FileKey,
   FileUp,
@@ -15,6 +17,8 @@ import type {
   DataSource,
   ImportFormat,
   RestoreStaged,
+  RemoteBackup,
+  RemoteBackupStatus,
   SourceDeletionResult,
 } from "../types.ts";
 
@@ -56,6 +60,9 @@ export function DataScreen({
   const [importFormat, setImportFormat] = useState<ImportFormat>("auto");
   const [restoreFile, setRestoreFile] = useState<File | null>(null);
   const [passphrase, setPassphrase] = useState("");
+  const [remoteStatus, setRemoteStatus] = useState<RemoteBackupStatus | null>(
+    null,
+  );
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -69,7 +76,23 @@ export function DataScreen({
     }
   }, []);
 
-  useEffect(() => void loadSources(), [loadSources]);
+  const loadRemoteStatus = useCallback(async () => {
+    try {
+      setRemoteStatus(
+        await apiRequest<RemoteBackupStatus>(
+          "GET",
+          "/v1/data/remote-backups/status",
+        ),
+      );
+    } catch (reason) {
+      setError(errorMessage(reason, "Remote backup status is unavailable."));
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadSources();
+    void loadRemoteStatus();
+  }, [loadRemoteStatus, loadSources]);
 
   async function createArchive(encrypted: boolean) {
     if (busy) return;
@@ -114,6 +137,63 @@ export function DataScreen({
       onDataChanged();
     } catch (reason) {
       setError(errorMessage(reason, "The chat history could not be imported."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createRemoteBackup() {
+    if (busy || !remoteStatus?.configured) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await apiRequest<RemoteBackup>(
+        "POST",
+        "/v1/data/remote-backups",
+      );
+      setNotice(
+        `${result.archive.filename} encrypted and uploaded through ${result.backend}.`,
+      );
+      await loadRemoteStatus();
+    } catch (reason) {
+      setError(errorMessage(reason, "The remote backup could not be created."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function restoreLatestRemoteBackup() {
+    if (
+      busy ||
+      !remoteStatus?.configured ||
+      !window.confirm(
+        "Download the latest encrypted remote backup into this fresh installation and restart?",
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const result = await apiRequest<RestoreStaged>(
+        "POST",
+        "/v1/data/remote-restores/latest",
+      );
+      if (!result.restart_required) {
+        throw new Error("The restore did not request the required restart.");
+      }
+      await restartService();
+      await onServiceChanged();
+      onDataChanged();
+      setNotice(
+        `Restored remote schema ${result.source_schema_revision}. The Personal Model is being rebuilt.`,
+      );
+    } catch (reason) {
+      setError(
+        errorMessage(reason, "The remote backup could not be restored."),
+      );
     } finally {
       setBusy(false);
     }
@@ -205,7 +285,10 @@ export function DataScreen({
           className="secondary-button"
           disabled={busy}
           type="button"
-          onClick={() => void loadSources()}
+          onClick={() => {
+            void loadSources();
+            void loadRemoteStatus();
+          }}
         >
           <RefreshCw size={14} /> Refresh
         </button>
@@ -234,6 +317,45 @@ export function DataScreen({
           >
             <DatabaseBackup size={14} /> Back up now
           </button>
+        </article>
+
+        <article className="card data-card">
+          <div className="settings-section-heading">
+            <CloudUpload size={19} />
+            <div>
+              <span className="section-label">Optional replication</span>
+              <h2>Encrypted remote backup</h2>
+            </div>
+          </div>
+          <p>
+            {remoteStatus?.configured
+              ? `${remoteStatus.backend} is configured${remoteStatus.automatic_daily ? ` with a ${String(remoteStatus.interval_hours)}-hour schedule` : " for manual backups"}.`
+              : "Disabled by default. Configure an S3-compatible backend to enable it."}
+          </p>
+          {remoteStatus?.last_success_at ? (
+            <p className="muted">
+              Last successful upload:{" "}
+              {new Date(remoteStatus.last_success_at).toLocaleString()}
+            </p>
+          ) : null}
+          <div className="button-row">
+            <button
+              className="primary-button"
+              disabled={busy || !remoteStatus?.configured}
+              type="button"
+              onClick={() => void createRemoteBackup()}
+            >
+              <CloudUpload size={14} /> Upload now
+            </button>
+            <button
+              className="secondary-button"
+              disabled={busy || !remoteStatus?.configured}
+              type="button"
+              onClick={() => void restoreLatestRemoteBackup()}
+            >
+              <CloudDownload size={14} /> Restore latest
+            </button>
+          </div>
         </article>
 
         <article className="card data-card">

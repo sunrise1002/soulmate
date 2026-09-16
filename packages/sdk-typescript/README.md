@@ -17,8 +17,9 @@ so neither can drift from the daemon contract.
   use the same typed transport. External clients pass their service API key as the
   bearer credential and receive no raw evidence or memory payloads.
 - Phase 10 data methods cover static imports, source deletion, local backup,
-  encrypted export, and staged restore. The daemon permits these operations only
-  for a loopback owner, even though the shared client exposes their types.
+  encrypted export, staged restore, and optional encrypted remote backup/restore.
+  The daemon permits these operations only for a loopback owner, even though the
+  shared client exposes their types.
 - Phase 11 connector methods expose installed permission manifests, registration,
   durable synchronization status, enable/disable controls, and provenance-safe
   removal. Connector management remains owner-only.

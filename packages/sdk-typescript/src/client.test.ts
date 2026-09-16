@@ -260,16 +260,22 @@ describe("SoulmateClient", () => {
     await client.importChatHistory("history.json", "[]", "json");
     await client.deleteDataSource("source/1");
     await client.createBackup();
+    await client.remoteBackupStatus();
+    await client.createRemoteBackup();
     await client.createEncryptedExport("synthetic export phrase");
     await client.stageRestore("YXJjaGl2ZQ==", "synthetic export phrase");
+    await client.stageLatestRemoteRestore();
 
     expect(calls.map((call) => call.url)).toEqual([
       "http://127.0.0.1:7432/v1/data/sources",
       "http://127.0.0.1:7432/v1/data/imports",
       "http://127.0.0.1:7432/v1/data/sources/source%2F1",
       "http://127.0.0.1:7432/v1/data/backups",
+      "http://127.0.0.1:7432/v1/data/remote-backups/status",
+      "http://127.0.0.1:7432/v1/data/remote-backups",
       "http://127.0.0.1:7432/v1/data/exports",
       "http://127.0.0.1:7432/v1/data/restores",
+      "http://127.0.0.1:7432/v1/data/remote-restores/latest",
     ]);
     expect(calls[1]?.init?.body).toBe(
       JSON.stringify({

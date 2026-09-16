@@ -20,6 +20,13 @@ from soulmate_daemon.portability import (
     PortabilityError,
     stage_restore,
 )
+from soulmate_daemon.remote_backup import (
+    LAST_REMOTE_BACKUP_AT,
+    RemoteBackupError,
+    RemoteBackupResult,
+    RemoteBackupService,
+    parse_metadata_time,
+)
 from soulmate_daemon.runtime import runtime_of
 from soulmate_daemon.system import DEFAULT_PROFILE_ID
 
@@ -89,6 +96,20 @@ class RestoreResponse(BaseModel):
     restart_required: bool
 
 
+class RemoteBackupResponse(BaseModel):
+    archive: ArchiveResponse
+    backend: str
+    remote_key: str
+
+
+class RemoteBackupStatusResponse(BaseModel):
+    configured: bool
+    backend: str
+    automatic_daily: bool
+    interval_hours: int
+    last_success_at: datetime | None
+
+
 def _source_response(source: Source) -> SourceResponse:
     return SourceResponse(
         id=source.id,
@@ -117,6 +138,21 @@ def _archive_response(result: ArchiveResult) -> ArchiveResponse:
         encrypted=result.encrypted,
         schema_revision=result.schema_revision,
     )
+
+
+def _remote_backup_response(app: FastAPI, result: RemoteBackupResult) -> RemoteBackupResponse:
+    return RemoteBackupResponse(
+        archive=_archive_response(result.archive),
+        backend=runtime_of(app)["settings"].remote_backup.backend,
+        remote_key=result.remote.key,
+    )
+
+
+def _remote_backup_service(app: FastAPI) -> RemoteBackupService:
+    service = runtime_of(app)["remote_backup"]
+    if service is None:
+        raise HTTPException(status_code=409, detail="Remote backup is not configured.")
+    return service
 
 
 def _record_audit(app: FastAPI, action: str, metadata: dict[str, object]) -> None:
@@ -229,6 +265,64 @@ def build_data_router(app: FastAPI) -> APIRouter:
             {"sha256": result.sha256, "size_bytes": result.size_bytes},
         )
         return _archive_response(result)
+
+    @router.get("/v1/data/remote-backups/status", response_model=RemoteBackupStatusResponse)
+    def remote_backup_status() -> RemoteBackupStatusResponse:
+        runtime = runtime_of(app)
+        settings = runtime["settings"].remote_backup
+        return RemoteBackupStatusResponse(
+            configured=runtime["remote_backup"] is not None,
+            backend=settings.backend,
+            automatic_daily=settings.automatic_daily,
+            interval_hours=settings.interval_hours,
+            last_success_at=parse_metadata_time(
+                runtime["repositories"].system_metadata.get(LAST_REMOTE_BACKUP_AT)
+            ),
+        )
+
+    @router.post("/v1/data/remote-backups", response_model=RemoteBackupResponse, status_code=201)
+    def create_remote_backup() -> RemoteBackupResponse:
+        try:
+            result = _remote_backup_service(app).create_and_upload()
+        except (OSError, PortabilityError, RemoteBackupError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        _record_audit(
+            app,
+            "data.remote_backup",
+            {
+                "sha256": result.archive.sha256,
+                "size_bytes": result.archive.size_bytes,
+                "backend": runtime_of(app)["settings"].remote_backup.backend,
+                "trigger": "manual",
+            },
+        )
+        return _remote_backup_response(app, result)
+
+    @router.post("/v1/data/remote-restores/latest", response_model=RestoreResponse, status_code=202)
+    def prepare_latest_remote_restore() -> RestoreResponse:
+        service = _remote_backup_service(app)
+        try:
+            downloaded = service.download_latest()
+            revision = stage_restore(
+                runtime_of(app)["settings"],
+                downloaded.path.read_bytes(),
+                service.passphrase,
+            )
+        except (OSError, PortabilityError, RemoteBackupError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        _record_audit(
+            app,
+            "data.remote_restore_staged",
+            {
+                "source_schema_revision": revision,
+                "backend": runtime_of(app)["settings"].remote_backup.backend,
+            },
+        )
+        return RestoreResponse(
+            staged=True,
+            source_schema_revision=revision,
+            restart_required=True,
+        )
 
     @router.post("/v1/data/exports", response_model=ArchiveResponse, status_code=201)
     def create_export(request: ExportRequest) -> ArchiveResponse:

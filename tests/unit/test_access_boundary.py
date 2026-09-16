@@ -110,6 +110,8 @@ def test_non_loopback_hosts_are_not_the_owner(host: str | None) -> None:
         ("GET", "/v1/service-identities", Requirement.OWNER),
         ("GET", "/v1/audit/events", Requirement.OWNER),
         ("POST", "/v1/data/backups", Requirement.OWNER),
+        ("POST", "/v1/data/remote-backups", Requirement.OWNER),
+        ("POST", "/v1/data/remote-restores/latest", Requirement.OWNER),
         ("DELETE", "/v1/evidence/evidence_1", Requirement.OWNER),
         ("DELETE", "/v1/decisions/decision_1/outcome", Requirement.OWNER),
         ("GET", "/v1/evidence/evidence_1", Requirement.DEVICE),
@@ -158,6 +160,8 @@ def test_remote_requests_are_refused_while_lan_access_is_disabled() -> None:
         ("GET", "/v1/service-identities"),
         ("GET", "/v1/audit/events"),
         ("POST", "/v1/data/backups"),
+        ("POST", "/v1/data/remote-backups"),
+        ("POST", "/v1/data/remote-restores/latest"),
     ],
 )
 def test_paired_devices_cannot_reach_owner_only_routes(method: str, path: str) -> None:

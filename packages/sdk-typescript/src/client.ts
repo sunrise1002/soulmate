@@ -47,6 +47,8 @@ import type {
   IssuedServiceIdentity,
   ImportFormat,
   RestoreStaged,
+  RemoteBackup,
+  RemoteBackupStatus,
   SourceDeletionResult,
 } from "./types.ts";
 
@@ -446,6 +448,17 @@ export class SoulmateClient {
     return this.request<DataArchive>("POST", "/v1/data/backups");
   }
 
+  remoteBackupStatus(): Promise<RemoteBackupStatus> {
+    return this.request<RemoteBackupStatus>(
+      "GET",
+      "/v1/data/remote-backups/status",
+    );
+  }
+
+  createRemoteBackup(): Promise<RemoteBackup> {
+    return this.request<RemoteBackup>("POST", "/v1/data/remote-backups");
+  }
+
   createEncryptedExport(passphrase: string): Promise<DataArchive> {
     return this.request<DataArchive>("POST", "/v1/data/exports", {
       passphrase,
@@ -460,6 +473,13 @@ export class SoulmateClient {
       archive_base64: archiveBase64,
       passphrase: passphrase ?? null,
     });
+  }
+
+  stageLatestRemoteRestore(): Promise<RestoreStaged> {
+    return this.request<RestoreStaged>(
+      "POST",
+      "/v1/data/remote-restores/latest",
+    );
   }
 
   connectorCatalog(): Promise<ConnectorManifest[]> {

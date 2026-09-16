@@ -14,6 +14,7 @@ from pydantic import (
     SecretStr,
     ValidationError,
     field_validator,
+    model_validator,
 )
 
 
@@ -69,6 +70,63 @@ class StorageConfig(ConfigModel):
     path: Path | None = None
 
 
+class S3BackupConfig(ConfigModel):
+    """Connection settings shared by R2 and other S3-compatible stores."""
+
+    endpoint_url: AnyHttpUrl | None = None
+    region: str = "auto"
+    bucket: str = ""
+    prefix: str = "soulmate"
+    access_key_id: SecretStr | None = None
+    secret_access_key: SecretStr | None = None
+
+    @field_validator("bucket", "region")
+    @classmethod
+    def reject_blank_required_values(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("prefix")
+    @classmethod
+    def normalize_prefix(cls, value: str) -> str:
+        normalized = value.strip().strip("/")
+        if any(part in {".", ".."} for part in normalized.split("/")):
+            raise ValueError("Remote backup prefix must not contain dot path segments.")
+        return normalized
+
+
+class RemoteBackupConfig(ConfigModel):
+    """Optional encrypted replication of portable archives."""
+
+    backend: Literal["disabled", "s3"] = "disabled"
+    automatic_daily: bool = False
+    interval_hours: int = Field(default=24, ge=1, le=168)
+    passphrase: SecretStr | None = None
+    s3: S3BackupConfig = Field(default_factory=S3BackupConfig)
+
+    @model_validator(mode="after")
+    def validate_enabled_backend(self) -> "RemoteBackupConfig":
+        if self.backend == "disabled":
+            if self.automatic_daily:
+                raise ValueError("Automatic remote backup requires an enabled backend.")
+            return self
+        missing: list[str] = []
+        if self.passphrase is None or len(self.passphrase.get_secret_value()) < 12:
+            missing.append("passphrase (at least 12 characters)")
+        if self.s3.endpoint_url is None:
+            missing.append("s3.endpoint_url")
+        if not self.s3.region:
+            missing.append("s3.region")
+        if not self.s3.bucket:
+            missing.append("s3.bucket")
+        if self.s3.access_key_id is None:
+            missing.append("s3.access_key_id")
+        if self.s3.secret_access_key is None:
+            missing.append("s3.secret_access_key")
+        if missing:
+            raise ValueError(f"Enabled remote backup is missing: {', '.join(missing)}.")
+        return self
+
+
 class VectorConfig(ConfigModel):
     backend: Literal["sqlite_vec", "cosine"] = "sqlite_vec"
 
@@ -101,6 +159,7 @@ class Settings(ConfigModel):
     web: WebConfig = Field(default_factory=WebConfig)
     privacy: PrivacyConfig = Field(default_factory=PrivacyConfig)
     storage: StorageConfig = Field(default_factory=StorageConfig)
+    remote_backup: RemoteBackupConfig = Field(default_factory=RemoteBackupConfig)
     vector: VectorConfig = Field(default_factory=VectorConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
@@ -143,6 +202,19 @@ def _apply_override(data: dict[str, Any], keys: list[str], value: str) -> None:
     target[keys[-1]] = value
 
 
+def _reject_remote_backup_secrets_in_toml(data: dict[str, Any]) -> None:
+    remote = data.get("remote_backup")
+    if not isinstance(remote, dict):
+        return
+    s3 = remote.get("s3")
+    if "passphrase" in remote or (
+        isinstance(s3, dict) and {"access_key_id", "secret_access_key"}.intersection(s3)
+    ):
+        raise ConfigurationError(
+            "Remote backup passphrase and credentials must come from the process environment."
+        )
+
+
 def load_settings(
     config_file: Path | None = None, *, environ: Mapping[str, str] | None = None
 ) -> Settings:
@@ -166,6 +238,8 @@ def load_settings(
             raise ConfigurationError(f"Configuration file not found: {path}") from exc
     except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise ConfigurationError(f"Cannot read configuration file: {path}") from exc
+
+    _reject_remote_backup_secrets_in_toml(data)
 
     if "DATA_DIR" in env:
         data["data_dir"] = env["DATA_DIR"]

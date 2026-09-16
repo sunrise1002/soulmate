@@ -48,6 +48,11 @@ Phase 12 adds a deterministic Policy Engine to the kernel, owner-classified acti
 policies, confidence floors, durable approval requests, and a separate
 `agent:delegate` scope. The daemon and desktop expose approval workflows while
 external side effects remain outside Soulmate. See ADR-013.
+An owner-authorized portability increment adds optional encrypted remote backups
+without changing the primary database: the daemon owns a vendor-neutral storage
+port, an S3-compatible adapter, durable daily scheduling, and fresh-install latest
+restore. Local-only remains the default and the kernel imports no cloud SDK. See
+ADR-015; ADR-014 remains reserved for the planned Phase 13 decision.
 
 ADRs below record decisions from specification section 65. Each ADR status states
 whether the decision is architectural only or already implemented.
@@ -67,3 +72,4 @@ whether the decision is architectural only or already implemented.
 | [011](decisions/ADR-011-portable-archives.md) | Credential-free authenticated portable archives |
 | [012](decisions/ADR-012-connector-plugins.md) | Permissioned connector plugins outside the kernel |
 | [013](decisions/ADR-013-delegated-action-policy.md) | Prediction-bound delegated action policy |
+| [015](decisions/ADR-015-optional-remote-backups.md) | Optional encrypted remote backups behind a storage port |

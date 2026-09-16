@@ -43,7 +43,11 @@ portable exports, imports static JSON/Markdown/text histories, deletes imported
 sources and their derivative evidence, and stages restore into a fresh
 installation. Restore restarts the managed daemon so migrations and model rebuild
 run before the restored data is served. Desktop archive uploads are limited to 64
-MiB; use the CLI for larger supported archives.
+MiB; use the CLI for larger supported archives. When an optional S3-compatible
+backend is configured in the daemon environment, the same screen can manually
+upload an encrypted remote backup or stage the newest remote backup for restore;
+the daemon can also schedule the upload daily. The desktop proxy retains its
+30-second request timeout, so use the CLI for remote transfers that may exceed it.
 
 The Connections screen discovers independently packaged connector entry points,
 shows their complete permission declarations, and requires owner approval before

@@ -29,6 +29,11 @@ from soulmate_daemon.portability import (
     restore_archive,
 )
 from soulmate_daemon.providers import build_provider
+from soulmate_daemon.remote_backup import (
+    RemoteBackupError,
+    RemoteBackupService,
+    build_remote_backup_store,
+)
 from soulmate_daemon.serve import serve
 from soulmate_daemon.system import DEFAULT_PROFILE_ID, ensure_installation
 
@@ -306,6 +311,78 @@ def _restore(settings: Settings, archive: Path, passphrase_file: Path | None) ->
     return 0
 
 
+def _remote_backup(settings: Settings) -> int:
+    database = Database(settings.database_path)
+    try:
+        database.migrate()
+        repositories = Repositories(database.sessions())
+        ensure_installation(repositories.system_metadata, repositories.profiles)
+        store = build_remote_backup_store(settings)
+        if store is None:
+            raise RemoteBackupError("Remote backup is not configured.")
+        result = RemoteBackupService(
+            settings, database, repositories.system_metadata, store
+        ).create_and_upload()
+    except (OSError, RuntimeError, SQLAlchemyError, PortabilityError, RemoteBackupError) as exc:
+        print(json.dumps({"uploaded": False, "error": str(exc)}, sort_keys=True))
+        return 1
+    finally:
+        database.close()
+    print(
+        json.dumps(
+            {
+                "uploaded": True,
+                "backend": settings.remote_backup.backend,
+                "remote_key": result.remote.key,
+                "path": str(result.archive.path),
+                "size_bytes": result.archive.size_bytes,
+                "sha256": result.archive.sha256,
+                "encrypted": result.archive.encrypted,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
+def _remote_restore_latest(settings: Settings) -> int:
+    database = Database(settings.database_path)
+    try:
+        database.migrate()
+        repositories = Repositories(database.sessions())
+        store = build_remote_backup_store(settings)
+        if store is None:
+            raise RemoteBackupError("Remote backup is not configured.")
+        service = RemoteBackupService(settings, database, repositories.system_metadata, store)
+        downloaded = service.download_latest()
+        passphrase = service.passphrase
+    except (OSError, RuntimeError, SQLAlchemyError, RemoteBackupError) as exc:
+        print(json.dumps({"restored": False, "error": str(exc)}, sort_keys=True))
+        return 1
+    finally:
+        database.close()
+    try:
+        result = restore_archive(settings, downloaded.path, passphrase)
+    except (OSError, RuntimeError, SQLAlchemyError, PortabilityError) as exc:
+        print(json.dumps({"restored": False, "error": str(exc)}, sort_keys=True))
+        return 1
+    print(
+        json.dumps(
+            {
+                "restored": True,
+                "backend": settings.remote_backup.backend,
+                "remote_key": downloaded.remote.key,
+                "schema_revision_before": result.schema_revision_before,
+                "schema_revision_after": result.schema_revision_after,
+                "snapshot_version": result.snapshot_version,
+                "installation_id": result.installation_id,
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
 def _import_history(
     settings: Settings, path: Path, import_format: ImportFormat, name: str | None
 ) -> int:
@@ -384,6 +461,15 @@ def _parser() -> argparse.ArgumentParser:
     restore.add_argument(
         "--passphrase-file", type=Path, help="Read the archive passphrase from a file"
     )
+    for command, help_text in (
+        ("remote-backup", "Create and upload an encrypted remote backup"),
+        (
+            "remote-restore-latest",
+            "Download and restore the latest remote backup into a fresh installation",
+        ),
+    ):
+        remote = commands.add_parser(command, help=help_text)
+        remote.add_argument("--config", type=Path, help="Path to a TOML configuration file")
     import_command = commands.add_parser("import", help="Import static chat history")
     import_command.add_argument("path", type=Path, help="UTF-8 JSON, Markdown, or text file")
     import_command.add_argument("--config", type=Path, help="Path to a TOML configuration file")
@@ -431,6 +517,10 @@ def main() -> None:
         )
     if args.command == "restore":
         raise SystemExit(_restore(settings, args.archive, args.passphrase_file))
+    if args.command == "remote-backup":
+        raise SystemExit(_remote_backup(settings))
+    if args.command == "remote-restore-latest":
+        raise SystemExit(_remote_restore_latest(settings))
     if args.command == "import":
         raise SystemExit(_import_history(settings, args.path, args.format, args.name))
     raise SystemExit(_rebuild_model(settings))

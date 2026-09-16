@@ -430,6 +430,20 @@ export interface RestoreStaged {
   restart_required: boolean;
 }
 
+export interface RemoteBackup {
+  archive: DataArchive;
+  backend: string;
+  remote_key: string;
+}
+
+export interface RemoteBackupStatus {
+  configured: boolean;
+  backend: string;
+  automatic_daily: boolean;
+  interval_hours: number;
+  last_success_at: string | null;
+}
+
 export type ConnectorPermission =
   "data:read" | "network:access" | "credentials:read" | "learning:ingest";
 

@@ -34,6 +34,10 @@ Available reports:
 - [Phase 11](phase-11-report.md)
 - [Phase 12](phase-12-report.md)
 
+Owner-authorized cross-phase increments:
+
+- [Encrypted remote backup](remote-backup-increment-report.md)
+
 Planned work:
 
 - [Phase 13 — Decision I/O and trusted provenance](phase-13-plan.md). Planning is

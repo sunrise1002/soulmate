@@ -105,6 +105,8 @@ uv run --locked soulmate <command>
 | `import PATH` | Import JSON, Markdown, text, ChatGPT, or Claude history |
 | `backup` / `export` | Write a local `.dtwb` or encrypted `.dtw` archive |
 | `restore ARCHIVE` | Restore into a fresh installation while the daemon is stopped |
+| `remote-backup` | Encrypt and upload a backup through the configured storage adapter |
+| `remote-restore-latest` | Restore the newest remote backup into a fresh installation |
 | `connectors` | List installed connector plugins |
 | `mcp` | Run the scoped stdio MCP adapter |
 
@@ -154,7 +156,7 @@ loopback. Device and data management stay on the owner's machine.
 | [Setup, build, and run](docs/contributor-guide/setup.md) | Source prerequisites, installation, `.env`, providers, run modes, artifacts, and troubleshooting |
 | [Technical specification](<Open Personal Decision Agent — Technical Product Specification & Implementation Plan.md>) | Authoritative product definition and phase order |
 | [Phase status](docs/phase-status.md) | What is built and what is authorized |
-| [Architecture & ADRs](docs/architecture/README.md) | Layering rules and ADR-001 through ADR-013 |
+| [Architecture & ADRs](docs/architecture/README.md) | Layering rules and implemented ADRs through ADR-015; ADR-014 is reserved for Phase 13 |
 | [Security boundaries](docs/security/README.md) | Privacy and security guarantees in force |
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) | Human and AI agent rules — read before implementing |
 

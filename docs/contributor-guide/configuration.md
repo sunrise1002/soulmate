@@ -67,6 +67,59 @@ uppercase, and separating nested names with two underscores. For example,
 | `llm.openai_compatible.model` | `SOULMATE_LLM__OPENAI_COMPATIBLE__MODEL` | empty | Model identifier sent to the compatible provider. Empty means chat provider unavailable. |
 | `llm.openai_compatible.api_key` | `SOULMATE_LLM__OPENAI_COMPATIBLE__API_KEY` | unset | Optional bearer secret. Supply only through the process environment; never commit it or put it in TOML. |
 
+### Optional encrypted remote backup
+
+Remote backup is a separate adapter boundary; it does not replace SQLite as the
+primary database. The first adapter uses the S3 protocol, so the same code works
+with Cloudflare R2, AWS S3, Backblaze B2 S3, MinIO, and compatible self-hosted
+stores. Contributors can implement `RemoteBackupStore` for a different backend
+without changing archive or restore logic.
+
+| TOML field | Environment variable | Default | Meaning |
+| --- | --- | --- | --- |
+| `remote_backup.backend` | `SOULMATE_REMOTE_BACKUP__BACKEND` | `disabled` | `disabled` preserves local-only behavior; `s3` enables the S3-compatible adapter. |
+| `remote_backup.automatic_daily` | `SOULMATE_REMOTE_BACKUP__AUTOMATIC_DAILY` | `false` | Enqueues a durable encrypted upload when the configured interval has elapsed. |
+| `remote_backup.interval_hours` | `SOULMATE_REMOTE_BACKUP__INTERVAL_HOURS` | `24` | Successful/enqueued backup interval, from 1 through 168 hours. |
+| `remote_backup.passphrase` | `SOULMATE_REMOTE_BACKUP__PASSPHRASE` | unset | Archive encryption passphrase of at least 12 characters. Environment only; losing it makes remote backups unrecoverable. |
+| `remote_backup.s3.endpoint_url` | `SOULMATE_REMOTE_BACKUP__S3__ENDPOINT_URL` | unset | Explicit S3-compatible endpoint. External endpoints must use HTTPS and require `hybrid` privacy mode. |
+| `remote_backup.s3.region` | `SOULMATE_REMOTE_BACKUP__S3__REGION` | `auto` | Signing region; R2 uses `auto`. |
+| `remote_backup.s3.bucket` | `SOULMATE_REMOTE_BACKUP__S3__BUCKET` | unset | Existing private bucket name. Soulmate does not create or make buckets public. |
+| `remote_backup.s3.prefix` | `SOULMATE_REMOTE_BACKUP__S3__PREFIX` | `soulmate` | Object-key prefix used to isolate this backup collection. |
+| `remote_backup.s3.access_key_id` | `SOULMATE_REMOTE_BACKUP__S3__ACCESS_KEY_ID` | unset | S3 access identifier. Environment only. |
+| `remote_backup.s3.secret_access_key` | `SOULMATE_REMOTE_BACKUP__S3__SECRET_ACCESS_KEY` | unset | S3 secret. Environment only. |
+
+Each remote object is a credential-free `.dtw` archive encrypted and authenticated
+locally before upload. `soulmate remote-backup` triggers an immediate upload.
+On a new, fresh installation, `soulmate remote-restore-latest` downloads the newest
+object, validates and decrypts it, migrates known schemas, creates a new local
+installation identity, and rebuilds derived model state.
+
+This is versioned backup/restore, not bidirectional SQLite replication. Do not run
+two writable installations and alternate restores between them; select one active
+installation, upload a final backup, then restore it on the replacement machine.
+
+For Cloudflare R2, create a private bucket and an R2 API token scoped to that
+bucket with object read/write permission. Use the S3 endpoint shown by the R2
+dashboard and export the secrets only in the daemon process:
+
+```sh
+export SOULMATE_PRIVACY__MODE=hybrid
+export SOULMATE_REMOTE_BACKUP__BACKEND=s3
+export SOULMATE_REMOTE_BACKUP__AUTOMATIC_DAILY=true
+export SOULMATE_REMOTE_BACKUP__PASSPHRASE='replace-with-a-long-unique-passphrase'
+export SOULMATE_REMOTE_BACKUP__S3__ENDPOINT_URL='https://ACCOUNT_ID.r2.cloudflarestorage.com'
+export SOULMATE_REMOTE_BACKUP__S3__REGION=auto
+export SOULMATE_REMOTE_BACKUP__S3__BUCKET=soulmate-backups
+export SOULMATE_REMOTE_BACKUP__S3__PREFIX=soulmate
+export SOULMATE_REMOTE_BACKUP__S3__ACCESS_KEY_ID='replace-me'
+export SOULMATE_REMOTE_BACKUP__S3__SECRET_ACCESS_KEY='replace-me'
+uv run --locked soulmate serve
+```
+
+Keep the passphrase in a password manager separate from R2. Bucket lifecycle
+rules may remove old versions according to the owner's retention policy; Soulmate
+does not delete remote objects automatically.
+
 ### Opt-in LAN listener
 
 | TOML field | Environment variable | Default | Meaning |
@@ -161,9 +214,9 @@ DATA_DIR=/srv/soulmate/data \
   uv run --locked soulmate serve --config /etc/soulmate/config.toml
 ```
 
-Use the same configuration selection for `serve`, `status`, `doctor`, backup,
-restore, import, and rebuild commands so they resolve the same listener and
-database.
+Use the same configuration selection for `serve`, `status`, `doctor`, local and
+remote backup/restore, import, and rebuild commands so they resolve the same
+listener, database, and optional storage backend.
 
 ## Desktop configuration
 

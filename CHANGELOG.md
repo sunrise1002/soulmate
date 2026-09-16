@@ -4,6 +4,15 @@
 
 ### Added
 
+- Optional encrypted remote backups behind a vendor-neutral storage port, with an
+  S3-compatible adapter for R2, S3, B2, MinIO, and compatible private stores;
+  local SQLite remains the default and live database files are never uploaded.
+- Durable opt-in daily remote-backup scheduling, owner-only manual/status/latest-
+  restore APIs, `remote-backup` and `remote-restore-latest` CLI commands, typed SDK
+  operations, and desktop Data & Privacy controls.
+- Environment-only remote backup passphrase and S3 credentials, hybrid-mode
+  egress enforcement for external endpoints, encrypted fresh-install machine
+  handoff, and ADR-015 documenting the provider-neutral boundary.
 - A source-checkout setup, build, and run guide covering toolchain and native OS
   prerequisites, locked workspace installation, explicit POSIX/PowerShell `.env`
   loading, local and compatible model providers, daemon/desktop/web/mobile run

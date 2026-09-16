@@ -11,6 +11,8 @@ def test_defaults_are_local_and_do_not_create_storage(tmp_path: Path) -> None:
     assert settings.server.host == "127.0.0.1"
     assert settings.server.port == 7432
     assert settings.privacy.mode == "strict_local"
+    assert settings.remote_backup.backend == "disabled"
+    assert settings.remote_backup.automatic_daily is False
     assert settings.database_path == tmp_path / "data" / "soulmate.db"
     assert not settings.database_path.parent.exists()
 
@@ -193,3 +195,62 @@ def test_web_client_directory_is_resolved_only_when_the_client_is_enabled(
     # When/Then: disabling the web client removes it from the served surface
     assert enabled.web_client_directory == bundle.resolve()
     assert disabled.web_client_directory is None
+
+
+def test_s3_compatible_remote_backup_is_explicit_and_environment_configurable() -> None:
+    settings = load_settings(
+        None,
+        environ={
+            "SOULMATE_PRIVACY__MODE": "hybrid",
+            "SOULMATE_REMOTE_BACKUP__BACKEND": "s3",
+            "SOULMATE_REMOTE_BACKUP__AUTOMATIC_DAILY": "true",
+            "SOULMATE_REMOTE_BACKUP__PASSPHRASE": "synthetic backup phrase",
+            "SOULMATE_REMOTE_BACKUP__S3__ENDPOINT_URL": "https://account.r2.example.test",
+            "SOULMATE_REMOTE_BACKUP__S3__REGION": "auto",
+            "SOULMATE_REMOTE_BACKUP__S3__BUCKET": "private-backups",
+            "SOULMATE_REMOTE_BACKUP__S3__PREFIX": "/owner/soulmate/",
+            "SOULMATE_REMOTE_BACKUP__S3__ACCESS_KEY_ID": "synthetic-access-key",
+            "SOULMATE_REMOTE_BACKUP__S3__SECRET_ACCESS_KEY": "synthetic-secret-key",
+        },
+    )
+
+    assert settings.remote_backup.backend == "s3"
+    assert settings.remote_backup.automatic_daily is True
+    assert settings.remote_backup.s3.prefix == "owner/soulmate"
+    assert settings.remote_backup.passphrase is not None
+    assert settings.remote_backup.passphrase.get_secret_value() == "synthetic backup phrase"
+
+
+@pytest.mark.parametrize(
+    "environment",
+    [
+        {
+            "SOULMATE_REMOTE_BACKUP__BACKEND": "disabled",
+            "SOULMATE_REMOTE_BACKUP__AUTOMATIC_DAILY": "true",
+        },
+        {"SOULMATE_REMOTE_BACKUP__BACKEND": "s3"},
+        {
+            "SOULMATE_REMOTE_BACKUP__BACKEND": "s3",
+            "SOULMATE_REMOTE_BACKUP__PASSPHRASE": "short",
+        },
+    ],
+)
+def test_incomplete_remote_backup_configuration_is_rejected(
+    environment: dict[str, str],
+) -> None:
+    with pytest.raises(ConfigurationError, match="Invalid configuration fields"):
+        load_settings(None, environ=environment)
+
+
+def test_remote_backup_secrets_are_rejected_in_toml(tmp_path: Path) -> None:
+    private_value = "private-backup-passphrase"
+    config = tmp_path / "config.toml"
+    config.write_text(
+        f'[remote_backup]\npassphrase = "{private_value}"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ConfigurationError, match="process environment") as error:
+        load_settings(config, environ={})
+
+    assert private_value not in str(error.value)

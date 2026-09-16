@@ -11,6 +11,7 @@ from soulmate_storage_sqlite import Database, Repositories
 from soulmate_daemon.config import Settings
 from soulmate_daemon.network import LanEndpoint
 from soulmate_daemon.pairing import DeviceAccessService, pairing_token_ttl
+from soulmate_daemon.remote_backup import RemoteBackupService
 
 
 class AppState(TypedDict):
@@ -22,6 +23,7 @@ class AppState(TypedDict):
     lan: LanEndpoint | None
     lan_error: str | None
     connector_catalog: ConnectorCatalog
+    remote_backup: RemoteBackupService | None
 
 
 def runtime_of(app: FastAPI) -> AppState:

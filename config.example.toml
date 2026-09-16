@@ -29,6 +29,21 @@ backend = "sqlite"
 # Omit path to use DATA_DIR/soulmate.db. `serve` creates and migrates it.
 # path = "./data/soulmate.db"
 
+[remote_backup]
+# Local-only remains the default. Set to "s3" for R2 or another
+# S3-compatible private bucket. Remote HTTPS requires privacy.mode = "hybrid".
+backend = "disabled"
+automatic_daily = false
+interval_hours = 24
+# Supply PASSPHRASE only through the process environment.
+
+[remote_backup.s3]
+region = "auto"
+prefix = "soulmate"
+# endpoint_url = "https://ACCOUNT_ID.r2.cloudflarestorage.com"
+# bucket = "soulmate-backups"
+# Supply ACCESS_KEY_ID and SECRET_ACCESS_KEY only through the environment.
+
 [vector]
 backend = "sqlite_vec"
 

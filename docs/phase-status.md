@@ -10,6 +10,13 @@ and trusted provenance has a recorded plan, but implementation has not started a
 requires a separate explicit owner instruction. No Phase 14 or later work is
 defined or authorized for implementation.
 
+An owner-authorized cross-phase portability increment for optional encrypted
+remote backup is complete locally. It keeps SQLite as the local primary store,
+adds a provider-neutral storage port with an S3-compatible adapter, durable daily
+and manual uploads, and fresh-install latest restore. It does not start Phase 13
+or authorize a later phase. See the
+[remote backup increment report](phases/remote-backup-increment-report.md).
+
 ## Reports
 
 | Phase | State | Report | Important open issue |
@@ -54,6 +61,17 @@ and maintainer repository settings are documented under the
 phase boundary above. Remote CI and GitHub ruleset activation remain unverified.
 
 ## Repository maintenance
+
+On 2026-09-16, optional encrypted remote backup was added as an explicitly
+authorized portability increment. Local-only SQLite remains the default; external
+storage is behind a vendor-neutral port, with R2 represented through the included
+S3-compatible adapter. Manual and durable daily backup plus latest fresh-install
+restore are available through CLI, owner-only REST, typed SDK, and desktop
+surfaces. Python lint, formatting, strict typing, 302 tests, seven package builds,
+TypeScript lint/formatting/typing and 86 tests, documentation hooks, and web and
+desktop frontend builds passed locally on macOS arm64. Rust was unavailable, so
+native desktop checks, a live R2 request, packaged cross-platform behavior, and
+remote CI remain unverified. See ADR-015 and the increment report.
 
 On 2026-09-15, source onboarding documentation was expanded with explicit
 prerequisites, `.env` loading semantics, complete configuration meanings,

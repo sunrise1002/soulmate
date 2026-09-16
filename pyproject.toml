@@ -15,6 +15,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  "boto3-stubs[s3]>=1.40,<2",
   "httpx>=0.28,<1",
   "mypy>=1.15,<2",
   "pre-commit>=4,<5",

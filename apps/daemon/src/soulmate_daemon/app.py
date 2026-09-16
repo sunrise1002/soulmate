@@ -3,7 +3,7 @@
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Literal, cast
 from uuid import uuid4
 
@@ -52,8 +52,16 @@ from soulmate_daemon.network import (
     NetworkConfigurationError,
     prepare_lan_endpoint,
 )
-from soulmate_daemon.portability import apply_pending_restore
+from soulmate_daemon.portability import PortabilityError, apply_pending_restore
 from soulmate_daemon.providers import build_provider
+from soulmate_daemon.remote_backup import (
+    REMOTE_BACKUP_JOB,
+    RemoteBackupError,
+    RemoteBackupService,
+    RemoteBackupStore,
+    build_remote_backup_store,
+    enqueue_remote_backup_if_due,
+)
 from soulmate_daemon.runtime import (
     AppState,
     build_access_service,
@@ -564,6 +572,7 @@ def create_app(
     provider: LLMProvider | None = None,
     lan: LanEndpoint | None = None,
     connectors: tuple[SourceConnector, ...] = (),
+    remote_backup_store: RemoteBackupStore | None = None,
 ) -> FastAPI:
     resolved_settings = settings if settings is not None else Settings()
 
@@ -582,6 +591,21 @@ def create_app(
             )
         endpoint, lan_error = _resolve_lan(resolved_settings, lan)
         connector_catalog = discover_connectors(connectors)
+        backup_store = (
+            remote_backup_store
+            if remote_backup_store is not None
+            else build_remote_backup_store(resolved_settings)
+        )
+        remote_backup = (
+            None
+            if backup_store is None
+            else RemoteBackupService(
+                resolved_settings,
+                database,
+                repositories.system_metadata,
+                backup_store,
+            )
+        )
         app.state.runtime = AppState(
             settings=resolved_settings,
             database=database,
@@ -591,6 +615,7 @@ def create_app(
             lan=endpoint,
             lan_error=lan_error,
             connector_catalog=connector_catalog,
+            remote_backup=remote_backup,
         )
         stop = asyncio.Event()
 
@@ -607,13 +632,78 @@ def create_app(
                 privacy_mode=resolved_settings.privacy.mode,
             ).sync(profile_id, connector_id)
 
-        worker = DurableJobWorker(repositories.jobs, {CONNECTOR_SYNC_JOB: sync_connector})
+        async def create_remote_backup(payload: dict[str, object]) -> None:
+            if payload or remote_backup is None:
+                raise ValueError("Remote backup job payload or configuration is invalid.")
+            try:
+                result = await asyncio.to_thread(remote_backup.create_and_upload)
+            except (OSError, PortabilityError, RemoteBackupError) as exc:
+                repositories.audit_events.add(
+                    AuditEvent(
+                        id=f"audit_{uuid4().hex}",
+                        profile_id=DEFAULT_PROFILE_ID,
+                        action="data.remote_backup_failed",
+                        actor_type="system",
+                        actor_id=None,
+                        metadata={
+                            "backend": resolved_settings.remote_backup.backend,
+                            "trigger": "scheduled",
+                            "error_type": type(exc).__name__,
+                        },
+                        created_at=datetime.now(UTC),
+                    )
+                )
+                raise
+            repositories.audit_events.add(
+                AuditEvent(
+                    id=f"audit_{uuid4().hex}",
+                    profile_id=DEFAULT_PROFILE_ID,
+                    action="data.remote_backup",
+                    actor_type="system",
+                    actor_id=None,
+                    metadata={
+                        "sha256": result.archive.sha256,
+                        "size_bytes": result.archive.size_bytes,
+                        "backend": resolved_settings.remote_backup.backend,
+                        "trigger": "scheduled",
+                    },
+                    created_at=datetime.now(UTC),
+                )
+            )
+
+        handlers = {CONNECTOR_SYNC_JOB: sync_connector}
+        if remote_backup is not None:
+            handlers[REMOTE_BACKUP_JOB] = create_remote_backup
+        worker = DurableJobWorker(repositories.jobs, handlers)
         worker_task = asyncio.create_task(worker.run(stop), name="soulmate-durable-worker")
+        scheduler_task: asyncio.Task[None] | None = None
+        if remote_backup is not None and resolved_settings.remote_backup.automatic_daily:
+
+            async def schedule_remote_backup() -> None:
+                interval = timedelta(hours=resolved_settings.remote_backup.interval_hours)
+                while not stop.is_set():
+                    await asyncio.to_thread(
+                        enqueue_remote_backup_if_due,
+                        repositories.jobs,
+                        repositories.system_metadata,
+                        interval=interval,
+                    )
+                    try:
+                        await asyncio.wait_for(stop.wait(), timeout=3600)
+                    except TimeoutError:
+                        continue
+
+            scheduler_task = asyncio.create_task(
+                schedule_remote_backup(), name="soulmate-remote-backup-scheduler"
+            )
         try:
             yield
         finally:
             stop.set()
-            await worker_task
+            tasks = [worker_task]
+            if scheduler_task is not None:
+                tasks.append(scheduler_task)
+            await asyncio.gather(*tasks)
             if database.engine is not None:
                 database.engine.dispose()
 

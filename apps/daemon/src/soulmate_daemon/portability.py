@@ -349,6 +349,7 @@ class ArchiveService:
         *,
         passphrase: str | None = None,
         created_at: datetime | None = None,
+        artifact_type: str | None = None,
     ) -> ArchiveResult:
         now = created_at if created_at is not None else datetime.now(UTC)
         resolved_output = output.expanduser().resolve()
@@ -371,7 +372,13 @@ class ArchiveService:
                 payload_path,
                 created_at=now,
                 schema_revision=schema_revision,
-                artifact_type="encrypted_export" if passphrase is not None else "local_backup",
+                artifact_type=(
+                    artifact_type
+                    if artifact_type is not None
+                    else "encrypted_export"
+                    if passphrase is not None
+                    else "local_backup"
+                ),
             )
             payload = payload_path.read_bytes()
             encrypted = passphrase is not None

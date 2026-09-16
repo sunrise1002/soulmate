@@ -499,6 +499,7 @@
               <tr><td><a href="architecture/decisions/ADR-004-evidence-derived-model.md">004</a></td><td>Evidence-based derived model</td><td><a href="architecture/decisions/ADR-011-portable-archives.md">011</a></td><td>Credential-free authenticated archives</td></tr>
               <tr><td><a href="architecture/decisions/ADR-005-provider-abstraction.md">005</a></td><td>LLM provider abstraction</td><td><a href="architecture/decisions/ADR-012-connector-plugins.md">012</a></td><td>Permissioned connector plugins</td></tr>
               <tr><td><a href="architecture/decisions/ADR-006-no-default-telemetry.md">006</a></td><td>No cloud telemetry by default</td><td><a href="architecture/decisions/ADR-013-delegated-action-policy.md">013</a></td><td>Prediction-bound delegated actions</td></tr>
+              <tr><td><a href="architecture/decisions/ADR-015-optional-remote-backups.md">015</a></td><td>Optional encrypted remote backups</td><td>014</td><td>Reserved for planned Phase 13</td></tr>
               <tr><td><a href="architecture/decisions/ADR-007-desktop-daemon.md">007</a></td><td>Desktop daemon model</td><td></td><td></td></tr>
             </tbody>
           </table>
@@ -654,6 +655,8 @@ pnpm --filter @soulmate/desktop tauri build   # native installer → src-tauri/t
               <tr><td><code>soulmate backup [--output PATH]</code></td><td>Write a credential-free <code>.dtwb</code> archive (default <code>DATA_DIR/backups</code>).</td></tr>
               <tr><td><code>soulmate export [--output PATH] [--passphrase-file PATH]</code></td><td>Write an AES-256-GCM encrypted portable <code>.dtw</code> archive.</td></tr>
               <tr><td><code>soulmate restore ARCHIVE [--passphrase-file PATH]</code></td><td>Restore into a <em>fresh</em> installation while the daemon is stopped.</td></tr>
+              <tr><td><code>soulmate remote-backup</code></td><td>Encrypt and upload a portable archive through the optional configured storage adapter.</td></tr>
+              <tr><td><code>soulmate remote-restore-latest</code></td><td>Download and restore the newest remote archive into a fresh installation.</td></tr>
               <tr><td><code>soulmate connectors</code></td><td>List installed connector plugins discovered via entry points.</td></tr>
               <tr><td><code>soulmate mcp</code></td><td>Run the scoped stdio MCP adapter against the daemon.</td></tr>
             </tbody>
@@ -698,6 +701,8 @@ pnpm --filter @soulmate/desktop tauri build   # native installer → src-tauri/t
               <tr><td><code>SOULMATE_NETWORK__PAIRING_TTL_SECONDS</code></td><td>pairing code lifetime</td><td><code>300</code> (30–3600)</td></tr>
               <tr><td><code>SOULMATE_WEB__ENABLED</code></td><td><code>web.enabled</code></td><td><code>true</code></td></tr>
               <tr><td><code>SOULMATE_STORAGE__PATH</code></td><td><code>storage.path</code></td><td>unset → <code>DATA_DIR/soulmate.db</code></td></tr>
+              <tr><td><code>SOULMATE_REMOTE_BACKUP__BACKEND</code></td><td><code>remote_backup.backend</code></td><td><code>disabled</code></td></tr>
+              <tr><td><code>SOULMATE_REMOTE_BACKUP__AUTOMATIC_DAILY</code></td><td>durable encrypted upload schedule</td><td><code>false</code></td></tr>
             </tbody>
           </table>
 
@@ -766,7 +771,7 @@ pnpm --filter @soulmate/desktop tauri build   # native installer → src-tauri/t
             <tbody>
               <tr><td>Devices</td><td><code>POST /v1/pairing/start</code>, <code>POST /v1/pairing/complete</code>, <code>GET</code>/<code>DELETE /v1/devices[/{id}]</code>, <code>GET /v1/network/state</code>, <code>GET /v1/session</code></td></tr>
               <tr><td>Service identities</td><td><code>GET</code>/<code>POST</code>/<code>DELETE /v1/service-identities[/{id}]</code>, <code>…/scopes</code>, <code>…/credentials[/{id}]</code></td></tr>
-              <tr><td>Data</td><td><code>GET</code>/<code>DELETE /v1/data/sources[/{id}]</code>, <code>POST /v1/data/imports|backups|exports|restores</code></td></tr>
+              <tr><td>Data</td><td><code>GET</code>/<code>DELETE /v1/data/sources[/{id}]</code>, <code>POST /v1/data/imports|backups|exports|restores</code>, and owner-only remote backup status/upload/latest-restore routes</td></tr>
               <tr><td>Connectors</td><td><code>GET /v1/connectors/catalog</code>, <code>GET</code>/<code>POST /v1/connectors</code>, <code>PATCH</code>/<code>DELETE /v1/connectors/{id}</code>, <code>POST /v1/connectors/{id}/sync</code>, <code>GET /v1/connectors/syncs/{job_id}</code></td></tr>
               <tr><td>Delegation</td><td><code>GET</code>/<code>POST</code>/<code>DELETE /v1/delegation-policies[/{id}]</code>, <code>GET /v1/delegation-requests</code>, <code>POST /v1/delegation-requests/{id}/approve|reject</code></td></tr>
               <tr><td>Audit</td><td><code>GET /v1/audit/events</code> — metadata only, never keys or payloads.</td></tr>
@@ -897,11 +902,19 @@ request_delegation    get_delegation          complete_delegation</code></pre>
               <h4>Restore</h4>
               <p>Validates paths, checksums, and versions; refuses non-fresh installations; migrates known schemas forward; issues a new installation identity; rebuilds the model from Evidence.</p>
             </div>
+            <div class="card">
+              <h4>Optional remote backup</h4>
+              <p>Encrypts locally before upload through a vendor-neutral storage port. The included S3-compatible adapter supports R2, S3, B2, and MinIO endpoints; local-only remains the default.</p>
+            </div>
           </div>
           <p>Archives include the database and any local <code>objects</code>, <code>indexes</code>, and <code>models</code> files. They <strong>exclude</strong> pairing state, API credentials, installation identity, TLS keys, provider secrets, logs, configuration, and existing backups.</p>
 <pre><code># restore only while the daemon is stopped, and only into a fresh installation
 DATA_DIR=./fresh-data uv run --locked soulmate restore ./backup.dtwb
-DATA_DIR=./fresh-data uv run --locked soulmate restore ./personal-model.dtw</code></pre>
+DATA_DIR=./fresh-data uv run --locked soulmate restore ./personal-model.dtw
+
+# explicit handoff, not bidirectional synchronization
+uv run --locked soulmate remote-backup
+DATA_DIR=./fresh-data uv run --locked soulmate remote-restore-latest</code></pre>
           <div class="note warn">
             <strong>Restore never merges.</strong>
             <p>It will not overwrite or blend into owner-created data. Deleting an imported source removes its messages, RawEvents, and derivative Evidence before the model is rebuilt.</p>
