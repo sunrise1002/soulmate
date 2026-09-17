@@ -3,10 +3,10 @@
 ## Status and authorization
 
 This plan was recorded on 2026-09-17 as an owner-requested cross-phase increment.
-Planning is recorded; implementation has not started and requires a separate,
-explicit owner instruction. The open decisions in
-[Owner decisions required](#owner-decisions-required) must be answered before P2
-(persistence) begins. This plan does not start Phase 13 or authorize Phase 14.
+Planning is recorded and the owner answered all open decisions on 2026-09-17
+(see [Owner decisions](#owner-decisions)). Implementation has not started and
+requires a separate, explicit owner instruction. This plan does not start Phase 13
+or authorize Phase 14.
 
 Parts B (multilingual labels and local embeddings) and C (key canonicalization and
 aliases) change persistence, add native runtime dependencies, and introduce a
@@ -51,8 +51,9 @@ keys stay separate.
 - Aggregation lives in `soulmate_core/preferences/aggregation.py` and groups by
   exact key. Evidence is immutable, so key mapping can be applied at aggregation
   time without rewriting provenance.
-- The latest migration is `0010_phase_12`. The Phase 13 plan reserves
-  `0011_phase_13_decision_io` and ADR-014; this increment therefore uses ADR-016.
+- The latest migration is `0010_phase_12`. By owner decision this increment uses
+  migration `0011`, and the Phase 13 plan moved to `0012_phase_13_decision_io`.
+  ADR-014 stays reserved for Phase 13; this increment uses ADR-016.
 - `privacy.mode` defaults to `strict_local`, and `EgressPolicy` denies every
   non-loopback endpoint in that mode. A model download needs an explicit design.
 - `Settings` already reserves `embedding.provider = "local"` and
@@ -60,9 +61,17 @@ keys stay separate.
 - The macOS arm64 desktop sidecar is about 43 MB. `numpy`, `onnxruntime`, and
   `tokenizers` are not in `uv.lock`.
 - Reference sizes on 2026-09-17: `onnxruntime` 1.30 macOS arm64 wheel about 22 MB;
-  `tokenizers` 0.23 about 3 MB; `intfloat/multilingual-e5-small` ONNX weights
-  470 MB (fp32), 235 MB (O4), 118 MB (int8 AVX-512 VNNI, x86 only). An arm64-safe
-  int8 artifact must be produced or selected.
+  `tokenizers` 0.23 about 3 MB. MIT-licensed multilingual ONNX weights:
+
+  | Model | fp32 | fp16 / O4 | int8 |
+  |---|---|---|---|
+  | `BAAI/bge-m3` (ONNX exports in `Xenova/bge-m3`) | 2267 MB | 1134 MB | 568 MB |
+  | `intfloat/multilingual-e5-large` | 2235 MB | — | 562 MB (AVX-512 VNNI, x86 only) |
+  | `intfloat/multilingual-e5-base` | 1110 MB | 555 MB | 278–279 MB |
+  | `intfloat/multilingual-e5-small` | 470 MB | 235 MB | 118 MB (AVX-512 VNNI, x86 only) |
+
+  The license and redistribution terms of any third-party ONNX export must be
+  confirmed in P0 before pinning it.
 - `fastembed` was considered and rejected as the default: it adds `pillow`,
   `huggingface-hub`, `loguru`, and other dependencies, and downloads models itself,
   bypassing the central egress policy and artifact pinning.
@@ -103,8 +112,13 @@ keys stay separate.
      lazily and released after an idle period.
 2. Model manager:
    - pinned artifact URL and SHA-256, stored under `DATA_DIR/models`;
-   - download only through an explicit owner action (see decision 2), with
-     progress reporting, and a manual file import alternative;
+   - download only when the owner presses a download button in the client, which
+     shows the model name, download size, disk and memory needs, and progress; the
+     request passes the central egress policy as an explicit owner-initiated
+     `model_artifact` download, which is permitted even in `strict_local` mode and
+     never happens automatically;
+   - resumable download, SHA-256 verification before activation, and removal of
+     partial files on failure; manual file import remains an offline fallback;
    - disabled in `offline` mode; any load failure falls back to step A.
 3. Table `target_key_catalog`: owner-editable label and aliases in the owner's
    language per key. The extraction wire schema gains optional `label` and
@@ -128,7 +142,7 @@ Each increment stops for verification before the next one starts.
 
 | Step | Scope | Verification |
 |---|---|---|
-| P0 | ADR-016 and spike: choose model and quantization for macOS arm64, x64, Windows, and Linux; measure recall@50 and antonym false-merge rate on a synthetic Vietnamese/English key set; measure latency, RAM, and size | Spike report; owner confirms the model |
+| P0 | ADR-016 and accuracy-first spike: compare `bge-m3` (fp16 and int8) with `multilingual-e5-large` and `multilingual-e5-base` on macOS arm64, x64, Windows, and Linux; measure recall@50 and antonym false-merge rate on a synthetic Vietnamese/English key set, plus latency, RAM, and size | Spike report; owner confirms the model and quantization |
 | P1 | Core `normalize_key`, alias domain model, alias-aware aggregation (pure, no I/O) | Unit tests without an LLM |
 | P2 | Migration, repositories, revision bump, export and restore | Migration test from a real `0010` schema, restart and deletion tests |
 | P3 | Wire C: automatic normalized aliases, predictor and pairwise mapping, owner API and review UI | Integration and client tests |
@@ -146,9 +160,10 @@ exercised by an opt-in test marker and the P6 smoke test.
 | Wrong merges, especially antonyms | Only normalized matches merge automatically; semantic matches need owner review; every alias can be undone |
 | Model download conflicts with `strict_local` | Download only on explicit owner action with SHA-256 verification, or manual import |
 | Native runtime differences on Windows and Linux | P0 spike and P6 smoke test; fall back to step A when loading fails |
-| RAM and CPU use | Small model, lazy loading, idle release, background job execution |
+| RAM, CPU, and disk use of an accuracy-first model (roughly 0.6–1.2 GB on disk and more in memory) | Lazy loading, idle release, background job execution, size and memory shown before download, P0 measurements; int8 is used when its accuracy loss is negligible |
+| Large download on slow or metered connections | Owner-initiated only, resumable, cancellable, with manual import |
 | Migration number collision with Phase 13 | Decision 1 |
-| Vietnamese quality of a small model | Measured in P0 before product code is written |
+| Vietnamese retrieval quality | Measured in P0 before product code is written |
 | Embedding model change invalidates vectors | Vectors store `model_id` and `text_hash`; mismatches are recomputed by a job |
 
 ## Rollback
@@ -161,11 +176,13 @@ exercised by an opt-in test marker and the P6 smoke test.
 - Model artifacts live only in `DATA_DIR/models`; deleting that directory removes
   them.
 
-## Owner decisions required
+## Owner decisions
 
-| # | Decision | Recommendation |
+Recorded on 2026-09-17.
+
+| # | Question | Decision |
 |---|---|---|
-| 1 | Migration number: take `0011` and move Phase 13 to `0012` (updating the Phase 13 plan), or take `0012` and wait for Phase 13 | Take `0011`; Phase 13 has not started |
-| 2 | Model acquisition under `strict_local`: allow an owner-initiated download, or manual import only | Owner-initiated download with SHA-256 pinning, plus manual import |
-| 3 | Merge policy: automatic only for normalized matches with semantic matches reviewed, or automatic above a similarity threshold | Normalized-only automatic merges |
-| 4 | Default model: `multilingual-e5-small` int8 (about 120 MB) or a larger model (about 0.5–1.2 GB) for accuracy | `multilingual-e5-small` int8, confirmed by the P0 spike |
+| 1 | Migration number relative to Phase 13 | This increment takes `0011`; Phase 13 moves to `0012_phase_13_decision_io` and its plan was updated |
+| 2 | Model acquisition under `strict_local` | Allowed only when the owner presses the download button, with SHA-256 pinning; manual import stays available as an offline fallback |
+| 3 | Merge policy | Automatic aliases only for equal normalized keys; semantic matches are suggestions that require owner review |
+| 4 | Default model | Accuracy first: `bge-m3` is the leading candidate (about 1.13 GB fp16 or 568 MB int8), compared in P0 with `multilingual-e5-large` and `multilingual-e5-base`; `multilingual-e5-small` is not the default |

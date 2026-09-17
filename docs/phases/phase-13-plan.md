@@ -18,6 +18,13 @@ subsequent chat-path hardening that moved Evidence extraction to a backoff-enabl
 durable job also leaves Phase 13 scope, ordering, persistence plan, and authorization
 gate unchanged.
 
+On 2026-09-17 the owner assigned migration `0011` to the
+[key consistency increment](key-consistency-increment-plan.md). Phase 13 therefore
+uses migration `0012_phase_13_decision_io` on top of revision `0011`. If Phase 13 is
+authorized before that increment ships, the two migrations must be renumbered
+together before either is merged. Phase 13 scope, ordering, and authorization gate
+are otherwise unchanged.
+
 ## Inputs and precedence
 
 Phase 13 must preserve the existing technical specification unless this plan and
@@ -116,7 +123,7 @@ Phase 13 includes:
 - decision origin and purpose metadata;
 - separate resolution and outcome observations;
 - separate technical, user-behavior, and owner-reported outcome semantics;
-- atomic SQLite persistence and migration `0011_phase_13_decision_io`;
+- atomic SQLite persistence and migration `0012_phase_13_decision_io`;
 - scoped REST ingestion and owner inspection/deletion surfaces;
 - compatibility behavior for existing external decision and outcome APIs;
 - typed TypeScript SDK support;
@@ -414,7 +421,7 @@ These are intended locations, not permission to introduce unused abstractions.
 
 ### P13-06 — Migration and conservative backfill
 
-Create migration `0011_phase_13_decision_io` with indexes, constraints, foreign
+Create migration `0012_phase_13_decision_io` with indexes, constraints, foreign
 keys, and new observation records required by the accepted ADR.
 
 Backfill conservatively:
@@ -430,7 +437,7 @@ Backfill conservatively:
   remain visible but must not gain stronger trust through migration.
 
 Do not infer consent, provider, or owner authorship merely because data is stored
-locally. Migration tests must start from a real revision `0010` schema fixture.
+locally. Migration tests must start from a real revision `0011` schema fixture.
 
 ### P13-07 — REST authorization and compatibility
 
@@ -524,7 +531,7 @@ Update:
 | P13-T11 | Unsupported schema, naive timestamp, oversized content | Validation | Request is rejected without partial state |
 | P13-T12 | Daemon restart after accepted events | Persistence | Idempotency, provenance, correlation, and observation state survive |
 | P13-T13 | Owner removes a source with derivative Evidence | Privacy deletion | Provenance graph is removed and the Personal Model is rebuilt |
-| P13-T14 | Migration from revision `0010` | Upgrade | Existing data remains readable with conservative provenance |
+| P13-T14 | Migration from revision `0011` | Upgrade | Existing data remains readable with conservative provenance |
 | P13-T15 | Backup/export/restore after migration | Portability | New records restore and migrate without usable external credentials |
 | P13-T16 | Audit and failure paths | Payload privacy | Prompts, content, diffs, keys, and outcome notes are absent from logs/audit |
 | P13-T17 | Core package import graph | Architecture | Core remains free of FastAPI, SQLAlchemy, provider, connector, and runtime dependencies |
@@ -549,7 +556,7 @@ uv build --all-packages
 pnpm --filter @soulmate/desktop sidecar:build
 ```
 
-Perform a clean packaged-sidecar smoke test covering migration `0010 → 0011`, MCP
+Perform a clean packaged-sidecar smoke test covering migration `0011 → 0012`, MCP
 initialization, one valid event, one identical retry, one conflicting retry,
 restart persistence, and source deletion. Cross-platform installer and sidecar
 behavior belongs in the existing CI matrix. Local success must never be reported

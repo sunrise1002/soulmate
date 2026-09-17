@@ -91,7 +91,9 @@ verified. No migration was required. Cross-language key matching (multilingual
 key labels or local embeddings) and post-extraction key canonicalization remain
 unimplemented; their persistence plan is recorded in the
 [key consistency increment plan](phases/key-consistency-increment-plan.md) and
-awaits owner decisions and explicit authorization.
+records the owner decisions of 2026-09-17 (migration `0011` for this increment and
+`0012` for Phase 13, owner-initiated model download, reviewed semantic merges, and an
+accuracy-first embedding model); implementation awaits explicit authorization.
 
 On 2026-09-16, desktop daemon restart and application-exit cleanup were corrected
 for the PyInstaller one-file sidecar. The shell now uses a private graceful
