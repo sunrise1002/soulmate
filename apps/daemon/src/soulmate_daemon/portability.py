@@ -29,7 +29,9 @@ from soulmate_daemon.system import DEFAULT_PROFILE_ID, INSTALLATION_ID_KEY, ensu
 
 ARCHIVE_FORMAT_VERSION = 1
 ARCHIVE_MAGIC = b"SOULMATE-DTW\x00"
-ARCHIVE_DIRECTORIES = ("objects", "indexes", "models")
+# Downloaded model artifacts stay out of archives: they are pinned, re-downloadable,
+# and larger on their own than the supported archive size.
+ARCHIVE_DIRECTORIES = ("objects", "indexes")
 MAX_ARCHIVE_ENTRIES = 100_000
 MAX_ARCHIVE_SIZE = 512 * 1024 * 1024
 MIN_PASSPHRASE_LENGTH = 12

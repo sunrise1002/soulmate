@@ -4,6 +4,25 @@
 
 ### Added
 
+- Local embedding port for the key consistency increment (step P4): the kernel
+  gained an `EmbeddingProvider` port with a `NullEmbedding` default, and the
+  daemon gained a `LocalOnnxEmbedding` adapter that imports `onnxruntime`,
+  `tokenizers`, and `numpy` only when a model is actually loaded, keeps the model
+  in memory only while it is used, and reports `EmbeddingUnavailableError` so a
+  missing or broken runtime falls back to the existing word-overlap ranking. The
+  pinned `bge-m3` int8 artifact (MIT, 568 MB) is identified by URL and SHA-256 and
+  is only fetched when the owner asks: a new owner-only API (`GET
+  /v1/embedding-model`, `POST /v1/embedding-model/download`, `/cancel`, `/import`,
+  `/remove`) reports the download size, memory need, and progress, resumes an
+  interrupted download with a range request, verifies every file before it is
+  activated, deletes a file that fails verification, and accepts a manually copied
+  file as an offline fallback. The central egress policy now recognizes a
+  `model_artifact` classification that is allowed over HTTPS even in
+  `strict_local` mode and refused in `offline` mode, while personal data stays
+  bound by the old rules. `embedding.provider` defaults to `none`, so nothing is
+  downloaded, loaded, or installed until the owner changes it, and downloaded
+  artifacts are excluded from portable archives and backups. Nothing computes key
+  embeddings yet.
 - Accuracy spike for the key consistency increment (step P0): a packaged
   synthetic `synthetic-key-retrieval-v1` dataset (168 dotted keys with Vietnamese
   owner labels, 84 Vietnamese and English messages, 27 opposite key pairs) and a

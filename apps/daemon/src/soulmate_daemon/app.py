@@ -44,6 +44,8 @@ from soulmate_daemon.conversation import CONVERSATION_EXTRACTION_JOB, Conversati
 from soulmate_daemon.data_api import build_data_router
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
 from soulmate_daemon.delegation_api import build_delegation_router
+from soulmate_daemon.embedding_api import build_embedding_router
+from soulmate_daemon.embedding_models import EmbeddingModelService
 from soulmate_daemon.external_api import build_external_router
 from soulmate_daemon.jobs import DurableJobWorker
 from soulmate_daemon.key_alias_api import build_key_alias_router
@@ -615,6 +617,9 @@ def create_app(
                 backup_store,
             )
         )
+        embedding_models = EmbeddingModelService(
+            resolved_settings, repositories.audit_events, profile_id=DEFAULT_PROFILE_ID
+        )
         app.state.runtime = AppState(
             settings=resolved_settings,
             database=database,
@@ -625,6 +630,7 @@ def create_app(
             lan_error=lan_error,
             connector_catalog=connector_catalog,
             remote_backup=remote_backup,
+            embedding_models=embedding_models,
         )
         stop = asyncio.Event()
 
@@ -728,6 +734,7 @@ def create_app(
             yield
         finally:
             stop.set()
+            await embedding_models.shutdown()
             tasks = [worker_task]
             if scheduler_task is not None:
                 tasks.append(scheduler_task)
@@ -1346,5 +1353,6 @@ def create_app(
     app.include_router(build_connector_router(app))
     app.include_router(build_delegation_router(app))
     app.include_router(build_key_alias_router(app))
+    app.include_router(build_embedding_router(app))
     mount_web_client(app, resolved_settings.web_client_directory)
     return app

@@ -7,6 +7,9 @@ from urllib.parse import urlparse
 
 PrivacyMode = Literal["strict_local", "hybrid", "offline"]
 
+MODEL_ARTIFACT_CLASSIFICATION = "model_artifact"
+"""An owner-initiated download of a pinned model file; it carries no personal data."""
+
 
 class EgressDeniedError(PermissionError):
     """The configured privacy policy denied a provider request."""
@@ -29,11 +32,15 @@ class EgressPolicy:
 
     def can_send(self, *, provider: str, endpoint: str, data_classification: str) -> bool:
         """Return whether a provider may receive the classified payload."""
-        del provider, data_classification
+        del provider
         parsed = urlparse(endpoint)
         local = _is_loopback(parsed.hostname)
         if parsed.scheme not in {"http", "https"}:
             return False
+        if data_classification == MODEL_ARTIFACT_CLASSIFICATION:
+            # Nothing personal leaves the device, so only offline mode refuses a
+            # download the owner started; the endpoint still needs transport security.
+            return self.mode != "offline" and (local or parsed.scheme == "https")
         if self.mode in {"strict_local", "offline"}:
             return local
         return local or parsed.scheme == "https"

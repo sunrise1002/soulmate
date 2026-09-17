@@ -60,7 +60,12 @@ model = ""
 # Set SOULMATE_LLM__OPENAI_COMPATIBLE__API_KEY in the environment when required.
 
 [embedding]
-provider = "local"
+# "none" keeps today's behavior and downloads nothing. "local" enables on-device
+# key embeddings; the pinned model is only fetched when the owner asks for it.
+provider = "none"
+model_id = "bge-m3-int8"
+# Release the loaded model after this many idle seconds to return its memory.
+idle_release_seconds = 300
 
 [key_aliases]
 # Group equal target keys, such as ui.theme.dark_mode and ui.theme.dark, into one

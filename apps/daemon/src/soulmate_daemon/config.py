@@ -149,7 +149,11 @@ class LLMConfig(ConfigModel):
 
 
 class EmbeddingConfig(ConfigModel):
-    provider: Literal["local"] = "local"
+    """Local key embeddings; the pinned artifact is only downloaded on owner request."""
+
+    provider: Literal["none", "local"] = "none"
+    model_id: Literal["bge-m3-int8"] = "bge-m3-int8"
+    idle_release_seconds: int = Field(default=300, ge=30, le=3600)
 
 
 class KeyAliasesConfig(ConfigModel):
@@ -189,6 +193,11 @@ class Settings(ConfigModel):
             packaged = Path(__file__).resolve().parent / "web_client"
             return packaged if packaged.is_dir() else None
         return directory.expanduser().resolve()
+
+    @property
+    def models_directory(self) -> Path:
+        """Resolve where downloaded model artifacts live, without creating anything."""
+        return (self.data_dir.expanduser() / "models").resolve()
 
     @property
     def database_path(self) -> Path:

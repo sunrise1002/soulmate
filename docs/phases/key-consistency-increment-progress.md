@@ -76,6 +76,53 @@ documentation. Authoritative documents stay
   `DuplicateKeysPanel.test.tsx`, `DuplicateKeys.test.tsx`, `client.test.ts`, and
   `apps/web/src/App.test.tsx`.
 
+### P4 (2026-09-18) — embedding port, local adapter, model manager
+
+- Kernel: `soulmate_core/embeddings/port.py` (`EmbeddingProvider` protocol with
+  `model_id`, `dimensions`, `ready`, `embed`, `release`; `NullEmbedding`;
+  `EmbeddingUnavailableError`; `EmbeddingVector = tuple[float, ...]`). The kernel
+  stays dependency-free: adapters satisfy the protocol structurally, so nothing
+  outside imports a runtime.
+- Daemon: `soulmate_daemon/model_artifacts.py` holds `ModelFile`,
+  `ModelArtifact`, the pinned `BGE_M3_INT8` artifact, `MODEL_ARTIFACTS`,
+  `ModelArtifactStore` (paths, `status`, `activate`, `import_file`, `remove`) and
+  `ArtifactDownloader` (`authorize`, resumable `download`). Files live in
+  `DATA_DIR/models/<model_id>/`, downloads stream into `<name>.part` and are only
+  renamed after the pinned SHA-256 matches.
+- Daemon: `soulmate_daemon/embeddings.py` holds `artifact_for`, `artifact_store`,
+  `LocalOnnxEmbedding` (lazy load, idle release, injectable `loader` and `clock`),
+  the default `onnx_session_loader` (imports `numpy`, `onnxruntime`, `tokenizers`
+  inside `_OnnxSession`, CLS pooling and L2 normalization as P0 measured), and
+  `embedding_provider(settings)`.
+- Daemon: `soulmate_daemon/embedding_models.py` holds `EmbeddingModelService`
+  (`state`, `start_download`, `wait`, `shutdown`, `cancel`, `import_file`,
+  `remove`) plus the audit action constants. It runs at most one download task,
+  records `model.embedding_*` audits with no key names, and lives in `AppState`
+  as `embedding_models`; `app.py` awaits `shutdown()` on lifespan exit.
+- Daemon: `soulmate_daemon/embedding_api.py` is the owner-only router
+  (`GET /v1/embedding-model`, `POST /v1/embedding-model/download`, `/cancel`,
+  `/import`, `/remove`); `security.py` lists `/v1/embedding-model` under
+  `OWNER_ONLY_RULES`.
+- Egress: `MODEL_ARTIFACT_CLASSIFICATION = "model_artifact"` in
+  `soulmate_llm_providers.policy`. `EgressPolicy.can_send` now reads
+  `data_classification`: an artifact endpoint passes in `strict_local` and
+  `hybrid` when it uses HTTPS (or loopback) and is refused in `offline`; personal
+  data keeps the old rules.
+- Config: `embedding.provider` now accepts `"none"` (new default) and `"local"`,
+  plus `embedding.model_id` and `embedding.idle_release_seconds` (30–3600);
+  `Settings.models_directory` resolves `DATA_DIR/models`. `config.example.toml`
+  documents all three.
+- Portability: `ARCHIVE_DIRECTORIES` no longer contains `models`, so a 568 MB
+  artifact cannot break the 512 MB archive cap. Restore rejects `models/` entries.
+- `pyproject.toml` gained a mypy override so `numpy`, `onnxruntime`, and
+  `tokenizers` may be missing; they are still **not** in `uv.lock`.
+- Tests: `tests/unit/test_model_artifacts.py` (19), `test_embedding_provider.py`
+  (11), `test_embedding_model_service.py` (12),
+  `tests/integration/test_embedding_model_api.py` (7), plus new cases in
+  `test_config.py`, `test_access_boundary.py`, and `test_portability.py`. All use
+  fakes: `httpx.MockTransport` for downloads, a fake session loader for the
+  adapter, and a synthetic artifact pinned into `MODEL_ARTIFACTS` by monkeypatch.
+
 ### P0 (2026-09-18) — spike, ADR-016, owner decision
 
 Full detail in the [P0 spike report](key-consistency-p0-spike-report.md); only
@@ -97,12 +144,17 @@ what P4/P5 must act on is repeated here.
 
 ## Not done
 
-- P4: embedding port, null and ONNX adapters, model manager, egress handling.
 - P5: extraction `label`/`aliases` fields, catalog and embedding repositories and
   domain records, backfill job, semantic scoring, **semantic alias suggestions**
   (the review UI already renders `suggested` aliases and sends
-  approve/invert/reject, so P5 only has to create the rows).
-- P6: sidecar packaging, size check, smoke test, final documentation.
+  approve/invert/reject, so P5 only has to create the rows). Nothing calls
+  `embedding_provider(settings)` yet — P4 only built it.
+- P6: sidecar packaging (`onnxruntime`, `tokenizers`, `numpy` in `uv.lock`), size
+  check, smoke test against the real artifact, final documentation. **No client
+  UI exists for the model yet**: the API is complete and owner-only, but the
+  TypeScript SDK has no `embeddingModel*` methods and no screen shows the
+  download button, size, memory warning, or progress. That UI is unassigned in
+  the plan; P5 or P6 should take it.
 
 ## Decisions that later steps must honor
 
@@ -122,6 +174,23 @@ what P4/P5 must act on is repeated here.
   (x86-only) and its similarity range is so compressed that every antonym pair
   exceeded 0.85. Do not swap it in as a "smaller alternative" without redoing the
   antonym measurement.
+
+- From P4: the pinned artifact is the single source of truth for what may be
+  downloaded. `EgressPolicy` only allows `data_classification="model_artifact"`
+  over HTTPS or loopback and never in `offline` mode; do not add a second network
+  path for models. Downloads are started by an owner request only — no job, no
+  scheduler, and no automatic retry may call `start_download`.
+- From P4: `ModelArtifactStore.activate` is the only way a file becomes usable,
+  and it deletes anything that fails the SHA-256 check. An interrupted transfer
+  keeps its `.part` file on purpose so the next attempt sends a range request.
+- From P4: `LocalOnnxEmbedding` raises `EmbeddingUnavailableError` for every
+  failure (not installed, runtime missing, inference failed). P5 must catch it
+  and fall back to the step-A lexical ranking instead of surfacing an error.
+- From P4: the artifact hashes were copied from the P0 spike report, not
+  re-verified by downloading 568 MB in this session.
+  `test_default_artifact_pins_match_the_recorded_spike_measurements` keeps the
+  code and the report in sync; P6 must download the real files once and confirm
+  both hashes before release.
 
 - From P1/P2: evidence is never rewritten; polarity `-1` only for preferences; a
   `semantic` alias needs `similarity`; `upsert` rejects active cycles, keeps the
@@ -143,9 +212,9 @@ what P4/P5 must act on is repeated here.
 
 ## Watch out
 
-- `ARCHIVE_DIRECTORIES` in `portability.py` includes `models`, and archives are
-  capped at 512 MB. P4 stores model artifacts under `DATA_DIR/models`
-  (0.5–1.2 GB), which would make every backup fail; exclude or relocate them.
+- Handled in P4: `ARCHIVE_DIRECTORIES` no longer includes `models`, so artifacts
+  stay out of the 512 MB archive cap. An archive written before P4 that contains
+  `models/` entries is now rejected on restore; no such archive should exist.
 - Catalog and embedding rows still have no repository or domain record. P5 should
   use the existing `0011` columns; amend `0011` only if no user database has it
   yet — otherwise stop and ask the owner, because `0012` belongs to Phase 13.
@@ -160,12 +229,23 @@ what P4/P5 must act on is repeated here.
 - Tests that construct daemon services must pass `aliases=repositories.key_aliases`
   (the keyword is required); passing `None` produces snapshots with a different
   algorithm version, which the daemon then rebuilds.
-- `pytest-cov` is not installed, so P1 to P3 and P0 still have no coverage number.
+- `pytest-cov` is not installed, so P0 to P4 still have no coverage number.
+- The real `_OnnxSession` in `soulmate_daemon/embeddings.py` has no automated
+  test: `numpy`, `onnxruntime`, and `tokenizers` are not installed, so mypy skips
+  them through a `pyproject.toml` override and every test injects a fake loader.
+  P6 owns the first real execution; treat its pooling and padding code as
+  unverified until then.
+- `EmbeddingModelService` keeps download progress in memory only. A daemon
+  restart during a download loses the progress number but not the bytes: the
+  `.part` file resumes. There is no durable job for it on purpose — a download
+  must never restart without the owner.
 - P0 measured macOS arm64 only. Windows, Linux, and x64 are unverified and moved
   into P6; the step-A fallback on load failure is what makes that acceptable.
 - Peak RSS with `bge-m3` int8 loaded was about 1.8 GB (whole process, mapped
-  weights included). P4 must load lazily and release after idle, and the client
-  download dialog should state this before the owner presses download.
+  weights included). P4 loads lazily and releases after
+  `embedding.idle_release_seconds`, and `GET /v1/embedding-model` returns
+  `peak_memory_bytes` and `download_bytes`; the client dialog still has to show
+  them before the owner presses download.
 - P5 can ship semantic scoring before the label catalog UI: key text alone already
   reaches 97.7% Vietnamese recall inside the 50-key budget; labels take it to 100%
   and mainly improve rank 1.
@@ -181,6 +261,7 @@ uv run --locked pytest
 pnpm check
 ```
 
-Result for P3: `pnpm check` passed locally (500 Python tests, 50 SDK, 18 desktop,
-27 web, 27 mobile client tests, Rust tests). `pnpm check:all` (lockfile check,
-pre-commit, builds) was not run.
+Result for P4: `pnpm check` passed locally (582 Python tests, 50 SDK, 18 desktop,
+27 web, 27 mobile client tests, 7 Rust tests), with `ruff`, `ruff format`, and
+strict `mypy` clean. `pnpm check:all` (lockfile check, pre-commit, builds) was
+not run in P3 or P4.

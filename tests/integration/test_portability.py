@@ -265,3 +265,26 @@ def test_backup_manifest_contains_no_credentials(tmp_path: Path) -> None:
         manifest = json.loads(archive.read("manifest.json"))
     assert manifest["format_version"] == 1
     assert manifest["credentials_included"] is False
+
+
+def test_backups_exclude_downloaded_model_artifacts(tmp_path: Path) -> None:
+    # Given: an installation holding a downloaded model artifact and one stored object
+    settings = Settings(data_dir=tmp_path / "data")
+    database, _ = _storage(settings.database_path)
+    model_file = settings.models_directory / "bge-m3-int8" / "model_int8.onnx"
+    model_file.parent.mkdir(parents=True)
+    model_file.write_bytes(b"synthetic pinned weights")
+    objects = settings.data_dir.expanduser() / "objects"
+    objects.mkdir(parents=True, exist_ok=True)
+    (objects / "kept.bin").write_bytes(b"owner data")
+
+    # When: a local backup is created
+    archive_path = tmp_path / "backup.dtwb"
+    ArchiveService(settings, database).create(archive_path, created_at=NOW)
+    database.close()
+
+    # Then: the re-downloadable pinned artifact stays out of the size-capped archive
+    with zipfile.ZipFile(archive_path) as archive:
+        names = set(archive.namelist())
+    assert "objects/kept.bin" in names
+    assert not any(name.startswith("models/") for name in names)

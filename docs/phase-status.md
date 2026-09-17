@@ -31,9 +31,12 @@ arm64: word overlap places the right key inside the shared 50-key budget for onl
 27.3% of Vietnamese messages, a local `bge-m3` int8 model reaches 97.7%, and every
 opposite key pair is more similar to its opposite than a typical correct match is,
 so semantic merges must stay owner-reviewed. The owner confirmed `bge-m3` int8 as
-the default model and quantization. No model is downloaded or loaded by the
-product yet. Steps P4 to P6 are not implemented. See the
-[P0 spike report](phases/key-consistency-p0-spike-report.md).
+the default model and quantization. Step P4 followed on 2026-09-18 with the
+kernel embedding port, the lazily loaded local ONNX adapter, the pinned artifact
+manager, and the owner-only `/v1/embedding-model` API; `embedding.provider`
+defaults to `none`, so no model is downloaded or loaded unless the owner asks,
+and no code computes key embeddings yet. Steps P5 and P6 are not implemented. See
+the [P0 spike report](phases/key-consistency-p0-spike-report.md).
 
 ## Reports
 
@@ -176,6 +179,30 @@ unresolved decision option key is matched by normalization but stores no alias;
 the clients cannot create owner merges yet (API and SDK only); and semantic
 suggestions, key labels, embeddings, and the P0 model spike remain
 unimplemented.
+
+Step P4 was implemented on 2026-09-18. The kernel gained an `EmbeddingProvider`
+port with a `NullEmbedding` default and an `EmbeddingUnavailableError` that means
+"fall back to lexical ranking", and it stays dependency-free because adapters
+satisfy the port structurally. The daemon gained `LocalOnnxEmbedding`, which
+imports `onnxruntime`, `tokenizers`, and `numpy` only when a model is first used
+and releases the session after `embedding.idle_release_seconds`, and a model
+manager that stores the pinned `bge-m3` int8 artifact under `DATA_DIR/models`,
+resumes an interrupted transfer with a range request, verifies each file against
+its pinned SHA-256 before activating it, deletes anything that fails, and accepts
+a manually copied file as an offline fallback. `EgressPolicy` now recognizes the
+`model_artifact` classification, which passes over HTTPS even in `strict_local`
+mode and is refused in `offline` mode, while personal data keeps the old rules.
+The owner-only `/v1/embedding-model` API reports the download size, peak memory,
+progress, and per-file state and exposes download, cancel, import, and remove;
+every action is audited without key names, and a running download is cancelled at
+shutdown. `embedding.provider` defaults to `none`, and downloaded artifacts are
+excluded from portable archives so they cannot break the 512 MB archive limit.
+`pnpm check` passed locally, including 582 Python tests and the client suites;
+`pnpm check:all` and coverage collection (pytest-cov is still not installed) were
+not run. Limitations: `onnxruntime`, `tokenizers`, and `numpy` are still not in
+`uv.lock`, so the real ONNX session is exercised by no test; the pinned hashes
+were copied from the P0 spike report rather than re-downloaded; no client screen
+offers the download button; and nothing computes or uses key embeddings yet.
 
 On 2026-09-16, desktop daemon restart and application-exit cleanup were corrected
 for the PyInstaller one-file sidecar. The shell now uses a private graceful

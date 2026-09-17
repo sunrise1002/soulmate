@@ -9,6 +9,7 @@ from soulmate_llm_providers import LLMProvider
 from soulmate_storage_sqlite import Database, Repositories
 
 from soulmate_daemon.config import Settings
+from soulmate_daemon.embedding_models import EmbeddingModelService
 from soulmate_daemon.network import LanEndpoint
 from soulmate_daemon.pairing import DeviceAccessService, pairing_token_ttl
 from soulmate_daemon.remote_backup import RemoteBackupService
@@ -24,6 +25,7 @@ class AppState(TypedDict):
     lan_error: str | None
     connector_catalog: ConnectorCatalog
     remote_backup: RemoteBackupService | None
+    embedding_models: EmbeddingModelService
 
 
 def runtime_of(app: FastAPI) -> AppState:

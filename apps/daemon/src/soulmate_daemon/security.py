@@ -53,6 +53,7 @@ OWNER_ONLY_RULES: tuple[tuple[str | None, str], ...] = (
     (None, "/v1/delegation-policies"),
     (None, "/v1/delegation-requests"),
     (None, "/v1/key-aliases"),
+    (None, "/v1/embedding-model"),
 )
 
 PUBLIC_RULES: tuple[tuple[str | None, str], ...] = (
