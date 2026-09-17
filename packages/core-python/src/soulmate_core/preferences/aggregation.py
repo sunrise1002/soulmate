@@ -3,7 +3,7 @@
 import json
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import cast
 
 from soulmate_core.domain.models import (
@@ -14,7 +14,9 @@ from soulmate_core.domain.models import (
     Fact,
     Goal,
     Preference,
+    TargetKeyAlias,
 )
+from soulmate_core.keys import KeyAliasMap
 
 ALGORITHM_VERSION = "personal-model-v1:evidence-weights-v1"
 
@@ -54,6 +56,17 @@ class EvidenceWeightingStrategy:
 DEFAULT_WEIGHTING_STRATEGY = EvidenceWeightingStrategy(
     version="evidence-weights-v1", source_weights=DEFAULT_SOURCE_WEIGHTS
 )
+
+
+def _canonical(item: Evidence, aliases: KeyAliasMap) -> Evidence:
+    """Return the evidence as it aggregates; stored evidence keeps its own key."""
+    resolved = aliases.resolve(item.profile_id, item.target_type, item.target_key)
+    if resolved.key == item.target_key and resolved.polarity == 1:
+        return item
+    value = item.value
+    if resolved.polarity == -1:
+        value = -cast(float, value)
+    return replace(item, target_key=resolved.key, value=value)
 
 
 def _context_key(context: Mapping[str, object]) -> str:
@@ -139,14 +152,21 @@ def _categorical[DerivedRecord: (Fact, Goal, Constraint)](
 def aggregate_evidence(
     evidence: Sequence[Evidence],
     strategy: EvidenceWeightingStrategy = DEFAULT_WEIGHTING_STRATEGY,
+    aliases: Sequence[TargetKeyAlias] = (),
 ) -> DerivedModel:
-    """Aggregate fixed evidence into stable, sorted model content without an LLM."""
+    """Aggregate fixed evidence into stable, sorted model content without an LLM.
 
+    Active aliases group semantically equal keys under one canonical key and invert
+    the values of opposite preference keys, so both directions reinforce one entry.
+    """
+
+    alias_map = KeyAliasMap(aliases)
+    canonical = [_canonical(item, alias_map) for item in evidence]
     preferences: list[Preference] = []
     facts: list[Fact] = []
     goals: list[Goal] = []
     constraints: list[Constraint] = []
-    for (target_type, key, _), items in sorted(_group(evidence).items(), key=lambda item: item[0]):
+    for (target_type, key, _), items in sorted(_group(canonical).items(), key=lambda item: item[0]):
         if target_type is EvidenceTargetType.PREFERENCE:
             preferences.append(_preference(key, items, strategy))
         elif target_type is EvidenceTargetType.FACT:

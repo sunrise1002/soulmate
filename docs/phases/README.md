@@ -37,7 +37,7 @@ Available reports:
 Owner-authorized cross-phase increments:
 
 - [Encrypted remote backup](remote-backup-increment-report.md)
-- [Key consistency plan](key-consistency-increment-plan.md) (planned, not started)
+- [Key consistency plan](key-consistency-increment-plan.md) (in progress; step P1 implemented)
 
 Planned work:
 

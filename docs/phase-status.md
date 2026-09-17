@@ -17,6 +17,13 @@ and manual uploads, and fresh-install latest restore. It does not start Phase 13
 or authorize a later phase. See the
 [remote backup increment report](phases/remote-backup-increment-report.md).
 
+The owner authorized the key consistency increment on 2026-09-17, and step P1 of
+its [plan](phases/key-consistency-increment-plan.md) is implemented locally:
+`normalize_key`, the `TargetKeyAlias` domain record, and alias-aware aggregation
+inside the kernel, with no persistence, no wiring, and no new dependency. Steps
+P0 and P2 to P6 are not implemented. This does not start Phase 13 or authorize a
+later phase.
+
 ## Reports
 
 | Phase | State | Report | Important open issue |
@@ -93,7 +100,20 @@ unimplemented; their persistence plan is recorded in the
 [key consistency increment plan](phases/key-consistency-increment-plan.md) and
 records the owner decisions of 2026-09-17 (migration `0011` for this increment and
 `0012` for Phase 13, owner-initiated model download, reviewed semantic merges, and an
-accuracy-first embedding model); implementation awaits explicit authorization.
+accuracy-first embedding model).
+
+On 2026-09-17 the owner authorized that plan and step P1 was implemented: the
+kernel gained the versioned `key-normalizer-v1` `normalize_key`, a `TargetKeyAlias`
+record carrying polarity, review status, method, similarity, and algorithm version,
+a cycle-safe `KeyAliasMap` that follows only active aliases, and
+`aggregate_evidence(..., aliases=...)`, which groups aliased keys under one
+canonical key and inverts opposite preference values. Evidence is never rewritten,
+so removing an alias and rebuilding restores the previous grouping. `ruff check`,
+`ruff format --check`, strict `mypy`, and 398 Python tests passed locally;
+`pnpm check:all`, coverage collection (pytest-cov is still not installed), and
+client behavior were not verified. No migration, dependency, persistence, API, or
+client change was made; the alias tables, extraction and predictor wiring, owner
+review API and UI, embeddings, and the P0 model spike remain unimplemented.
 
 On 2026-09-16, desktop daemon restart and application-exit cleanup were corrected
 for the PyInstaller one-file sidecar. The shell now uses a private graceful

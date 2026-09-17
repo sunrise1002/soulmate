@@ -4,6 +4,14 @@
 
 ### Added
 
+- Infrastructure-free key canonicalization core for the key consistency
+  increment (step P1): a versioned `key-normalizer-v1` `normalize_key`, a
+  `TargetKeyAlias` domain record with polarity, review status, and provenance
+  method, a cycle-safe `KeyAliasMap`, and alias-aware evidence aggregation that
+  groups semantically equal keys under one canonical key and folds opposite
+  preference keys into one signed axis. Evidence is never rewritten, only active
+  aliases apply, and removing an alias restores the previous grouping. Nothing is
+  persisted or wired into extraction, prediction, or clients yet.
 - Provider capability negotiation for OpenAI-compatible endpoints: strict JSON
   Schema, JSON-object mode, and validated schema-guided JSON fallback, with the
   successful mode cached per configured provider instance; Ollama also gains a

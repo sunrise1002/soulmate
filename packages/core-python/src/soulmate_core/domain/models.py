@@ -32,6 +32,22 @@ class EvidenceTargetType(StrEnum):
     CONSTRAINT = "constraint"
 
 
+class TargetKeyAliasMethod(StrEnum):
+    """How an alias between two target keys was proposed."""
+
+    NORMALIZED = "normalized"
+    SEMANTIC = "semantic"
+    OWNER = "owner"
+
+
+class TargetKeyAliasStatus(StrEnum):
+    """Review state of an alias; only active aliases affect derived state."""
+
+    ACTIVE = "active"
+    SUGGESTED = "suggested"
+    REJECTED = "rejected"
+
+
 class MessageRole(StrEnum):
     """Conversation roles persisted by the provider-neutral kernel."""
 
@@ -377,6 +393,45 @@ class Evidence:
             or not -1.0 <= float(self.value) <= 1.0
         ):
             raise ValueError("Preference evidence value must be numeric and between -1 and 1.")
+
+
+@dataclass(frozen=True, slots=True)
+class TargetKeyAlias:
+    """Owner-owned mapping of one target key onto the canonical key it reinforces.
+
+    Evidence is never rewritten: aggregation applies active aliases, so removing
+    one and rebuilding restores the previous grouping. ``polarity`` is ``-1`` for
+    opposite keys such as ``ui.theme.light`` against ``ui.theme.dark``.
+    """
+
+    profile_id: str
+    target_type: EvidenceTargetType
+    alias_key: str
+    canonical_key: str
+    polarity: int
+    method: TargetKeyAliasMethod
+    status: TargetKeyAliasStatus
+    algorithm_version: str
+    created_at: datetime
+    updated_at: datetime
+    similarity: float | None = None
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at, self.updated_at)
+        if not self.alias_key or not self.canonical_key:
+            raise ValueError("Target key alias keys must not be empty.")
+        if self.alias_key == self.canonical_key:
+            raise ValueError("A target key alias must not point at itself.")
+        if not self.algorithm_version:
+            raise ValueError("Target key alias algorithm version must not be empty.")
+        if self.polarity not in (1, -1):
+            raise ValueError("Target key alias polarity must be 1 or -1.")
+        if self.polarity == -1 and self.target_type is not EvidenceTargetType.PREFERENCE:
+            raise ValueError("Only preference aliases can invert polarity.")
+        if self.similarity is not None and not 0.0 <= self.similarity <= 1.0:
+            raise ValueError("Target key alias similarity must be between 0 and 1.")
+        if self.method is TargetKeyAliasMethod.SEMANTIC and self.similarity is None:
+            raise ValueError("Semantic target key aliases must record a similarity.")
 
 
 @dataclass(frozen=True, slots=True)

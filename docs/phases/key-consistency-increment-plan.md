@@ -4,9 +4,12 @@
 
 This plan was recorded on 2026-09-17 as an owner-requested cross-phase increment.
 Planning is recorded and the owner answered all open decisions on 2026-09-17
-(see [Owner decisions](#owner-decisions)). Implementation has not started and
-requires a separate, explicit owner instruction. This plan does not start Phase 13
-or authorize Phase 14.
+(see [Owner decisions](#owner-decisions)). On 2026-09-17 the owner authorized
+implementation, and step P1 is complete locally; steps P0 and P2 to P6 have not
+started and each still stops for verification. This plan does not start Phase 13
+or authorize Phase 14. Temporary hand-over notes for the next session live in
+[working notes](key-consistency-increment-progress.md); delete that file when the
+increment finishes.
 
 Parts B (multilingual labels and local embeddings) and C (key canonicalization and
 aliases) change persistence, add native runtime dependencies, and introduce a
@@ -143,7 +146,7 @@ Each increment stops for verification before the next one starts.
 | Step | Scope | Verification |
 |---|---|---|
 | P0 | ADR-016 and accuracy-first spike: compare `bge-m3` (fp16 and int8) with `multilingual-e5-large` and `multilingual-e5-base` on macOS arm64, x64, Windows, and Linux; measure recall@50 and antonym false-merge rate on a synthetic Vietnamese/English key set, plus latency, RAM, and size | Spike report; owner confirms the model and quantization |
-| P1 | Core `normalize_key`, alias domain model, alias-aware aggregation (pure, no I/O) | Unit tests without an LLM |
+| P1 | Core `normalize_key`, alias domain model, alias-aware aggregation (pure, no I/O) — complete on 2026-09-17 | Unit tests without an LLM: passed locally (398 Python tests, strict typing, lint) |
 | P2 | Migration, repositories, revision bump, export and restore | Migration test from a real `0010` schema, restart and deletion tests |
 | P3 | Wire C: automatic normalized aliases, predictor and pairwise mapping, owner API and review UI | Integration and client tests |
 | P4 | Embedding port, null and ONNX adapters, model manager and egress handling | Tests for failed download, SHA mismatch, offline and strict modes using fakes |
