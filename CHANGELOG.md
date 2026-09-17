@@ -4,6 +4,20 @@
 
 ### Added
 
+- Accuracy spike for the key consistency increment (step P0): a packaged
+  synthetic `synthetic-key-retrieval-v1` dataset (168 dotted keys with Vietnamese
+  owner labels, 84 Vietnamese and English messages, 27 opposite key pairs) and a
+  deterministic `soulmate_core.evaluation.key_retrieval` harness that measures
+  recall inside the shared key budget, mean reciprocal rank, and the rate at which
+  opposite keys would be merged automatically. Measured on macOS arm64, today's
+  word-overlap ranking shares the right key for 27.3% of Vietnamese messages
+  against 97.7% for a local `bge-m3` int8 model, and 100% once owner labels are
+  included; every opposite key pair scored closer to its opposite than a typical
+  correct match, so semantic merges stay owner-reviewed. ADR-016 records the
+  embedding port, the owner-initiated pinned download, and the owner-confirmed
+  `bge-m3` int8 default; `scripts/key_embedding_spike.py` reproduces the numbers
+  from a throwaway environment. No product code loads a model, and `onnxruntime`,
+  `tokenizers`, and `numpy` are still not dependencies.
 - Key consistency wiring for the key consistency increment (step P3): reviewed
   evidence now creates active `normalized` aliases automatically when two used
   keys share one `key-normalizer-v1` form, so `ui.theme.dark_mode` reinforces

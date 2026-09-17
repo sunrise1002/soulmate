@@ -1,0 +1,1461 @@
+{
+  "dataset_version": "synthetic-key-retrieval-v1",
+  "keys": [
+    {
+      "key": "clothing.color.black",
+      "key_type": "preferences",
+      "label": "Quần áo màu đen"
+    },
+    {
+      "key": "clothing.color.bright",
+      "key_type": "preferences",
+      "label": "Quần áo màu sáng"
+    },
+    {
+      "key": "clothing.fabric.cotton",
+      "key_type": "preferences",
+      "label": "Vải cotton"
+    },
+    {
+      "key": "clothing.shoe.sneaker",
+      "key_type": "preferences",
+      "label": "Giày thể thao"
+    },
+    {
+      "key": "clothing.style.minimal",
+      "key_type": "preferences",
+      "label": "Phong cách tối giản"
+    },
+    {
+      "key": "communication.channel.call",
+      "key_type": "preferences",
+      "label": "Gọi điện thoại"
+    },
+    {
+      "key": "communication.channel.text",
+      "key_type": "preferences",
+      "label": "Nhắn tin"
+    },
+    {
+      "key": "communication.language.vietnamese",
+      "key_type": "facts",
+      "label": "Giao tiếp bằng tiếng Việt"
+    },
+    {
+      "key": "communication.notification.batch",
+      "key_type": "preferences",
+      "label": "Gom thông báo lại"
+    },
+    {
+      "key": "communication.response.same_day",
+      "key_type": "preferences",
+      "label": "Trả lời trong ngày"
+    },
+    {
+      "key": "communication.smalltalk.avoid",
+      "key_type": "preferences",
+      "label": "Tránh nói chuyện xã giao"
+    },
+    {
+      "key": "communication.tone.direct",
+      "key_type": "preferences",
+      "label": "Nói thẳng vào vấn đề"
+    },
+    {
+      "key": "communication.tone.gentle",
+      "key_type": "preferences",
+      "label": "Nói nhẹ nhàng"
+    },
+    {
+      "key": "device.headphone.noise_cancelling",
+      "key_type": "preferences",
+      "label": "Tai nghe chống ồn"
+    },
+    {
+      "key": "device.keyboard.mechanical",
+      "key_type": "preferences",
+      "label": "Bàn phím cơ"
+    },
+    {
+      "key": "device.laptop.linux",
+      "key_type": "facts",
+      "label": "Máy tính Linux"
+    },
+    {
+      "key": "device.laptop.macos",
+      "key_type": "facts",
+      "label": "Máy tính macOS"
+    },
+    {
+      "key": "device.phone.android",
+      "key_type": "facts",
+      "label": "Điện thoại Android"
+    },
+    {
+      "key": "device.phone.ios",
+      "key_type": "facts",
+      "label": "Điện thoại iPhone"
+    },
+    {
+      "key": "device.storage.cloud",
+      "key_type": "preferences",
+      "label": "Lưu trữ trên đám mây"
+    },
+    {
+      "key": "device.storage.local",
+      "key_type": "preferences",
+      "label": "Lưu trữ trong máy"
+    },
+    {
+      "key": "drink.alcohol.none",
+      "key_type": "preferences",
+      "label": "Không uống bia rượu"
+    },
+    {
+      "key": "drink.coffee.strong",
+      "key_type": "preferences",
+      "label": "Cà phê pha đậm"
+    },
+    {
+      "key": "drink.tea.green",
+      "key_type": "preferences",
+      "label": "Trà xanh"
+    },
+    {
+      "key": "drink.water.daily_target",
+      "key_type": "goals",
+      "label": "Lượng nước uống mỗi ngày"
+    },
+    {
+      "key": "finance.budget.travel",
+      "key_type": "preferences",
+      "label": "Ngân sách du lịch"
+    },
+    {
+      "key": "finance.debt.avoid",
+      "key_type": "constraints",
+      "label": "Tránh vay nợ"
+    },
+    {
+      "key": "finance.investment.crypto",
+      "key_type": "preferences",
+      "label": "Đầu tư tiền mã hóa"
+    },
+    {
+      "key": "finance.investment.index_fund",
+      "key_type": "preferences",
+      "label": "Đầu tư quỹ chỉ số"
+    },
+    {
+      "key": "finance.payment.card",
+      "key_type": "preferences",
+      "label": "Trả bằng thẻ"
+    },
+    {
+      "key": "finance.payment.cash",
+      "key_type": "preferences",
+      "label": "Trả bằng tiền mặt"
+    },
+    {
+      "key": "finance.risk.high",
+      "key_type": "preferences",
+      "label": "Khẩu vị rủi ro cao"
+    },
+    {
+      "key": "finance.risk.low",
+      "key_type": "preferences",
+      "label": "Khẩu vị rủi ro thấp"
+    },
+    {
+      "key": "finance.saving.monthly_target",
+      "key_type": "goals",
+      "label": "Mục tiêu tiết kiệm hằng tháng"
+    },
+    {
+      "key": "finance.spending.coffee",
+      "key_type": "preferences",
+      "label": "Chi tiêu cho cà phê"
+    },
+    {
+      "key": "finance.subscription.audit",
+      "key_type": "goals",
+      "label": "Rà soát các gói đăng ký"
+    },
+    {
+      "key": "food.allergy.peanut",
+      "key_type": "constraints",
+      "label": "Dị ứng đậu phộng"
+    },
+    {
+      "key": "food.allergy.seafood",
+      "key_type": "constraints",
+      "label": "Dị ứng hải sản"
+    },
+    {
+      "key": "food.breakfast.coffee",
+      "key_type": "preferences",
+      "label": "Cà phê buổi sáng"
+    },
+    {
+      "key": "food.breakfast.skip",
+      "key_type": "preferences",
+      "label": "Bỏ bữa sáng"
+    },
+    {
+      "key": "food.cooking.home",
+      "key_type": "preferences",
+      "label": "Tự nấu ăn ở nhà"
+    },
+    {
+      "key": "food.cuisine.italian",
+      "key_type": "preferences",
+      "label": "Món Ý"
+    },
+    {
+      "key": "food.cuisine.japanese",
+      "key_type": "preferences",
+      "label": "Món Nhật"
+    },
+    {
+      "key": "food.cuisine.korean",
+      "key_type": "preferences",
+      "label": "Món Hàn"
+    },
+    {
+      "key": "food.cuisine.vietnamese",
+      "key_type": "preferences",
+      "label": "Món Việt"
+    },
+    {
+      "key": "food.delivery.frequency",
+      "key_type": "preferences",
+      "label": "Tần suất đặt đồ ăn ngoài"
+    },
+    {
+      "key": "food.diet.meat",
+      "key_type": "preferences",
+      "label": "Ăn thịt"
+    },
+    {
+      "key": "food.diet.vegetarian",
+      "key_type": "preferences",
+      "label": "Ăn chay"
+    },
+    {
+      "key": "food.portion.large",
+      "key_type": "preferences",
+      "label": "Khẩu phần lớn"
+    },
+    {
+      "key": "food.restaurant.quiet",
+      "key_type": "preferences",
+      "label": "Quán ăn yên tĩnh"
+    },
+    {
+      "key": "food.snack.fruit",
+      "key_type": "preferences",
+      "label": "Ăn vặt bằng trái cây"
+    },
+    {
+      "key": "food.spice.high",
+      "key_type": "preferences",
+      "label": "Ăn cay nhiều"
+    },
+    {
+      "key": "food.spice.low",
+      "key_type": "preferences",
+      "label": "Ăn ít cay"
+    },
+    {
+      "key": "food.sugar.low",
+      "key_type": "preferences",
+      "label": "Ít đường"
+    },
+    {
+      "key": "health.checkup.annual",
+      "key_type": "goals",
+      "label": "Khám sức khỏe hằng năm"
+    },
+    {
+      "key": "health.exercise.gym",
+      "key_type": "preferences",
+      "label": "Tập gym"
+    },
+    {
+      "key": "health.exercise.running",
+      "key_type": "preferences",
+      "label": "Chạy bộ"
+    },
+    {
+      "key": "health.exercise.swimming",
+      "key_type": "preferences",
+      "label": "Bơi lội"
+    },
+    {
+      "key": "health.exercise.yoga",
+      "key_type": "preferences",
+      "label": "Tập yoga"
+    },
+    {
+      "key": "health.posture.standing_desk",
+      "key_type": "preferences",
+      "label": "Dùng bàn đứng"
+    },
+    {
+      "key": "health.screen_time.limit",
+      "key_type": "preferences",
+      "label": "Giới hạn thời gian nhìn màn hình"
+    },
+    {
+      "key": "health.sleep.duration_target",
+      "key_type": "goals",
+      "label": "Số giờ ngủ mục tiêu"
+    },
+    {
+      "key": "health.sleep.early",
+      "key_type": "preferences",
+      "label": "Ngủ sớm"
+    },
+    {
+      "key": "health.sleep.late",
+      "key_type": "preferences",
+      "label": "Ngủ muộn"
+    },
+    {
+      "key": "health.stress.breathing",
+      "key_type": "preferences",
+      "label": "Thở sâu để giảm căng thẳng"
+    },
+    {
+      "key": "health.walk.daily_steps",
+      "key_type": "goals",
+      "label": "Số bước đi bộ mỗi ngày"
+    },
+    {
+      "key": "home.cleaning.weekly",
+      "key_type": "preferences",
+      "label": "Dọn nhà hằng tuần"
+    },
+    {
+      "key": "home.lighting.warm",
+      "key_type": "preferences",
+      "label": "Ánh sáng vàng ấm"
+    },
+    {
+      "key": "home.noise.low",
+      "key_type": "preferences",
+      "label": "Không gian ít tiếng ồn"
+    },
+    {
+      "key": "home.pet.cat",
+      "key_type": "facts",
+      "label": "Nuôi mèo"
+    },
+    {
+      "key": "home.pet.dog",
+      "key_type": "facts",
+      "label": "Nuôi chó"
+    },
+    {
+      "key": "home.plants.indoor",
+      "key_type": "preferences",
+      "label": "Trồng cây trong nhà"
+    },
+    {
+      "key": "home.temperature.cool",
+      "key_type": "preferences",
+      "label": "Để nhà mát"
+    },
+    {
+      "key": "home.temperature.warm",
+      "key_type": "preferences",
+      "label": "Để nhà ấm"
+    },
+    {
+      "key": "home.workspace.separate_room",
+      "key_type": "preferences",
+      "label": "Phòng làm việc riêng"
+    },
+    {
+      "key": "learning.format.text",
+      "key_type": "preferences",
+      "label": "Học qua tài liệu viết"
+    },
+    {
+      "key": "learning.format.video",
+      "key_type": "preferences",
+      "label": "Học qua video"
+    },
+    {
+      "key": "learning.language.english",
+      "key_type": "goals",
+      "label": "Học tiếng Anh"
+    },
+    {
+      "key": "learning.language.japanese",
+      "key_type": "goals",
+      "label": "Học tiếng Nhật"
+    },
+    {
+      "key": "learning.note.handwritten",
+      "key_type": "preferences",
+      "label": "Ghi chú viết tay"
+    },
+    {
+      "key": "learning.pace.slow",
+      "key_type": "preferences",
+      "label": "Học chậm và kỹ"
+    },
+    {
+      "key": "learning.practice.project",
+      "key_type": "preferences",
+      "label": "Học qua dự án thực tế"
+    },
+    {
+      "key": "learning.time.evening",
+      "key_type": "preferences",
+      "label": "Học vào buổi tối"
+    },
+    {
+      "key": "media.book.fiction",
+      "key_type": "preferences",
+      "label": "Sách hư cấu"
+    },
+    {
+      "key": "media.book.nonfiction",
+      "key_type": "preferences",
+      "label": "Sách phi hư cấu"
+    },
+    {
+      "key": "media.game.strategy",
+      "key_type": "preferences",
+      "label": "Game chiến thuật"
+    },
+    {
+      "key": "media.movie.dubbed",
+      "key_type": "preferences",
+      "label": "Xem phim lồng tiếng"
+    },
+    {
+      "key": "media.movie.horror",
+      "key_type": "preferences",
+      "label": "Phim kinh dị"
+    },
+    {
+      "key": "media.movie.scifi",
+      "key_type": "preferences",
+      "label": "Phim khoa học viễn tưởng"
+    },
+    {
+      "key": "media.movie.subtitles",
+      "key_type": "preferences",
+      "label": "Xem phim có phụ đề"
+    },
+    {
+      "key": "media.music.lofi",
+      "key_type": "preferences",
+      "label": "Nhạc nhẹ lofi"
+    },
+    {
+      "key": "media.music.rock",
+      "key_type": "preferences",
+      "label": "Nhạc rock"
+    },
+    {
+      "key": "media.music.vietnamese_indie",
+      "key_type": "preferences",
+      "label": "Nhạc indie Việt"
+    },
+    {
+      "key": "media.podcast.technology",
+      "key_type": "preferences",
+      "label": "Podcast công nghệ"
+    },
+    {
+      "key": "media.reading.ebook",
+      "key_type": "preferences",
+      "label": "Đọc sách điện tử"
+    },
+    {
+      "key": "media.reading.paper_book",
+      "key_type": "preferences",
+      "label": "Đọc sách giấy"
+    },
+    {
+      "key": "privacy.backup.encrypted",
+      "key_type": "preferences",
+      "label": "Sao lưu có mã hóa"
+    },
+    {
+      "key": "privacy.camera.cover",
+      "key_type": "preferences",
+      "label": "Che camera máy tính"
+    },
+    {
+      "key": "privacy.data.local_only",
+      "key_type": "constraints",
+      "label": "Dữ liệu chỉ lưu trong máy"
+    },
+    {
+      "key": "privacy.sharing.minimal",
+      "key_type": "preferences",
+      "label": "Chia sẻ tối thiểu"
+    },
+    {
+      "key": "privacy.tracking.block",
+      "key_type": "preferences",
+      "label": "Chặn theo dõi quảng cáo"
+    },
+    {
+      "key": "schedule.deadline.buffer",
+      "key_type": "preferences",
+      "label": "Chừa thời gian đệm trước hạn"
+    },
+    {
+      "key": "schedule.planning.calendar_blocks",
+      "key_type": "preferences",
+      "label": "Lên lịch theo khối thời gian"
+    },
+    {
+      "key": "schedule.wakeup.time",
+      "key_type": "preferences",
+      "label": "Giờ thức dậy"
+    },
+    {
+      "key": "schedule.weekend.no_work",
+      "key_type": "constraints",
+      "label": "Cuối tuần không làm việc"
+    },
+    {
+      "key": "shopping.brand.loyalty",
+      "key_type": "preferences",
+      "label": "Trung thành với thương hiệu"
+    },
+    {
+      "key": "shopping.channel.online",
+      "key_type": "preferences",
+      "label": "Mua sắm trực tuyến"
+    },
+    {
+      "key": "shopping.channel.store",
+      "key_type": "preferences",
+      "label": "Mua tại cửa hàng"
+    },
+    {
+      "key": "shopping.delivery.fast",
+      "key_type": "preferences",
+      "label": "Giao hàng nhanh"
+    },
+    {
+      "key": "shopping.price.discount_hunting",
+      "key_type": "preferences",
+      "label": "Săn hàng giảm giá"
+    },
+    {
+      "key": "shopping.quality.durable",
+      "key_type": "preferences",
+      "label": "Ưu tiên đồ bền"
+    },
+    {
+      "key": "shopping.return.policy_important",
+      "key_type": "preferences",
+      "label": "Quan tâm chính sách đổi trả"
+    },
+    {
+      "key": "shopping.secondhand.acceptable",
+      "key_type": "preferences",
+      "label": "Chấp nhận hàng đã qua sử dụng"
+    },
+    {
+      "key": "social.event.large_party",
+      "key_type": "preferences",
+      "label": "Tiệc đông người"
+    },
+    {
+      "key": "social.event.small_group",
+      "key_type": "preferences",
+      "label": "Gặp nhóm nhỏ"
+    },
+    {
+      "key": "social.family.weekly_call",
+      "key_type": "preferences",
+      "label": "Gọi cho gia đình hằng tuần"
+    },
+    {
+      "key": "social.friend.close_circle",
+      "key_type": "facts",
+      "label": "Nhóm bạn thân"
+    },
+    {
+      "key": "social.invitation.advance_notice",
+      "key_type": "preferences",
+      "label": "Hẹn trước khi gặp"
+    },
+    {
+      "key": "social.weekend.home",
+      "key_type": "preferences",
+      "label": "Cuối tuần ở nhà"
+    },
+    {
+      "key": "social.weekend.outdoor",
+      "key_type": "preferences",
+      "label": "Cuối tuần ra ngoài"
+    },
+    {
+      "key": "transport.commute.bus",
+      "key_type": "preferences",
+      "label": "Đi xe buýt"
+    },
+    {
+      "key": "transport.commute.car",
+      "key_type": "preferences",
+      "label": "Đi ô tô"
+    },
+    {
+      "key": "transport.commute.motorbike",
+      "key_type": "preferences",
+      "label": "Đi xe máy"
+    },
+    {
+      "key": "transport.commute.walk",
+      "key_type": "preferences",
+      "label": "Đi bộ"
+    },
+    {
+      "key": "transport.parking.easy",
+      "key_type": "preferences",
+      "label": "Chỗ đậu xe thuận tiện"
+    },
+    {
+      "key": "transport.ride_hailing.grab",
+      "key_type": "preferences",
+      "label": "Dùng ứng dụng gọi xe"
+    },
+    {
+      "key": "transport.route.scenic",
+      "key_type": "preferences",
+      "label": "Đường đi có cảnh đẹp"
+    },
+    {
+      "key": "transport.traffic.avoid_peak",
+      "key_type": "preferences",
+      "label": "Tránh giờ cao điểm"
+    },
+    {
+      "key": "travel.booking.early",
+      "key_type": "preferences",
+      "label": "Đặt vé sớm"
+    },
+    {
+      "key": "travel.destination.da_lat",
+      "key_type": "preferences",
+      "label": "Điểm đến Đà Lạt"
+    },
+    {
+      "key": "travel.destination.japan",
+      "key_type": "preferences",
+      "label": "Điểm đến Nhật Bản"
+    },
+    {
+      "key": "travel.flight.aisle_seat",
+      "key_type": "preferences",
+      "label": "Ghế cạnh lối đi"
+    },
+    {
+      "key": "travel.flight.budget_airline",
+      "key_type": "preferences",
+      "label": "Hãng bay giá rẻ"
+    },
+    {
+      "key": "travel.flight.direct",
+      "key_type": "preferences",
+      "label": "Chuyến bay thẳng"
+    },
+    {
+      "key": "travel.flight.window_seat",
+      "key_type": "preferences",
+      "label": "Ghế cạnh cửa sổ"
+    },
+    {
+      "key": "travel.hotel.budget",
+      "key_type": "preferences",
+      "label": "Ngân sách khách sạn"
+    },
+    {
+      "key": "travel.hotel.city_center",
+      "key_type": "preferences",
+      "label": "Khách sạn gần trung tâm"
+    },
+    {
+      "key": "travel.hotel.quiet_room",
+      "key_type": "preferences",
+      "label": "Phòng khách sạn yên tĩnh"
+    },
+    {
+      "key": "travel.packing.carry_on_only",
+      "key_type": "preferences",
+      "label": "Chỉ mang hành lý xách tay"
+    },
+    {
+      "key": "travel.trip.beach",
+      "key_type": "preferences",
+      "label": "Đi biển"
+    },
+    {
+      "key": "travel.trip.group",
+      "key_type": "preferences",
+      "label": "Đi theo nhóm"
+    },
+    {
+      "key": "travel.trip.mountain",
+      "key_type": "preferences",
+      "label": "Đi núi"
+    },
+    {
+      "key": "travel.trip.solo",
+      "key_type": "preferences",
+      "label": "Đi một mình"
+    },
+    {
+      "key": "ui.animation.reduced",
+      "key_type": "preferences",
+      "label": "Giảm hiệu ứng chuyển động"
+    },
+    {
+      "key": "ui.density.compact",
+      "key_type": "preferences",
+      "label": "Bố cục gọn"
+    },
+    {
+      "key": "ui.font.large",
+      "key_type": "preferences",
+      "label": "Cỡ chữ lớn"
+    },
+    {
+      "key": "ui.font.small",
+      "key_type": "preferences",
+      "label": "Cỡ chữ nhỏ"
+    },
+    {
+      "key": "ui.keyboard.shortcuts",
+      "key_type": "preferences",
+      "label": "Dùng phím tắt"
+    },
+    {
+      "key": "ui.language.english",
+      "key_type": "facts",
+      "label": "Ngôn ngữ tiếng Anh"
+    },
+    {
+      "key": "ui.language.vietnamese",
+      "key_type": "facts",
+      "label": "Ngôn ngữ tiếng Việt"
+    },
+    {
+      "key": "ui.notifications.quiet_hours",
+      "key_type": "preferences",
+      "label": "Giờ yên lặng không báo tin"
+    },
+    {
+      "key": "ui.theme.dark",
+      "key_type": "preferences",
+      "label": "Giao diện tối"
+    },
+    {
+      "key": "ui.theme.light",
+      "key_type": "preferences",
+      "label": "Giao diện sáng"
+    },
+    {
+      "key": "work.communication.async",
+      "key_type": "preferences",
+      "label": "Trao đổi bất đồng bộ"
+    },
+    {
+      "key": "work.email.batch_twice_daily",
+      "key_type": "preferences",
+      "label": "Đọc email hai lần mỗi ngày"
+    },
+    {
+      "key": "work.focus.deep_work_block",
+      "key_type": "preferences",
+      "label": "Khối thời gian tập trung sâu"
+    },
+    {
+      "key": "work.location.office",
+      "key_type": "preferences",
+      "label": "Làm việc tại văn phòng"
+    },
+    {
+      "key": "work.location.remote",
+      "key_type": "preferences",
+      "label": "Làm việc từ xa"
+    },
+    {
+      "key": "work.meeting.no_meeting_friday",
+      "key_type": "constraints",
+      "label": "Thứ sáu không họp"
+    },
+    {
+      "key": "work.meeting.short",
+      "key_type": "preferences",
+      "label": "Họp ngắn gọn"
+    },
+    {
+      "key": "work.overtime.avoid",
+      "key_type": "constraints",
+      "label": "Tránh làm thêm giờ"
+    },
+    {
+      "key": "work.review.written_feedback",
+      "key_type": "preferences",
+      "label": "Góp ý bằng văn bản"
+    },
+    {
+      "key": "work.schedule.morning",
+      "key_type": "preferences",
+      "label": "Làm việc buổi sáng"
+    },
+    {
+      "key": "work.schedule.night",
+      "key_type": "preferences",
+      "label": "Làm việc buổi tối"
+    },
+    {
+      "key": "work.task.batching",
+      "key_type": "preferences",
+      "label": "Gom nhóm công việc giống nhau"
+    },
+    {
+      "key": "work.tool.editor",
+      "key_type": "facts",
+      "label": "Trình soạn thảo quen dùng"
+    },
+    {
+      "key": "work.tool.terminal",
+      "key_type": "facts",
+      "label": "Làm việc bằng dòng lệnh"
+    },
+    {
+      "key": "work.travel.willingness",
+      "key_type": "preferences",
+      "label": "Mức sẵn sàng đi công tác"
+    }
+  ],
+  "queries": [
+    {
+      "id": "q001",
+      "language": "vi",
+      "text": "Tối nay tôi muốn đổi giao diện sang nền tối cho đỡ mỏi mắt",
+      "expected_key": "ui.theme.dark"
+    },
+    {
+      "id": "q002",
+      "language": "vi",
+      "text": "Cho tôi chữ to hơn một chút, đọc mãi không ra",
+      "expected_key": "ui.font.large"
+    },
+    {
+      "id": "q003",
+      "language": "vi",
+      "text": "Buổi tối đừng báo tin gì hết nhé, tôi cần yên tĩnh",
+      "expected_key": "ui.notifications.quiet_hours"
+    },
+    {
+      "id": "q004",
+      "language": "vi",
+      "text": "Tôi thích ăn cay, càng cay càng ngon",
+      "expected_key": "food.spice.high"
+    },
+    {
+      "id": "q005",
+      "language": "vi",
+      "text": "Mình ăn chay vào thứ hai hằng tuần",
+      "expected_key": "food.diet.vegetarian"
+    },
+    {
+      "id": "q006",
+      "language": "vi",
+      "text": "Tôi bị dị ứng hải sản nên tránh tôm cua",
+      "expected_key": "food.allergy.seafood"
+    },
+    {
+      "id": "q007",
+      "language": "vi",
+      "text": "Sáng nào cũng phải có ly cà phê mới tỉnh táo",
+      "expected_key": "food.breakfast.coffee"
+    },
+    {
+      "id": "q008",
+      "language": "vi",
+      "text": "Cà phê pha đậm giúp tôi tập trung hơn",
+      "expected_key": "drink.coffee.strong"
+    },
+    {
+      "id": "q009",
+      "language": "vi",
+      "text": "Tôi không uống bia rượu trong các buổi tiệc",
+      "expected_key": "drink.alcohol.none"
+    },
+    {
+      "id": "q010",
+      "language": "vi",
+      "text": "Đi máy bay tôi luôn chọn chỗ cạnh cửa sổ",
+      "expected_key": "travel.flight.window_seat"
+    },
+    {
+      "id": "q011",
+      "language": "vi",
+      "text": "Ưu tiên chuyến bay thẳng, tôi ngại quá cảnh lắm",
+      "expected_key": "travel.flight.direct"
+    },
+    {
+      "id": "q012",
+      "language": "vi",
+      "text": "Đặt phòng gần trung tâm cho tiện đi bộ",
+      "expected_key": "travel.hotel.city_center"
+    },
+    {
+      "id": "q013",
+      "language": "vi",
+      "text": "Kỳ nghỉ này tôi muốn ra biển tắm cho thoải mái",
+      "expected_key": "travel.trip.beach"
+    },
+    {
+      "id": "q014",
+      "language": "vi",
+      "text": "Cuối năm đi Đà Lạt thì sao nhỉ",
+      "expected_key": "travel.destination.da_lat"
+    },
+    {
+      "id": "q015",
+      "language": "vi",
+      "text": "Chỉ mang một vali nhỏ xách tay thôi cho gọn",
+      "expected_key": "travel.packing.carry_on_only"
+    },
+    {
+      "id": "q016",
+      "language": "vi",
+      "text": "Tôi làm việc hiệu quả nhất vào sáng sớm",
+      "expected_key": "work.schedule.morning"
+    },
+    {
+      "id": "q017",
+      "language": "vi",
+      "text": "Cho tôi làm ở nhà hai ngày mỗi tuần",
+      "expected_key": "work.location.remote"
+    },
+    {
+      "id": "q018",
+      "language": "vi",
+      "text": "Cuộc họp nên ngắn gọn, ba mươi phút là đủ",
+      "expected_key": "work.meeting.short"
+    },
+    {
+      "id": "q019",
+      "language": "vi",
+      "text": "Thứ sáu tôi muốn trống lịch, đừng xếp buổi nào",
+      "expected_key": "work.meeting.no_meeting_friday"
+    },
+    {
+      "id": "q020",
+      "language": "vi",
+      "text": "Trao đổi qua tin nhắn cũng được, không cần gặp trực tiếp ngay",
+      "expected_key": "work.communication.async"
+    },
+    {
+      "id": "q021",
+      "language": "vi",
+      "text": "Tôi chạy bộ ba buổi một tuần",
+      "expected_key": "health.exercise.running"
+    },
+    {
+      "id": "q022",
+      "language": "vi",
+      "text": "Tôi cố lên giường trước mười một giờ đêm",
+      "expected_key": "health.sleep.early"
+    },
+    {
+      "id": "q023",
+      "language": "vi",
+      "text": "Mỗi ngày tôi muốn đi đủ mười nghìn bước",
+      "expected_key": "health.walk.daily_steps"
+    },
+    {
+      "id": "q024",
+      "language": "vi",
+      "text": "Ngồi lâu mỏi lưng nên tôi dùng bàn đứng",
+      "expected_key": "health.posture.standing_desk"
+    },
+    {
+      "id": "q025",
+      "language": "vi",
+      "text": "Mỗi tháng tôi để dành một khoản cố định",
+      "expected_key": "finance.saving.monthly_target"
+    },
+    {
+      "id": "q026",
+      "language": "vi",
+      "text": "Tôi không thích mạo hiểm khi đầu tư",
+      "expected_key": "finance.risk.low"
+    },
+    {
+      "id": "q027",
+      "language": "vi",
+      "text": "Tôi hay quên mấy gói đăng ký trả tiền hằng tháng",
+      "expected_key": "finance.subscription.audit"
+    },
+    {
+      "id": "q028",
+      "language": "vi",
+      "text": "Tôi thích nghe nhạc nhẹ nhàng khi làm việc",
+      "expected_key": "media.music.lofi"
+    },
+    {
+      "id": "q029",
+      "language": "vi",
+      "text": "Xem phim tôi thích để phụ đề hơn là lồng tiếng",
+      "expected_key": "media.movie.subtitles"
+    },
+    {
+      "id": "q030",
+      "language": "vi",
+      "text": "Tôi thích đọc sách in hơn đọc trên màn hình",
+      "expected_key": "media.reading.paper_book"
+    },
+    {
+      "id": "q031",
+      "language": "vi",
+      "text": "Nhắn tin tiện hơn gọi điện với tôi",
+      "expected_key": "communication.channel.text"
+    },
+    {
+      "id": "q032",
+      "language": "vi",
+      "text": "Nói thẳng vào vấn đề giúp tôi đỡ mất thời gian",
+      "expected_key": "communication.tone.direct"
+    },
+    {
+      "id": "q033",
+      "language": "vi",
+      "text": "Tôi hay chờ đợt giảm giá cuối tháng mới mua",
+      "expected_key": "shopping.price.discount_hunting"
+    },
+    {
+      "id": "q034",
+      "language": "vi",
+      "text": "Mua đồ bền một chút cũng được, đắt hơn không sao",
+      "expected_key": "shopping.quality.durable"
+    },
+    {
+      "id": "q035",
+      "language": "vi",
+      "text": "Nhà tôi để điều hòa hơi mát một chút",
+      "expected_key": "home.temperature.cool"
+    },
+    {
+      "id": "q036",
+      "language": "vi",
+      "text": "Tôi đang nuôi một con mèo nhỏ",
+      "expected_key": "home.pet.cat"
+    },
+    {
+      "id": "q037",
+      "language": "vi",
+      "text": "Tôi đang học tiếng Nhật để đi làm bên đó",
+      "expected_key": "learning.language.japanese"
+    },
+    {
+      "id": "q038",
+      "language": "vi",
+      "text": "Cuối tuần tôi thích ở nhà nghỉ ngơi",
+      "expected_key": "social.weekend.home"
+    },
+    {
+      "id": "q039",
+      "language": "vi",
+      "text": "Tôi đi làm bằng xe máy mỗi ngày",
+      "expected_key": "transport.commute.motorbike"
+    },
+    {
+      "id": "q040",
+      "language": "vi",
+      "text": "Tránh ra đường vào giờ cao điểm cho đỡ kẹt",
+      "expected_key": "transport.traffic.avoid_peak"
+    },
+    {
+      "id": "q041",
+      "language": "vi",
+      "text": "Dữ liệu của tôi chỉ nên nằm trong máy thôi",
+      "expected_key": "privacy.data.local_only"
+    },
+    {
+      "id": "q042",
+      "language": "vi",
+      "text": "Tôi dùng tai nghe chống ồn khi làm việc",
+      "expected_key": "device.headphone.noise_cancelling"
+    },
+    {
+      "id": "q043",
+      "language": "vi",
+      "text": "Tôi mặc đồ đơn giản, chủ yếu màu đen",
+      "expected_key": "clothing.color.black"
+    },
+    {
+      "id": "q044",
+      "language": "vi",
+      "text": "Tôi sắp xếp công việc theo từng khối thời gian",
+      "expected_key": "schedule.planning.calendar_blocks"
+    },
+    {
+      "id": "q045",
+      "language": "en",
+      "text": "Switch the interface to night mode please",
+      "expected_key": "ui.theme.dark"
+    },
+    {
+      "id": "q046",
+      "language": "en",
+      "text": "The text is too small for me to read",
+      "expected_key": "ui.font.large"
+    },
+    {
+      "id": "q047",
+      "language": "en",
+      "text": "Stop pinging me after ten at night",
+      "expected_key": "ui.notifications.quiet_hours"
+    },
+    {
+      "id": "q048",
+      "language": "en",
+      "text": "I love really spicy food",
+      "expected_key": "food.spice.high"
+    },
+    {
+      "id": "q049",
+      "language": "en",
+      "text": "I am avoiding meat these days",
+      "expected_key": "food.diet.vegetarian"
+    },
+    {
+      "id": "q050",
+      "language": "en",
+      "text": "Peanuts make me sick, keep them away",
+      "expected_key": "food.allergy.peanut"
+    },
+    {
+      "id": "q051",
+      "language": "en",
+      "text": "I need an espresso to start the day",
+      "expected_key": "food.breakfast.coffee"
+    },
+    {
+      "id": "q052",
+      "language": "en",
+      "text": "Book me a nonstop flight",
+      "expected_key": "travel.flight.direct"
+    },
+    {
+      "id": "q053",
+      "language": "en",
+      "text": "I prefer sitting by the window on planes",
+      "expected_key": "travel.flight.window_seat"
+    },
+    {
+      "id": "q054",
+      "language": "en",
+      "text": "A hotel downtown would be easier to walk from",
+      "expected_key": "travel.hotel.city_center"
+    },
+    {
+      "id": "q055",
+      "language": "en",
+      "text": "I would rather go to the mountains than the sea",
+      "expected_key": "travel.trip.mountain"
+    },
+    {
+      "id": "q056",
+      "language": "en",
+      "text": "Travelling alone suits me better",
+      "expected_key": "travel.trip.solo"
+    },
+    {
+      "id": "q057",
+      "language": "en",
+      "text": "I only bring hand luggage",
+      "expected_key": "travel.packing.carry_on_only"
+    },
+    {
+      "id": "q058",
+      "language": "en",
+      "text": "I am sharpest first thing in the morning",
+      "expected_key": "work.schedule.morning"
+    },
+    {
+      "id": "q059",
+      "language": "en",
+      "text": "Working from home two days a week works for me",
+      "expected_key": "work.location.remote"
+    },
+    {
+      "id": "q060",
+      "language": "en",
+      "text": "Keep meetings to half an hour",
+      "expected_key": "work.meeting.short"
+    },
+    {
+      "id": "q061",
+      "language": "en",
+      "text": "I want uninterrupted blocks for concentrated work",
+      "expected_key": "work.focus.deep_work_block"
+    },
+    {
+      "id": "q062",
+      "language": "en",
+      "text": "Written comments are easier for me to act on",
+      "expected_key": "work.review.written_feedback"
+    },
+    {
+      "id": "q063",
+      "language": "en",
+      "text": "I go jogging three times a week",
+      "expected_key": "health.exercise.running"
+    },
+    {
+      "id": "q064",
+      "language": "en",
+      "text": "I try to be in bed before eleven",
+      "expected_key": "health.sleep.early"
+    },
+    {
+      "id": "q065",
+      "language": "en",
+      "text": "I want to hit ten thousand steps a day",
+      "expected_key": "health.walk.daily_steps"
+    },
+    {
+      "id": "q066",
+      "language": "en",
+      "text": "Sitting all day hurts my back so I stand while working",
+      "expected_key": "health.posture.standing_desk"
+    },
+    {
+      "id": "q067",
+      "language": "en",
+      "text": "I put aside a fixed amount every month",
+      "expected_key": "finance.saving.monthly_target"
+    },
+    {
+      "id": "q068",
+      "language": "en",
+      "text": "Low volatility investments only",
+      "expected_key": "finance.risk.low"
+    },
+    {
+      "id": "q069",
+      "language": "en",
+      "text": "Index funds are fine for me",
+      "expected_key": "finance.investment.index_fund"
+    },
+    {
+      "id": "q070",
+      "language": "en",
+      "text": "Quiet instrumental music helps me concentrate",
+      "expected_key": "media.music.lofi"
+    },
+    {
+      "id": "q071",
+      "language": "en",
+      "text": "I always watch films with subtitles",
+      "expected_key": "media.movie.subtitles"
+    },
+    {
+      "id": "q072",
+      "language": "en",
+      "text": "Printed books feel better than screens",
+      "expected_key": "media.reading.paper_book"
+    },
+    {
+      "id": "q073",
+      "language": "en",
+      "text": "Texting is easier than calling for me",
+      "expected_key": "communication.channel.text"
+    },
+    {
+      "id": "q074",
+      "language": "en",
+      "text": "Just tell me straight, no sugar coating",
+      "expected_key": "communication.tone.direct"
+    },
+    {
+      "id": "q075",
+      "language": "en",
+      "text": "I wait for sales before buying anything",
+      "expected_key": "shopping.price.discount_hunting"
+    },
+    {
+      "id": "q076",
+      "language": "en",
+      "text": "I would pay more for something that lasts",
+      "expected_key": "shopping.quality.durable"
+    },
+    {
+      "id": "q077",
+      "language": "en",
+      "text": "Keep the apartment on the cool side",
+      "expected_key": "home.temperature.cool"
+    },
+    {
+      "id": "q078",
+      "language": "en",
+      "text": "My cat needs feeding twice a day",
+      "expected_key": "home.pet.cat"
+    },
+    {
+      "id": "q079",
+      "language": "en",
+      "text": "I study Japanese in the evenings",
+      "expected_key": "learning.language.japanese"
+    },
+    {
+      "id": "q080",
+      "language": "en",
+      "text": "Weekends at home recharge me",
+      "expected_key": "social.weekend.home"
+    },
+    {
+      "id": "q081",
+      "language": "en",
+      "text": "I ride a scooter to work",
+      "expected_key": "transport.commute.motorbike"
+    },
+    {
+      "id": "q082",
+      "language": "en",
+      "text": "I avoid rush hour traffic",
+      "expected_key": "transport.traffic.avoid_peak"
+    },
+    {
+      "id": "q083",
+      "language": "en",
+      "text": "Everything should stay on my own machine",
+      "expected_key": "privacy.data.local_only"
+    },
+    {
+      "id": "q084",
+      "language": "en",
+      "text": "Noise cancelling headphones keep me focused",
+      "expected_key": "device.headphone.noise_cancelling"
+    }
+  ],
+  "antonym_pairs": [
+    [
+      "ui.theme.dark",
+      "ui.theme.light"
+    ],
+    [
+      "ui.font.large",
+      "ui.font.small"
+    ],
+    [
+      "ui.language.vietnamese",
+      "ui.language.english"
+    ],
+    [
+      "food.spice.high",
+      "food.spice.low"
+    ],
+    [
+      "food.diet.vegetarian",
+      "food.diet.meat"
+    ],
+    [
+      "travel.flight.window_seat",
+      "travel.flight.aisle_seat"
+    ],
+    [
+      "travel.trip.beach",
+      "travel.trip.mountain"
+    ],
+    [
+      "travel.trip.solo",
+      "travel.trip.group"
+    ],
+    [
+      "work.schedule.morning",
+      "work.schedule.night"
+    ],
+    [
+      "work.location.remote",
+      "work.location.office"
+    ],
+    [
+      "health.sleep.early",
+      "health.sleep.late"
+    ],
+    [
+      "finance.risk.low",
+      "finance.risk.high"
+    ],
+    [
+      "finance.payment.cash",
+      "finance.payment.card"
+    ],
+    [
+      "media.movie.subtitles",
+      "media.movie.dubbed"
+    ],
+    [
+      "media.book.nonfiction",
+      "media.book.fiction"
+    ],
+    [
+      "media.reading.paper_book",
+      "media.reading.ebook"
+    ],
+    [
+      "communication.channel.text",
+      "communication.channel.call"
+    ],
+    [
+      "communication.tone.direct",
+      "communication.tone.gentle"
+    ],
+    [
+      "shopping.channel.online",
+      "shopping.channel.store"
+    ],
+    [
+      "home.temperature.cool",
+      "home.temperature.warm"
+    ],
+    [
+      "home.pet.cat",
+      "home.pet.dog"
+    ],
+    [
+      "learning.format.video",
+      "learning.format.text"
+    ],
+    [
+      "social.event.small_group",
+      "social.event.large_party"
+    ],
+    [
+      "social.weekend.outdoor",
+      "social.weekend.home"
+    ],
+    [
+      "device.phone.android",
+      "device.phone.ios"
+    ],
+    [
+      "device.storage.cloud",
+      "device.storage.local"
+    ],
+    [
+      "clothing.color.black",
+      "clothing.color.bright"
+    ]
+  ]
+}

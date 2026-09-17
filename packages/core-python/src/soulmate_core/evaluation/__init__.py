@@ -1,5 +1,19 @@
 """Evaluation metrics and reproducible benchmark datasets."""
 
+from soulmate_core.evaluation.key_retrieval import (
+    KEY_RETRIEVAL_EVALUATION_VERSION,
+    KeyRetrievalDataset,
+    KeyRetrievalKey,
+    KeyRetrievalMetrics,
+    KeyRetrievalQuery,
+    KeyRetrievalReport,
+    SimilarityScorer,
+    default_key_dataset_path,
+    evaluate_key_retrieval,
+    key_text,
+    lexical_scores,
+    load_key_dataset,
+)
 from soulmate_core.evaluation.metrics import (
     CalibrationBin,
     EvaluationMetrics,
@@ -20,6 +34,7 @@ from soulmate_core.evaluation.runner import (
 
 __all__ = [
     "EVALUATION_ALGORITHM_VERSION",
+    "KEY_RETRIEVAL_EVALUATION_VERSION",
     "CalibrationBin",
     "EvaluationDataset",
     "EvaluationDecision",
@@ -27,9 +42,20 @@ __all__ = [
     "EvaluationOption",
     "EvaluationPreference",
     "EvaluationReport",
+    "KeyRetrievalDataset",
+    "KeyRetrievalKey",
+    "KeyRetrievalMetrics",
+    "KeyRetrievalQuery",
+    "KeyRetrievalReport",
     "PredictionObservation",
+    "SimilarityScorer",
     "default_dataset_path",
+    "default_key_dataset_path",
     "evaluate_dataset",
+    "evaluate_key_retrieval",
     "evaluate_predictions",
+    "key_text",
+    "lexical_scores",
     "load_dataset",
+    "load_key_dataset",
 ]

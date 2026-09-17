@@ -5,9 +5,12 @@
 This plan was recorded on 2026-09-17 as an owner-requested cross-phase increment.
 Planning is recorded and the owner answered all open decisions on 2026-09-17
 (see [Owner decisions](#owner-decisions)). On 2026-09-17 the owner authorized
-implementation; steps P1 and P2 are complete locally, and step P3 is complete
-locally on 2026-09-18. Steps P0 and P4 to P6 have not started and each still
-stops for verification. This plan does not start
+implementation; steps P1 and P2 are complete locally, and steps P3 and P0 are
+complete locally on 2026-09-18. Step P0 produced
+[ADR-016](../architecture/decisions/ADR-016-local-multilingual-key-embeddings.md)
+and the [P0 spike report](key-consistency-p0-spike-report.md), and the owner
+confirmed `bge-m3` int8 as the default model and quantization on 2026-09-18.
+Steps P4 to P6 have not started and each still stops for verification. This plan does not start
 Phase 13 or authorize Phase 14. Temporary hand-over notes for the next session live in
 [working notes](key-consistency-increment-progress.md); delete that file when the
 increment finishes.
@@ -146,7 +149,7 @@ Each increment stops for verification before the next one starts.
 
 | Step | Scope | Verification |
 |---|---|---|
-| P0 | ADR-016 and accuracy-first spike: compare `bge-m3` (fp16 and int8) with `multilingual-e5-large` and `multilingual-e5-base` on macOS arm64, x64, Windows, and Linux; measure recall@50 and antonym false-merge rate on a synthetic Vietnamese/English key set, plus latency, RAM, and size | Spike report; owner confirms the model and quantization |
+| P0 | ADR-016 and accuracy-first spike: compare `bge-m3` (fp16 and int8) with `multilingual-e5-large` and `multilingual-e5-base`; measure recall@50 and antonym false-merge rate on a synthetic Vietnamese/English key set, plus latency, RAM, and size — complete on 2026-09-18 | [Spike report](key-consistency-p0-spike-report.md): measured on macOS arm64 only; owner confirmed `bge-m3` int8. x64, Windows, and Linux move to P6 |
 | P1 | Core `normalize_key`, alias domain model, alias-aware aggregation (pure, no I/O) — complete on 2026-09-17 | Unit tests without an LLM: passed locally (398 Python tests, strict typing, lint) |
 | P2 | Migration, repositories, revision bump, export and restore — complete on 2026-09-17 | Migration test from a real `0010` schema, restart and deletion tests: passed locally (430 Python tests, strict typing, lint) |
 | P3 | Wire C: automatic normalized aliases, predictor and pairwise mapping, owner API and review UI — complete on 2026-09-18 | Integration and client tests: passed locally (`pnpm check`, 500 Python tests and 122 client tests) |
@@ -190,3 +193,4 @@ Recorded on 2026-09-17.
 | 2 | Model acquisition under `strict_local` | Allowed only when the owner presses the download button, with SHA-256 pinning; manual import stays available as an offline fallback |
 | 3 | Merge policy | Automatic aliases only for equal normalized keys; semantic matches are suggestions that require owner review |
 | 4 | Default model | Accuracy first: `bge-m3` is the leading candidate (about 1.13 GB fp16 or 568 MB int8), compared in P0 with `multilingual-e5-large` and `multilingual-e5-base`; `multilingual-e5-small` is not the default |
+| 5 | Model and quantization confirmed after the P0 measurements (2026-09-18) | `bge-m3` int8 (568 MB): equal retrieval quality to fp16 at half the size and a third of the latency, the only candidate with a portable non-x86 int8 export, and the widest separation between opposite keys |

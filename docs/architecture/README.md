@@ -58,6 +58,12 @@ without changing the primary database: the daemon owns a vendor-neutral storage
 port, an S3-compatible adapter, durable daily scheduling, and fresh-install latest
 restore. Local-only remains the default and the kernel imports no cloud SDK. See
 ADR-015; ADR-014 remains reserved for the planned Phase 13 decision.
+An owner-authorized key consistency increment adds deterministic target key
+normalization, owner-reviewed canonical key aliases, and alias-aware aggregation
+and prediction inside the kernel, with the alias review surface in the daemon and
+clients. Its planned local multilingual retrieval keeps embeddings behind a kernel
+port with a null default, an owner-initiated pinned model download, and semantic
+matches that may only ever suggest a merge, never apply one. See ADR-016.
 
 ADRs below record decisions from specification section 65. Each ADR status states
 whether the decision is architectural only or already implemented.
@@ -78,3 +84,4 @@ whether the decision is architectural only or already implemented.
 | [012](decisions/ADR-012-connector-plugins.md) | Permissioned connector plugins outside the kernel |
 | [013](decisions/ADR-013-delegated-action-policy.md) | Prediction-bound delegated action policy |
 | [015](decisions/ADR-015-optional-remote-backups.md) | Optional encrypted remote backups behind a storage port |
+| [016](decisions/ADR-016-local-multilingual-key-embeddings.md) | Local multilingual key embeddings behind an embedding port |

@@ -25,7 +25,15 @@ P0 and P2 to P6 are not implemented. This does not start Phase 13 or authorize a
 later phase. Step P2 (migration `0011`, alias repository, revision bump, deletion
 cleanup, and archive coverage) followed on the same day, and step P3 (automatic
 normalized aliases, alias-aware prediction, the owner alias API, and the desktop
-and web review list) on 2026-09-18. Steps P0 and P4 to P6 are not implemented.
+and web review list) on 2026-09-18. Step P0 closed on 2026-09-18 with ADR-016, a
+reproducible key retrieval dataset and metric harness, and measurements on macOS
+arm64: word overlap places the right key inside the shared 50-key budget for only
+27.3% of Vietnamese messages, a local `bge-m3` int8 model reaches 97.7%, and every
+opposite key pair is more similar to its opposite than a typical correct match is,
+so semantic merges must stay owner-reviewed. The owner confirmed `bge-m3` int8 as
+the default model and quantization. No model is downloaded or loaded by the
+product yet. Steps P4 to P6 are not implemented. See the
+[P0 spike report](phases/key-consistency-p0-spike-report.md).
 
 ## Reports
 

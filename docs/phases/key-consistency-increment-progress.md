@@ -76,9 +76,27 @@ documentation. Authoritative documents stay
   `DuplicateKeysPanel.test.tsx`, `DuplicateKeys.test.tsx`, `client.test.ts`, and
   `apps/web/src/App.test.tsx`.
 
+### P0 (2026-09-18) — spike, ADR-016, owner decision
+
+Full detail in the [P0 spike report](key-consistency-p0-spike-report.md); only
+what P4/P5 must act on is repeated here.
+
+- Kernel: `soulmate_core/evaluation/key_retrieval.py` plus the packaged dataset
+  `evaluation/data/synthetic-key-retrieval-v1.json` (168 keys with Vietnamese
+  labels, 84 vi/en messages, 27 antonym pairs). `evaluate_key_retrieval(dataset,
+  scorer, *, include_labels, merge_threshold)` takes any
+  `Callable[[str, Sequence[str]], Sequence[float]]`, so P5 can score the real
+  provider with it. `lexical_scores` is the step-A word-overlap baseline.
+- `scripts/key_embedding_spike.py` is the ONNX runner. It is dev-only and imports
+  `onnxruntime`/`tokenizers`/`numpy`, which are still **not** in `uv.lock`; ruff
+  checks it, mypy does not (`scripts/` is outside `tool.mypy.files`).
+- Tests: `tests/evaluation/test_key_retrieval_evaluation.py` (29 cases, marked
+  `evaluation`, no model and no network).
+- ADR-016 records the embedding port, the owner-initiated pinned download, and the
+  default model.
+
 ## Not done
 
-- P0: ADR-016 and the embedding model spike (does not block P4).
 - P4: embedding port, null and ONNX adapters, model manager, egress handling.
 - P5: extraction `label`/`aliases` fields, catalog and embedding repositories and
   domain records, backfill job, semantic scoring, **semantic alias suggestions**
@@ -87,6 +105,23 @@ documentation. Authoritative documents stay
 - P6: sidecar packaging, size check, smoke test, final documentation.
 
 ## Decisions that later steps must honor
+
+- From P0 (owner-confirmed 2026-09-18): the default artifact is **`bge-m3` int8**,
+  `Xenova/bge-m3` `onnx/model_int8.onnx` (568 MB, MIT), SHA-256
+  `a206e10e995aa2a833924bcd725ba5dd6c3425cd34bac3cf2b5677cd2a1c51d6`, with
+  `tokenizer.json` SHA-256
+  `6710678b12670bc442b99edc952c4d996ae309a7020c1fa0096dd245c2faf790`. Use CLS
+  pooling, L2 normalization, no instruction prefix, 128-token truncation, and key
+  text = dotted segments split into words, plus `" | "` and the owner label when
+  the catalog has one. Re-verify both hashes when P4 pins them.
+- From P0: semantic similarity may never merge keys automatically. Every one of
+  the 27 antonym pairs scored higher against its own opposite than the median
+  correct message-to-key match scored, under every model measured, so no threshold
+  separates them. This is now measured, not cautionary.
+- From P0: `multilingual-e5` was rejected. Its int8 exports are AVX-512 VNNI
+  (x86-only) and its similarity range is so compressed that every antonym pair
+  exceeded 0.85. Do not swap it in as a "smaller alternative" without redoing the
+  antonym measurement.
 
 - From P1/P2: evidence is never rewritten; polarity `-1` only for preferences; a
   `semantic` alias needs `similarity`; `upsert` rejects active cycles, keeps the
@@ -125,7 +160,17 @@ documentation. Authoritative documents stay
 - Tests that construct daemon services must pass `aliases=repositories.key_aliases`
   (the keyword is required); passing `None` produces snapshots with a different
   algorithm version, which the daemon then rebuilds.
-- `pytest-cov` is not installed, so P1 to P3 still have no coverage number.
+- `pytest-cov` is not installed, so P1 to P3 and P0 still have no coverage number.
+- P0 measured macOS arm64 only. Windows, Linux, and x64 are unverified and moved
+  into P6; the step-A fallback on load failure is what makes that acceptable.
+- Peak RSS with `bge-m3` int8 loaded was about 1.8 GB (whole process, mapped
+  weights included). P4 must load lazily and release after idle, and the client
+  download dialog should state this before the owner presses download.
+- P5 can ship semantic scoring before the label catalog UI: key text alone already
+  reaches 97.7% Vietnamese recall inside the 50-key budget; labels take it to 100%
+  and mainly improve rank 1.
+- Re-run the harness whenever the scoring mix in `select_known_keys` changes;
+  `lexical_scores` is committed precisely so the before/after gap stays visible.
 
 ## Verification commands
 

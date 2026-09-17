@@ -13,7 +13,7 @@ Everything else here is the detailed source of truth behind that page.
 | [index.html](index.html) | Orientation for newcomers and a consolidated reference for everyone |
 | [phase-status.md](phase-status.md) | What is built, what is authorized, and the current phase gate |
 | [phases/](phases/README.md) | Durable per-phase plan, verification, known issues, and handoff |
-| [architecture/](architecture/README.md) | Layering rules and implemented ADRs through ADR-015; ADR-014 is reserved for Phase 13 |
+| [architecture/](architecture/README.md) | Layering rules and implemented ADRs through ADR-016; ADR-014 is reserved for Phase 13 |
 | [security/](security/README.md) | Privacy and security boundaries in force |
 | [contributor-guide/setup.md](contributor-guide/setup.md) | Source setup, `.env`, providers, run modes, builds, and troubleshooting |
 | [contributor-guide/](contributor-guide/README.md) | Conventions, workflow, quality gates, repository settings, configuration |
