@@ -29,11 +29,13 @@ from soulmate_core.domain import (
     PersonalModelRepository,
     RawEvent,
     RawEventRepository,
+    TargetKeyAliasRepository,
 )
 from soulmate_core.preferences import ModelRebuilder
 from soulmate_llm_providers import LLMMessage, LLMProvider
 
 from soulmate_daemon.extraction import KEY_REUSE_RULES
+from soulmate_daemon.key_aliases import register_normalized_aliases
 
 FEATURE_EXTRACTION_PROMPT = f"""Extract comparable preference features for each decision option.
 Use stable dotted English keys; known_keys lists known preference keys and namespaces.
@@ -90,13 +92,15 @@ class DecisionService:
         models: PersonalModelRepository,
         outcomes: OutcomeRepository,
         provider: LLMProvider | None,
+        aliases: TargetKeyAliasRepository | None,
     ) -> None:
         self._decisions = decisions
         self._raw_events = raw_events
         self._evidence = evidence
-        self._models = models
         self._outcomes = outcomes
         self._provider = provider
+        self._aliases = aliases
+        self._rebuilder = ModelRebuilder(evidence, models, aliases)
 
     async def create(
         self,
@@ -112,7 +116,7 @@ class DecisionService:
         if missing:
             if self._provider is None:
                 raise RuntimeError("A model provider is required for natural option extraction.")
-            snapshot = ModelRebuilder(self._evidence, self._models).current(profile_id)
+            snapshot = self._rebuilder.current(profile_id)
             resolved_keys = {
                 key
                 for item, historical_options, _ in self._decisions.list_resolved(profile_id)
@@ -203,7 +207,7 @@ class DecisionService:
         if decision.status is DecisionStatus.RESOLVED:
             raise ValueError("Resolved decisions cannot receive new predictions.")
         now = datetime.now(UTC)
-        snapshot = ModelRebuilder(self._evidence, self._models).current(profile_id, now)
+        snapshot = self._rebuilder.current(profile_id, now)
         history = tuple(
             ResolvedDecision(item, historical_options, resolution)
             for item, historical_options, resolution in self._decisions.list_resolved(profile_id)
@@ -215,6 +219,7 @@ class DecisionService:
             snapshot=snapshot,
             history=history,
             created_at=now,
+            aliases=self._rebuilder.alias_map(profile_id),
         )
         self._decisions.add_prediction(prediction)
         return prediction
@@ -257,7 +262,8 @@ class DecisionService:
         self._decisions.resolve(resolution)
         for item in learned:
             self._evidence.add(item)
-        snapshot = ModelRebuilder(self._evidence, self._models).rebuild(profile_id, now)
+        register_normalized_aliases(self._evidence, self._aliases, profile_id, now)
+        snapshot = self._rebuilder.rebuild(profile_id, now)
         return ResolutionResult(resolution, learned, snapshot.version)
 
     def record_outcome(
@@ -312,9 +318,7 @@ class DecisionService:
         decision, options = stored
         if decision.status is DecisionStatus.RESOLVED:
             raise ValueError("Resolved decisions cannot receive new advice.")
-        snapshot = ModelRebuilder(self._evidence, self._models).current(
-            profile_id, datetime.now(UTC)
-        )
+        snapshot = self._rebuilder.current(profile_id, datetime.now(UTC))
         prediction = self._decisions.latest_prediction(decision_id)
         if prediction is None or prediction.model_snapshot_version != snapshot.version:
             prediction = self.predict(profile_id, decision_id)

@@ -25,6 +25,7 @@ import type {
   DelegationRequest,
   DelegationRequestInput,
   Evidence,
+  EvidenceTargetType,
   ExternalDecision,
   ExternalDecisionInput,
   ExternalOutcome,
@@ -46,6 +47,11 @@ import type {
   IssuedApiCredential,
   IssuedServiceIdentity,
   ImportFormat,
+  KeyAlias,
+  KeyAliasChange,
+  KeyAliasList,
+  KeyAliasRemoval,
+  KeyAliasReviewAction,
   RestoreStaged,
   RemoteBackup,
   RemoteBackupStatus,
@@ -202,6 +208,45 @@ export class SoulmateClient {
       target_key: targetKey,
       value,
       context,
+    });
+  }
+
+  /** List key aliases; owner-only, so paired devices receive 403. */
+  keyAliases(): Promise<KeyAliasList> {
+    return this.request<KeyAliasList>("GET", "/v1/key-aliases");
+  }
+
+  mergeKeys(
+    targetType: EvidenceTargetType,
+    aliasKey: string,
+    canonicalKey: string,
+    polarity: KeyAlias["polarity"] = 1,
+  ): Promise<KeyAliasChange> {
+    return this.request<KeyAliasChange>("POST", "/v1/key-aliases", {
+      target_type: targetType,
+      alias_key: aliasKey,
+      canonical_key: canonicalKey,
+      polarity,
+    });
+  }
+
+  reviewKeyAlias(
+    alias: Pick<KeyAlias, "target_type" | "alias_key">,
+    action: KeyAliasReviewAction,
+  ): Promise<KeyAliasChange> {
+    return this.request<KeyAliasChange>("POST", "/v1/key-aliases/review", {
+      target_type: alias.target_type,
+      alias_key: alias.alias_key,
+      action,
+    });
+  }
+
+  removeKeyAlias(
+    alias: Pick<KeyAlias, "target_type" | "alias_key">,
+  ): Promise<KeyAliasRemoval> {
+    return this.request<KeyAliasRemoval>("POST", "/v1/key-aliases/remove", {
+      target_type: alias.target_type,
+      alias_key: alias.alias_key,
     });
   }
 

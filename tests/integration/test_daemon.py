@@ -448,6 +448,7 @@ def test_chat_extracts_preferences_and_persists_context_across_restart(tmp_path:
                 models=repositories.personal_models,
                 provider=first_provider,
                 jobs=repositories.jobs,
+                aliases=repositories.key_aliases,
             ).retry_learning(job.payload)
         )
         evidence = repositories.evidence.list_for_profile("profile_default")[0]
@@ -481,6 +482,7 @@ def test_chat_extracts_preferences_and_persists_context_across_restart(tmp_path:
                 models=repositories.personal_models,
                 provider=second_provider,
                 jobs=repositories.jobs,
+                aliases=repositories.key_aliases,
             ).retry_learning(job.payload)
         )
         assert client.get("/v1/model/summary").json()["version"] == 1
@@ -507,6 +509,7 @@ def _learn_from_chat(app: FastAPI, provider: FakeLLMProvider, message_id: str) -
             models=repositories.personal_models,
             provider=provider,
             jobs=repositories.jobs,
+            aliases=repositories.key_aliases,
         ).retry_learning(job.payload)
     )
 
@@ -665,6 +668,7 @@ def test_chat_preserves_reply_when_learning_output_is_invalid(tmp_path: Path) ->
             models=repositories.personal_models,
             provider=provider,
             jobs=repositories.jobs,
+            aliases=repositories.key_aliases,
         )
         with pytest.raises(ValueError):
             asyncio.run(service.retry_learning(job.payload))

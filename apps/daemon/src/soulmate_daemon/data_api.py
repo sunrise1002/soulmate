@@ -11,9 +11,9 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from soulmate_core.domain import AuditEvent, Source, SourceDeletion
 from soulmate_core.importing import ImportFormat
-from soulmate_core.preferences import ModelRebuilder
 
 from soulmate_daemon.imports import ChatImportService, ImportResult
+from soulmate_daemon.key_aliases import model_rebuilder
 from soulmate_daemon.portability import (
     ArchiveResult,
     ArchiveService,
@@ -233,7 +233,7 @@ def build_data_router(app: FastAPI) -> APIRouter:
         )
         if result is None:
             raise HTTPException(status_code=404, detail="Imported source was not found.")
-        snapshot = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
+        snapshot = model_rebuilder(repositories, runtime_of(app)["settings"]).rebuild(
             DEFAULT_PROFILE_ID
         )
         _record_audit(

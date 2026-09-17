@@ -4,6 +4,22 @@
 
 ### Added
 
+- Key consistency wiring for the key consistency increment (step P3): reviewed
+  evidence now creates active `normalized` aliases automatically when two used
+  keys share one `key-normalizer-v1` form, so `ui.theme.dark_mode` reinforces
+  `ui.theme.dark` instead of splitting the model. Evidence keeps its original
+  key. The decision predictor and its pairwise learner map option feature keys
+  through active aliases and, for keys the model does not know, through
+  normalization, so a decision extracted under a variant key uses the learned
+  preference instead of returning 50/50. Every daemon workflow builds its
+  `ModelRebuilder` through one factory, and snapshots record whether aliases were
+  applied, so turning `key_aliases.enabled` off rebuilds the model from the
+  original keys on the next read. A new owner-only API (`GET /v1/key-aliases`,
+  `POST /v1/key-aliases`, `/review`, `/remove`) lists, merges, approves, rejects,
+  inverts, and undoes aliases, records audits without key names, and returns the
+  rebuilt snapshot version; the desktop and web Model screens gained a
+  "Duplicate keys" review list, and the TypeScript SDK gained the matching
+  methods. Semantic suggestions, key labels, and embeddings remain unimplemented.
 - Persistence for the key consistency increment (step P2): migration
   `0011_key_consistency` adds `target_key_aliases`, `target_key_catalog`, and
   `target_key_embeddings` with a downgrade that drops them;

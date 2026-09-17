@@ -152,6 +152,12 @@ class EmbeddingConfig(ConfigModel):
     provider: Literal["local"] = "local"
 
 
+class KeyAliasesConfig(ConfigModel):
+    """Canonical target key aliases; disabling them rebuilds from original keys."""
+
+    enabled: bool = True
+
+
 class Settings(ConfigModel):
     data_dir: Path = Path("data")
     server: ServerConfig = Field(default_factory=ServerConfig)
@@ -163,6 +169,7 @@ class Settings(ConfigModel):
     vector: VectorConfig = Field(default_factory=VectorConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    key_aliases: KeyAliasesConfig = Field(default_factory=KeyAliasesConfig)
 
     @property
     def tls_directory(self) -> Path:

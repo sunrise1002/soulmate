@@ -10,6 +10,7 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import type { SyntheticEvent } from "react";
 
+import { DuplicateKeysPanel } from "../components/DuplicateKeysPanel.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 import { apiRequest } from "../runtime.ts";
 import type {
@@ -263,6 +264,13 @@ export function ModelScreen({ revision, onModelChanged }: ModelScreenProps) {
           </div>
         )}
       </article>
+      <DuplicateKeysPanel
+        revision={revision}
+        onChanged={() => {
+          void load();
+          onModelChanged();
+        }}
+      />
       {preferences.length ? (
         <div className="preference-grid">
           {preferences.map((item) => (

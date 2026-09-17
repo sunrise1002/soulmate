@@ -14,6 +14,7 @@ from soulmate_core.domain import (
     QuestionAnswer,
     RawEvent,
     RawEventRepository,
+    TargetKeyAliasRepository,
 )
 from soulmate_core.learning import answer_evidence, generate_active_questions
 from soulmate_core.preferences import ModelRebuilder
@@ -34,17 +35,18 @@ class ActiveLearningService:
         raw_events: RawEventRepository,
         evidence: EvidenceRepository,
         models: PersonalModelRepository,
+        aliases: TargetKeyAliasRepository | None,
     ) -> None:
         self._questions = questions
         self._raw_events = raw_events
         self._evidence = evidence
-        self._models = models
+        self._rebuilder = ModelRebuilder(evidence, models, aliases)
 
     def generate(
         self, profile_id: str, limit: int, target_key: str | None = None
     ) -> tuple[ActiveQuestion, ...]:
         now = datetime.now(UTC)
-        snapshot = ModelRebuilder(self._evidence, self._models).current(profile_id, now)
+        snapshot = self._rebuilder.current(profile_id, now)
         generated = generate_active_questions(
             snapshot=snapshot,
             existing=self._questions.list_for_profile(profile_id),
@@ -79,5 +81,5 @@ class ActiveLearningService:
         self._questions.add_answer(answer)
         for item in learned:
             self._evidence.add(item)
-        snapshot = ModelRebuilder(self._evidence, self._models).rebuild(profile_id, now)
+        snapshot = self._rebuilder.rebuild(profile_id, now)
         return ActiveAnswerResult(answer, learned, snapshot.version)

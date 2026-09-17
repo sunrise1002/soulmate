@@ -27,7 +27,6 @@ from soulmate_core.domain import (
     RawEvent,
 )
 from soulmate_core.learning import rank_uncertainties
-from soulmate_core.preferences import ModelRebuilder
 from soulmate_llm_providers import EgressDeniedError, LLMProvider, ProviderError
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy import text
@@ -47,6 +46,12 @@ from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, Reso
 from soulmate_daemon.delegation_api import build_delegation_router
 from soulmate_daemon.external_api import build_external_router
 from soulmate_daemon.jobs import DurableJobWorker
+from soulmate_daemon.key_alias_api import build_key_alias_router
+from soulmate_daemon.key_aliases import (
+    alias_repository,
+    model_rebuilder,
+    register_normalized_aliases,
+)
 from soulmate_daemon.network import (
     LanEndpoint,
     NetworkConfigurationError,
@@ -587,10 +592,12 @@ def create_app(
             raise RuntimeError("Database session factory was not initialized.")
         repositories = Repositories(database.session_factory)
         installation_id = ensure_installation(repositories.system_metadata, repositories.profiles)
+        rebuilder = model_rebuilder(repositories, resolved_settings)
         if restored_revision is not None:
-            ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-                DEFAULT_PROFILE_ID
-            )
+            rebuilder.rebuild(DEFAULT_PROFILE_ID)
+        elif repositories.personal_models.latest_snapshot(DEFAULT_PROFILE_ID) is not None:
+            # Refresh a snapshot built before key_aliases.enabled last changed.
+            rebuilder.current(DEFAULT_PROFILE_ID)
         endpoint, lan_error = _resolve_lan(resolved_settings, lan)
         connector_catalog = discover_connectors(connectors)
         backup_store = (
@@ -682,6 +689,7 @@ def create_app(
                 models=repositories.personal_models,
                 provider=_resolve_provider(_state(app)),
                 jobs=repositories.jobs,
+                aliases=alias_repository(repositories, resolved_settings),
             ).retry_learning(payload)
 
         handlers = {
@@ -910,6 +918,7 @@ def create_app(
             raw_events=repositories.raw_events,
             evidence=repositories.evidence,
             models=repositories.personal_models,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         questions = service.generate(DEFAULT_PROFILE_ID, request.limit, request.target_key)
         return [_active_question_response(item) for item in questions]
@@ -928,6 +937,7 @@ def create_app(
             raw_events=repositories.raw_events,
             evidence=repositories.evidence,
             models=repositories.personal_models,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             result: ActiveAnswerResult = service.answer(
@@ -1018,7 +1028,7 @@ def create_app(
             raise HTTPException(status_code=404, detail="Evidence was not found.")
         if not repositories.evidence.remove(evidence_id):
             raise HTTPException(status_code=404, detail="Evidence was not found.")
-        snapshot = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
+        snapshot = model_rebuilder(repositories, _state(app)["settings"]).rebuild(
             DEFAULT_PROFILE_ID, datetime.now(UTC)
         )
         return EvidenceDeletionResponse(
@@ -1071,9 +1081,14 @@ def create_app(
         )
         repositories.raw_events.add(event)
         repositories.evidence.add(evidence)
-        snapshot = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-            DEFAULT_PROFILE_ID, now
+        settings = _state(app)["settings"]
+        register_normalized_aliases(
+            repositories.evidence,
+            alias_repository(repositories, settings),
+            DEFAULT_PROFILE_ID,
+            now,
         )
+        snapshot = model_rebuilder(repositories, settings).rebuild(DEFAULT_PROFILE_ID, now)
         return PreferenceCorrectionResponse(
             evidence=_evidence_response(evidence), snapshot_version=snapshot.version
         )
@@ -1098,6 +1113,7 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=provider,
+            aliases=alias_repository(repositories, runtime["settings"]),
         )
         try:
             decision, options = await service.create(
@@ -1143,6 +1159,7 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=None,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             prediction = service.predict(DEFAULT_PROFILE_ID, decision_id)
@@ -1174,6 +1191,7 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=None,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             advice = service.advise(DEFAULT_PROFILE_ID, decision_id)
@@ -1202,6 +1220,7 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=None,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             result = service.resolve(DEFAULT_PROFILE_ID, decision_id, request.chosen_option_id)
@@ -1229,6 +1248,7 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=None,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             outcome = service.record_outcome(
@@ -1257,6 +1277,7 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=None,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             outcome = service.delete_outcome(DEFAULT_PROFILE_ID, decision_id)
@@ -1282,6 +1303,7 @@ def create_app(
             models=repositories.personal_models,
             provider=resolved_provider,
             jobs=repositories.jobs,
+            aliases=alias_repository(repositories, runtime["settings"]),
         )
         try:
             result = await service.chat(
@@ -1323,5 +1345,6 @@ def create_app(
     app.include_router(build_data_router(app))
     app.include_router(build_connector_router(app))
     app.include_router(build_delegation_router(app))
+    app.include_router(build_key_alias_router(app))
     mount_web_client(app, resolved_settings.web_client_directory)
     return app

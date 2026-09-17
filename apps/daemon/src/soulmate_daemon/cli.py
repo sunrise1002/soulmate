@@ -15,13 +15,13 @@ from alembic.util.exc import CommandError
 from soulmate_connector_sdk import discover_connectors
 from soulmate_core.evaluation import evaluate_dataset, load_dataset
 from soulmate_core.importing import ImportFormat
-from soulmate_core.preferences import ModelRebuilder
 from soulmate_mcp.server import main as mcp_main
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy.exc import SQLAlchemyError
 
 from soulmate_daemon.config import ConfigurationError, Settings, load_settings
 from soulmate_daemon.imports import ChatImportService
+from soulmate_daemon.key_aliases import model_rebuilder
 from soulmate_daemon.portability import (
     ARCHIVE_MAGIC,
     ArchiveService,
@@ -139,9 +139,7 @@ def _rebuild_model(settings: Settings) -> int:
         database.migrate()
         repositories = Repositories(database.sessions())
         ensure_installation(repositories.system_metadata, repositories.profiles)
-        snapshot = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-            DEFAULT_PROFILE_ID
-        )
+        snapshot = model_rebuilder(repositories, settings).rebuild(DEFAULT_PROFILE_ID)
     except (CommandError, OSError, RuntimeError, SQLAlchemyError, ValueError) as exc:
         print(
             json.dumps(

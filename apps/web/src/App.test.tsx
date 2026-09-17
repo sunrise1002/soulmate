@@ -1,5 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App.tsx";
 
@@ -33,6 +39,8 @@ function localStorageStub(initial: string | null): Storage {
 }
 
 describe("web client", () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
     vi.stubGlobal("fetch", fetchMock);
     fetchMock.mockReset();
@@ -101,4 +109,74 @@ describe("web client", () => {
     expect(screen.getByRole("button", { name: "My Model" })).not.toBeNull();
     expect(screen.getByRole("button", { name: "History" })).not.toBeNull();
   });
+
+  it.each([
+    ["owner", null, true],
+    ["device", "device_1.secret", false],
+  ] as const)(
+    "requests key alias review only for the %s when needed",
+    async (actor, credential, expected) => {
+      // Given: an owner browser or a paired device
+      fetchMock.mockImplementation((input: string) => {
+        if (input.endsWith("/v1/session")) {
+          return Promise.resolve(
+            json({
+              actor,
+              device_id: actor === "device" ? "device_1" : null,
+              device_name: actor === "device" ? "Phone" : null,
+              service_id: "installation_1",
+              profile_id: "profile_default",
+            }),
+          );
+        }
+        if (input.endsWith("/v1/key-aliases")) {
+          return Promise.resolve(json({ enabled: true, aliases: [] }));
+        }
+        if (input.endsWith("/v1/model/summary")) {
+          return Promise.resolve(
+            json({
+              version: 1,
+              algorithm_version: "personal-model-v1",
+              evidence_revision: 1,
+              preference_count: 0,
+              fact_count: 0,
+              goal_count: 0,
+              constraint_count: 0,
+            }),
+          );
+        }
+        return Promise.resolve(json([]));
+      });
+      const stored =
+        credential === null
+          ? null
+          : JSON.stringify({
+              serviceId: "installation_1",
+              deviceId: "device_1",
+              deviceName: "Phone",
+              credential,
+            });
+
+      // When: the model screen opens
+      render(
+        <App
+          origin="http://127.0.0.1:7432"
+          storage={localStorageStub(stored)}
+        />,
+      );
+      fireEvent.click(await screen.findByRole("button", { name: "My Model" }));
+      await screen.findByText("No preferences have been learned yet.");
+
+      // Then: only the owner loads the owner-only review list
+      await waitFor(() => {
+        const requested = fetchMock.mock.calls.some(([url]) =>
+          url.endsWith("/v1/key-aliases"),
+        );
+        expect(requested).toBe(expected);
+      });
+      expect(
+        screen.queryByText("No duplicate keys have been found.") !== null,
+      ).toBe(expected);
+    },
+  );
 });

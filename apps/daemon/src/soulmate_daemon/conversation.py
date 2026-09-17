@@ -21,6 +21,7 @@ from soulmate_core.domain import (
     PersonalModelRepository,
     RawEvent,
     RawEventRepository,
+    TargetKeyAliasRepository,
 )
 from soulmate_core.preferences import ModelRebuilder
 from soulmate_llm_providers import LLMMessage, LLMProvider, ProviderError
@@ -32,6 +33,7 @@ from soulmate_daemon.extraction import (
     review_proposals,
     validate_proposals,
 )
+from soulmate_daemon.key_aliases import register_normalized_aliases
 
 CONVERSATION_EXTRACTION_JOB = "conversation_evidence_extract"
 EXTRACTION_INITIAL_DELAY = timedelta(seconds=1)
@@ -70,6 +72,7 @@ class ConversationService:
         models: PersonalModelRepository,
         provider: LLMProvider,
         jobs: JobRepository | None = None,
+        aliases: TargetKeyAliasRepository | None,
     ) -> None:
         self._conversations = conversations
         self._messages = messages
@@ -78,6 +81,8 @@ class ConversationService:
         self._models = models
         self._provider = provider
         self._jobs = jobs
+        self._aliases = aliases
+        self._rebuilder = ModelRebuilder(evidence, models, aliases)
 
     async def _extract(
         self,
@@ -131,7 +136,7 @@ class ConversationService:
             if item.role is MessageRole.USER
         )
         return select_known_keys(
-            ModelRebuilder(self._evidence, self._models).current_model(profile_id),
+            self._rebuilder.current_model(profile_id),
             query=f"{content} {earlier_text}",
             recent_keys=recent_keys,
         )
@@ -141,7 +146,8 @@ class ConversationService:
             self._evidence.add(item)
         if not reviewed.accepted:
             return None
-        return ModelRebuilder(self._evidence, self._models).rebuild(profile_id, now).version
+        register_normalized_aliases(self._evidence, self._aliases, profile_id, now)
+        return self._rebuilder.rebuild(profile_id, now).version
 
     def _enqueue_learning(
         self,

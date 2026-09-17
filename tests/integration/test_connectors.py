@@ -169,9 +169,9 @@ def test_local_notes_sync_is_idempotent_persistent_and_provenance_deletable(
         repositories.key_aliases.upsert(
             alias("work.focus", "work.deep_focus", profile_id=DEFAULT_PROFILE_ID)
         )
-        ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-            DEFAULT_PROFILE_ID, now
-        )
+        ModelRebuilder(
+            repositories.evidence, repositories.personal_models, repositories.key_aliases
+        ).rebuild(DEFAULT_PROFILE_ID, now)
 
     restarted = create_app(settings)
     with _owner(restarted) as owner:

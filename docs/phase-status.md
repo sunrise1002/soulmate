@@ -23,8 +23,9 @@ its [plan](phases/key-consistency-increment-plan.md) is implemented locally:
 inside the kernel, with no persistence, no wiring, and no new dependency. Steps
 P0 and P2 to P6 are not implemented. This does not start Phase 13 or authorize a
 later phase. Step P2 (migration `0011`, alias repository, revision bump, deletion
-cleanup, and archive coverage) followed on the same day; steps P0 and P3 to P6 are
-not implemented.
+cleanup, and archive coverage) followed on the same day, and step P3 (automatic
+normalized aliases, alias-aware prediction, the owner alias API, and the desktop
+and web review list) on 2026-09-18. Steps P0 and P4 to P6 are not implemented.
 
 ## Reports
 
@@ -137,6 +138,36 @@ rejection, deletion, backup, export, and restore tests were added. `ruff check`,
 tests passed locally; `pnpm check:all` and coverage were not run. Limitations: the
 daemon still constructs `ModelRebuilder` without aliases, catalog and embedding
 tables have no repositories yet, and no code creates aliases.
+
+Step P3 was implemented on 2026-09-18. `propose_normalized_aliases` in the kernel
+turns used keys with equal normalized forms into active `normalized` aliases, and
+the daemon stores them after chat extraction review, decision resolution
+learning, and direct preference corrections; keys that already carry an alias of
+any status are left alone, so owner rejections are sticky. `DecisionPredictor`
+accepts a `KeyAliasMap` and canonicalizes current and historical option features
+before preference matching, pairwise learning, and similarity, falling back to
+normalized equality for keys the model does not know; its algorithm version now
+ends with `:canonical-features-v1:key-normalizer-v1`. A single
+`model_rebuilder(repositories, settings)` factory replaced the thirteen ad-hoc
+`ModelRebuilder` constructions, the services take an explicit alias repository,
+and snapshots built with aliases record
+`personal-model-v1:evidence-weights-v1:key-aliases-v1`, so toggling the new
+`key_aliases.enabled` setting invalidates stale snapshots and the daemon
+refreshes them at startup. The owner-only `/v1/key-aliases` API lists aliases
+with the enabled flag, creates owner merges (including inverted axes), approves,
+rejects, inverts, and removes them, maps alias rule violations and cycles to 409
+and unknown keys to 404, rebuilds the model, and audits changes without key
+names. The desktop and web Model screens show a "Duplicate keys" review list
+(web only for the owner, because the API is owner-only), and the TypeScript SDK
+exposes `keyAliases`, `mergeKeys`, `reviewKeyAlias`, and `removeKeyAlias`.
+`pnpm check` passed locally, including 500 Python tests, 50 SDK, 18 desktop, 27
+web, and 27 mobile client tests; `pnpm check:all` and coverage collection
+(pytest-cov is still not installed) were not run, and no live provider was
+exercised. Limitations: aliases are created only from evidence keys, so an
+unresolved decision option key is matched by normalization but stores no alias;
+the clients cannot create owner merges yet (API and SDK only); and semantic
+suggestions, key labels, embeddings, and the P0 model spike remain
+unimplemented.
 
 On 2026-09-16, desktop daemon restart and application-exit cleanup were corrected
 for the PyInstaller one-file sidecar. The shell now uses a private graceful

@@ -21,83 +21,111 @@ documentation. Authoritative documents stay
 
 ### P2 (2026-09-17) — persistence
 
-- Migration `0011_key_consistency` (file `0011_key_consistency.py`) creates all
-  three tables of the plan now, because `0012` is reserved for Phase 13:
-  - `target_key_aliases`, PK `(profile_id, target_type, alias_key)`, checks for
-    polarity, inversion only on preferences, method, status, similarity range,
-    and `alias_key <> canonical_key`;
-  - `target_key_catalog`, PK `(profile_id, target_type, key)`, columns `label`
-    (nullable), `aliases_json`, `label_source` (`extracted` | `owner`);
-  - `target_key_embeddings`, PK `(profile_id, target_type, key, model_id)`,
-    columns `text_hash`, `dim > 0`, `vector` (BLOB).
+- Migration `0011_key_consistency` creates `target_key_aliases`,
+  `target_key_catalog`, and `target_key_embeddings` (`0012` is reserved for
+  Phase 13).
 - `soulmate_storage_sqlite/key_aliases.py`: `SqliteTargetKeyAliasRepository`
-  (`upsert`, `get`, `list_for_profile(profile_id, status=None)`, `remove`),
-  exposed as `Repositories.key_aliases`; shared `bump_evidence_revision` (the three
-  duplicated inline bumps in `repositories.py` now use it) and
+  (`upsert`, `get`, `list_for_profile(profile_id, status=None)`, `remove`) as
+  `Repositories.key_aliases`, plus shared `bump_evidence_revision` and
   `prune_unsupported_keys`.
-- Port `TargetKeyAliasRepository` in `soulmate_core.domain.ports`.
-- `ModelRebuilder(evidence, models, aliases=None)` applies only active aliases in
-  `rebuild`, `current`, and `current_model`.
-- `portability.py`: aliases and catalog count as owner data for the
-  fresh-installation check; `encrypted_export` archives drop
-  `target_key_embeddings`; `local_backup` and `remote_backup` keep everything.
+- Port `TargetKeyAliasRepository`; `ModelRebuilder(evidence, models, aliases=None)`.
+- `portability.py`: aliases and catalog count as owner data; encrypted exports
+  drop `target_key_embeddings`; backups keep everything.
 - Tests: `tests/integration/test_key_alias_persistence.py`,
-  `tests/integration/test_key_alias_deletion.py`, shared fixtures in
-  `tests/integration/key_alias_support.py` (imported relatively, because mypy maps
-  `tests/` without an `__init__.py`), an alias assertion in the connector removal
-  test, and head-revision updates in older tests.
+  `tests/integration/test_key_alias_deletion.py`, fixtures in
+  `tests/integration/key_alias_support.py` (imported relatively).
+
+### P3 (2026-09-18) — wiring, owner API, review UI
+
+- Kernel: `soulmate_core/keys/proposals.py` with `propose_normalized_aliases`
+  (+ `normalized_or_none`). Groups used keys by normalized form; canonical key =
+  the target an existing **active** alias in the group already uses, else the
+  normalized form when it is itself used, else the first used key. Keys that
+  already have an alias row of **any** status are skipped, so rejections stick.
+- Kernel: `DecisionPredictor.predict(..., aliases: KeyAliasMap | None)`
+  canonicalizes current and historical option features (`_feature_resolver`,
+  `_canonical_option`) before matching, pairwise learning, and similarity;
+  unknown keys fall back to normalized equality with a model key, and keys that
+  collapse together are averaged. `DECISION_ALGORITHM_VERSION` now ends with
+  `:canonical-features-v1:key-normalizer-v1`.
+- Kernel: `ModelRebuilder.algorithm_version` is
+  `personal-model-v1:evidence-weights-v1` without aliases and
+  `...:key-aliases-v1` with them; `_fresh_snapshot` compares it, so toggling the
+  flag invalidates snapshots. `ModelRebuilder.alias_map(profile_id)` gives the
+  predictor its map.
+- Daemon: `soulmate_daemon/key_aliases.py` holds `alias_repository`,
+  `model_rebuilder` (the factory every rebuild site now uses),
+  `register_normalized_aliases`, `KeyAliasService`, `KeyAliasReviewAction`, and
+  `KeyAliasError`. `soulmate_daemon/key_alias_api.py` holds the owner-only
+  router; `security.py` lists `/v1/key-aliases` under `OWNER_ONLY_RULES`.
+- Daemon: `ConversationService`, `DecisionService`, and `ActiveLearningService`
+  take a **required** `aliases` keyword (may be `None`) and build one internal
+  rebuilder. Aliases are registered after chat extraction review, decision
+  resolution learning, and `POST /v1/preferences/corrections`.
+- Config: `key_aliases.enabled` (default `true`), documented in
+  `config.example.toml`.
+- Clients: `packages/sdk-typescript` gained `KeyAlias*` types and `keyAliases`,
+  `mergeKeys`, `reviewKeyAlias`, `removeKeyAlias`;
+  `apps/desktop/src/components/DuplicateKeysPanel.tsx` and
+  `apps/web/src/screens/DuplicateKeys.tsx` render the review list (web only when
+  `session.actor === "owner"`, because the API is owner-only).
+- Tests: `tests/unit/test_key_alias_proposals.py`,
+  `tests/unit/test_key_alias_service.py`, alias cases in
+  `tests/unit/test_decision_predictor.py` and `tests/unit/test_access_boundary.py`,
+  `tests/integration/test_key_alias_api.py`, plus client tests in
+  `DuplicateKeysPanel.test.tsx`, `DuplicateKeys.test.tsx`, `client.test.ts`, and
+  `apps/web/src/App.test.tsx`.
 
 ## Not done
 
-- P0: ADR-016 and the embedding model spike (does not block P3).
-- P3: automatic normalized aliases after extraction review, predictor and pairwise
-  key mapping, owner alias API, desktop/web duplicate-key review, the
-  `key_aliases.enabled` flag, and **daemon wiring of aliases into every
-  `ModelRebuilder`** (see below).
-- P4 to P6: embedding port, ONNX adapter and model manager, catalog and embedding
-  repositories and domain records, semantic suggestions, sidecar packaging, final
-  documentation.
+- P0: ADR-016 and the embedding model spike (does not block P4).
+- P4: embedding port, null and ONNX adapters, model manager, egress handling.
+- P5: extraction `label`/`aliases` fields, catalog and embedding repositories and
+  domain records, backfill job, semantic scoring, **semantic alias suggestions**
+  (the review UI already renders `suggested` aliases and sends
+  approve/invert/reject, so P5 only has to create the rows).
+- P6: sidecar packaging, size check, smoke test, final documentation.
 
 ## Decisions that later steps must honor
 
-- From P1: `TargetKeyAlias` has no `id`; polarity `-1` only for preferences; a
-  `semantic` alias needs `similarity`; aliases apply at aggregation time only and
-  evidence is never rewritten.
-- `upsert` builds a `KeyAliasMap` from the other active aliases plus the new one,
-  so a direct or transitive active cycle raises `ValueError("... cycle ...")`
-  before anything is written. Suggested/rejected rows are not cycle-checked;
-  activating one later is. The P3 API should map this `ValueError` to a 409/422.
-- `upsert` keeps the first `created_at` and returns the stored alias. Every
-  `upsert` and successful `remove` bumps the evidence revision, even if the row is
-  unchanged.
-- Pruning rule (runs inside the same transaction as evidence deletion): a key is
-  supported when evidence uses it, or when an active alias whose alias key is
-  supported points to it (followed transitively). Active aliases survive when
-  their alias key is supported; suggested/rejected aliases need both keys
-  supported; catalog and embedding rows survive only for supported keys. This
-  applies to `owner` aliases too, so a deleted topic does not leave key names.
-- Catalog and embedding rows have no repository or domain record yet; P5 should
-  add them against the existing columns rather than a new migration. If a column
-  must change, amend `0011` only if no user database has it yet — otherwise stop
-  and ask the owner, because `0012` belongs to Phase 13.
+- From P1/P2: evidence is never rewritten; polarity `-1` only for preferences; a
+  `semantic` alias needs `similarity`; `upsert` rejects active cycles, keeps the
+  first `created_at`, and bumps the evidence revision on every write; pruning
+  rules as recorded in P2.
+- From P3: only equal normalized forms merge automatically, and only between keys
+  that evidence already uses. An alias row of any status blocks re-proposal, so
+  "undo" of an automatic merge is **reject**, not delete (the UI does this; the
+  API `remove` endpoint deletes and lets the next extraction re-propose).
+- Alias writes go through `KeyAliasService`, and every rebuild goes through
+  `model_rebuilder(repositories, settings)`. Do not construct `ModelRebuilder`
+  directly in new daemon code, or snapshots will flip between grouped and
+  ungrouped models.
+- Audit metadata for alias changes deliberately omits key names (they can reveal
+  personal topics); keep it that way.
+- The Tauri bridge rejects paths containing `?`, so alias endpoints take their
+  arguments in POST bodies (`/v1/key-aliases/review`, `/v1/key-aliases/remove`)
+  instead of query strings or path segments.
 
 ## Watch out
 
-- The daemon constructs `ModelRebuilder(repositories.evidence,
-  repositories.personal_models)` in about 13 places (`app.py`, `decisions.py`,
-  `conversation.py`, `active_learning.py`, `data_api.py`, `connector_api.py`,
-  `cli.py`, `portability.py`). None pass aliases yet; that is harmless only while
-  nothing creates aliases. P3 must wire all of them at once (a small factory is
-  suggested), otherwise snapshots flip between grouped and ungrouped models.
 - `ARCHIVE_DIRECTORIES` in `portability.py` includes `models`, and archives are
   capped at 512 MB. P4 stores model artifacts under `DATA_DIR/models`
-  (0.5–1.2 GB), which would make every backup fail; exclude or relocate them in P4.
-- `normalize_key` still has no production caller; the first arrives in P3.
-- The predictor and pairwise learner must reuse `KeyAliasMap`.
-- Raw-SQL test inserts with `datetime` parameters emit Python 3.12
-  `DeprecationWarning`s; existing tests do the same.
-- `pytest-cov` is not installed, so no coverage number exists for P1 or P2;
-  `pnpm check:all` was not run for P2 (no TypeScript change).
+  (0.5–1.2 GB), which would make every backup fail; exclude or relocate them.
+- Catalog and embedding rows still have no repository or domain record. P5 should
+  use the existing `0011` columns; amend `0011` only if no user database has it
+  yet — otherwise stop and ask the owner, because `0012` belongs to Phase 13.
+- A decision option key that no evidence uses is matched by normalization at
+  prediction time but stores no alias until the decision is resolved. If P5 wants
+  the alias earlier, add it where options are created, and remember pruning
+  deletes aliases whose alias key has no supporting evidence.
+- The clients cannot create owner merges yet: `POST /v1/key-aliases` and
+  `SoulmateClient.mergeKeys` exist, but no screen calls them (the panel only
+  reviews existing aliases). A "merge into another key" control in the preference
+  drawer is the natural next UI step.
+- Tests that construct daemon services must pass `aliases=repositories.key_aliases`
+  (the keyword is required); passing `None` produces snapshots with a different
+  algorithm version, which the daemon then rebuilds.
+- `pytest-cov` is not installed, so P1 to P3 still have no coverage number.
 
 ## Verification commands
 
@@ -105,7 +133,9 @@ documentation. Authoritative documents stay
 uv run --locked ruff check . && uv run --locked ruff format --check .
 uv run --locked mypy
 uv run --locked pytest
-uv run --locked pre-commit run --all-files
+pnpm check
 ```
 
-Result for P2: all passed locally (430 Python tests).
+Result for P3: `pnpm check` passed locally (500 Python tests, 50 SDK, 18 desktop,
+27 web, 27 mobile client tests, Rust tests). `pnpm check:all` (lockfile check,
+pre-commit, builds) was not run.

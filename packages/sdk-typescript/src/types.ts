@@ -37,6 +37,40 @@ export interface ModelSummary {
   constraint_count: number;
 }
 
+export type KeyAliasStatus = "active" | "suggested" | "rejected";
+export type KeyAliasMethod = "normalized" | "semantic" | "owner";
+export type KeyAliasReviewAction = "approve" | "reject" | "invert";
+
+/** Owner-reviewable mapping of one target key onto the key it reinforces. */
+export interface KeyAlias {
+  target_type: EvidenceTargetType;
+  alias_key: string;
+  canonical_key: string;
+  polarity: 1 | -1;
+  method: KeyAliasMethod;
+  status: KeyAliasStatus;
+  similarity: number | null;
+  algorithm_version: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KeyAliasList {
+  enabled: boolean;
+  aliases: KeyAlias[];
+}
+
+export interface KeyAliasChange {
+  alias: KeyAlias;
+  snapshot_version: number;
+}
+
+export interface KeyAliasRemoval {
+  target_type: EvidenceTargetType;
+  alias_key: string;
+  snapshot_version: number;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";

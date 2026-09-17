@@ -1585,3 +1585,22 @@ select {
     grid-template-columns: 1fr;
   }
 }
+.duplicate-keys {
+  margin-top: 17px;
+  padding: 18px 20px;
+}
+.duplicate-keys ul {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.duplicate-keys li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}

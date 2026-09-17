@@ -6,12 +6,16 @@ import type {
   SoulmateClient,
 } from "@soulmate/sdk";
 
+import { DuplicateKeys } from "./DuplicateKeys.tsx";
+
 interface Props {
   client: SoulmateClient;
+  /** Key alias review is owner-only; paired devices would be refused. */
+  isOwner: boolean;
   onAuthError: (error: unknown) => void;
 }
 
-export function ModelScreen({ client, onAuthError }: Props) {
+export function ModelScreen({ client, isOwner, onAuthError }: Props) {
   const [summary, setSummary] = useState<ModelSummary | null>(null);
   const [preferences, setPreferences] = useState<Preference[]>([]);
   const [question, setQuestion] = useState<ActiveQuestion | null>(null);
@@ -96,6 +100,7 @@ export function ModelScreen({ client, onAuthError }: Props) {
           </div>
         )}
       </div>
+      {isOwner && <DuplicateKeys client={client} onChanged={load} />}
       <ul className="preferences">
         {preferences.map((preference) => (
           <li key={`${preference.key}-${String(preference.model_version)}`}>

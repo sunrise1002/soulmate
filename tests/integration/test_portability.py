@@ -72,15 +72,15 @@ def test_import_is_atomic_and_source_deletion_removes_derivatives(tmp_path: Path
             source_message_id=message_id,
         )
     )
-    before = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-        DEFAULT_PROFILE_ID, NOW
-    )
+    before = ModelRebuilder(
+        repositories.evidence, repositories.personal_models, repositories.key_aliases
+    ).rebuild(DEFAULT_PROFILE_ID, NOW)
 
     deletion = repositories.sources.remove_import(DEFAULT_PROFILE_ID, result.source.id)
     assert deletion is not None
-    after = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-        DEFAULT_PROFILE_ID, NOW
-    )
+    after = ModelRebuilder(
+        repositories.evidence, repositories.personal_models, repositories.key_aliases
+    ).rebuild(DEFAULT_PROFILE_ID, NOW)
 
     assert result.conversation_count == 1
     assert result.message_count == 2
@@ -130,9 +130,9 @@ def test_backup_restores_data_but_not_credentials_or_installation_identity(
             NOW,
         )
     )
-    ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-        DEFAULT_PROFILE_ID, NOW
-    )
+    ModelRebuilder(
+        repositories.evidence, repositories.personal_models, repositories.key_aliases
+    ).rebuild(DEFAULT_PROFILE_ID, NOW)
     assert database.engine is not None
     with database.engine.begin() as connection:
         connection.execute(
@@ -210,6 +210,7 @@ def test_encrypted_export_authenticates_and_migrates_an_older_model(
             NOW,
         )
     )
+    # The 0007 schema predates key aliases, so the old model is built without them.
     ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
         DEFAULT_PROFILE_ID, NOW
     )

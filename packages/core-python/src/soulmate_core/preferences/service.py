@@ -11,7 +11,11 @@ from soulmate_core.domain import (
     TargetKeyAliasStatus,
     UserModelSnapshot,
 )
+from soulmate_core.keys import KeyAliasMap
 from soulmate_core.preferences.aggregation import ALGORITHM_VERSION, aggregate_evidence
+
+KEY_ALIAS_ALGORITHM_SUFFIX = "key-aliases-v1"
+ALIASED_ALGORITHM_VERSION = f"{ALGORITHM_VERSION}:{KEY_ALIAS_ALGORITHM_SUFFIX}"
 
 
 class ModelRebuilder:
@@ -19,7 +23,8 @@ class ModelRebuilder:
 
     When an alias repository is given, active aliases group keys during
     aggregation; alias writes advance the evidence revision, so stale snapshots
-    are detected the same way as evidence changes.
+    are detected the same way as evidence changes. Snapshots also record whether
+    aliases were applied, so enabling or disabling aliases invalidates them.
     """
 
     def __init__(
@@ -32,10 +37,18 @@ class ModelRebuilder:
         self._models = models
         self._aliases = aliases
 
+    @property
+    def algorithm_version(self) -> str:
+        return ALGORITHM_VERSION if self._aliases is None else ALIASED_ALGORITHM_VERSION
+
     def _active_aliases(self, profile_id: str) -> tuple[TargetKeyAlias, ...]:
         if self._aliases is None:
             return ()
         return self._aliases.list_for_profile(profile_id, TargetKeyAliasStatus.ACTIVE)
+
+    def alias_map(self, profile_id: str) -> KeyAliasMap:
+        """Return the active aliases this rebuilder applies, for feature matching."""
+        return KeyAliasMap(self._active_aliases(profile_id))
 
     def rebuild(self, profile_id: str, now: datetime | None = None) -> UserModelSnapshot:
         rebuilt_at = now if now is not None else datetime.now(UTC)
@@ -47,14 +60,16 @@ class ModelRebuilder:
             profile_id=profile_id,
             model=model,
             evidence_revision=evidence_revision,
-            algorithm_version=ALGORITHM_VERSION,
+            algorithm_version=self.algorithm_version,
             created_at=rebuilt_at,
         )
 
     def _fresh_snapshot(self, profile_id: str) -> UserModelSnapshot | None:
         snapshot = self._models.latest_snapshot(profile_id)
-        if snapshot is None or snapshot.evidence_revision != self._evidence.current_revision(
-            profile_id
+        if (
+            snapshot is None
+            or snapshot.algorithm_version != self.algorithm_version
+            or snapshot.evidence_revision != self._evidence.current_revision(profile_id)
         ):
             return None
         return snapshot

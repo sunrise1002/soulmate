@@ -21,10 +21,10 @@ from alembic.script import ScriptDirectory
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
-from soulmate_core.preferences import ModelRebuilder
 from soulmate_storage_sqlite import Database, Repositories
 
 from soulmate_daemon.config import Settings
+from soulmate_daemon.key_aliases import model_rebuilder
 from soulmate_daemon.system import DEFAULT_PROFILE_ID, INSTALLATION_ID_KEY, ensure_installation
 
 ARCHIVE_FORMAT_VERSION = 1
@@ -516,9 +516,7 @@ def restore_archive(
         database.migrate()
         repositories = Repositories(database.sessions())
         installation_id = ensure_installation(repositories.system_metadata, repositories.profiles)
-        snapshot = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-            DEFAULT_PROFILE_ID
-        )
+        snapshot = model_rebuilder(repositories, settings).rebuild(DEFAULT_PROFILE_ID)
         after = database.current_revision()
         if after is None:
             raise PortabilityError("The restored schema revision is unavailable.")

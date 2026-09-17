@@ -102,6 +102,7 @@ def _chat_and_learn(
             models=repositories.personal_models,
             provider=provider,
             jobs=repositories.jobs,
+            aliases=repositories.key_aliases,
         ).retry_learning(job.payload)
     )
     return str(body["conversation_id"])

@@ -123,6 +123,88 @@ describe("SoulmateClient", () => {
     );
   });
 
+  it("sends key alias operations with keys only in request bodies", async () => {
+    // Given: a local owner client
+    const { fetch, calls } = stub(200, {});
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      fetch,
+    });
+    const alias = {
+      target_type: "preference",
+      alias_key: "ui/theme?x",
+    } as const;
+
+    // When: the owner lists, merges, reviews, and removes aliases
+    await client.keyAliases();
+    await client.mergeKeys("preference", "ui.theme.light", "ui.theme.dark", -1);
+    await client.mergeKeys("fact", "Home.City", "home.city");
+    await client.reviewKeyAlias(alias, "invert");
+    await client.removeKeyAlias(alias);
+
+    // Then: paths stay fixed and keys never reach the URL
+    expect(calls.map((call) => [call.init?.method, call.url])).toEqual([
+      ["GET", "http://127.0.0.1:7432/v1/key-aliases"],
+      ["POST", "http://127.0.0.1:7432/v1/key-aliases"],
+      ["POST", "http://127.0.0.1:7432/v1/key-aliases"],
+      ["POST", "http://127.0.0.1:7432/v1/key-aliases/review"],
+      ["POST", "http://127.0.0.1:7432/v1/key-aliases/remove"],
+    ]);
+    expect(calls.map((call) => call.init?.body)).toEqual([
+      undefined,
+      JSON.stringify({
+        target_type: "preference",
+        alias_key: "ui.theme.light",
+        canonical_key: "ui.theme.dark",
+        polarity: -1,
+      }),
+      JSON.stringify({
+        target_type: "fact",
+        alias_key: "Home.City",
+        canonical_key: "home.city",
+        polarity: 1,
+      }),
+      JSON.stringify({
+        target_type: "preference",
+        alias_key: "ui/theme?x",
+        action: "invert",
+      }),
+      JSON.stringify({ target_type: "preference", alias_key: "ui/theme?x" }),
+    ]);
+  });
+
+  it.each([
+    [403, "This action is only available on the owner's device."],
+    [404, "Key alias was not found."],
+    [409, "Key aliases are disabled in the configuration."],
+    [422, "The service request failed with status 422."],
+  ])("surfaces alias failure %s as a typed error", async (status, message) => {
+    // Given: a service that refuses an alias review
+    const { fetch } = stub(
+      status,
+      status === 422
+        ? { detail: [{ loc: ["body", "action"] }] }
+        : { detail: message },
+    );
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      fetch,
+    });
+
+    // When: the owner reviews an alias
+    const error = await client
+      .reviewKeyAlias(
+        { target_type: "preference", alias_key: "ui.theme.dark_mode" },
+        "approve",
+      )
+      .catch((caught: unknown) => caught);
+
+    // Then: the status and a readable message are preserved
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(status);
+    expect((error as ApiError).message).toBe(message);
+  });
+
   it("exposes active learning, advice, and outcome operations", async () => {
     // Given: a paired client and successful local service
     const { fetch, calls } = stub(200, {});

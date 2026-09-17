@@ -2,8 +2,8 @@
 
 import math
 import re
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 from soulmate_core.domain import (
@@ -17,6 +17,12 @@ from soulmate_core.domain import (
     Preference,
     UserModelSnapshot,
 )
+from soulmate_core.keys import (
+    KEY_NORMALIZER_VERSION,
+    KeyAliasMap,
+    ResolvedKey,
+    normalized_or_none,
+)
 from soulmate_core.learning import (
     CONTEXT_SCOPE_WEIGHTS,
     PAIRWISE_ALGORITHM_VERSION,
@@ -26,6 +32,7 @@ from soulmate_core.learning import (
 
 DECISION_ALGORITHM_VERSION = (
     f"decision-predictor-v2:contextual-v1:{PAIRWISE_ALGORITHM_VERSION}:confidence-v2"
+    f":canonical-features-v1:{KEY_NORMALIZER_VERSION}"
 )
 _TOKEN_PATTERN = re.compile(r"\w+", re.UNICODE)
 
@@ -101,6 +108,46 @@ def find_similar_decisions(
         for score, item in ranked
         if score > 0.0
     )[:limit]
+
+
+type _FeatureResolver = Callable[[str], ResolvedKey]
+
+
+def _feature_resolver(
+    profile_id: str, aliases: KeyAliasMap, preferences: Sequence[Preference]
+) -> _FeatureResolver:
+    """Map option feature keys onto the canonical keys of the model snapshot.
+
+    Active aliases apply first; a key the model does not know then falls back to
+    the model key with the same normalized form, preferring an already
+    normalized key, which mirrors the automatic merge policy.
+    """
+    model_keys = {item.key for item in preferences}
+    by_normalized: dict[str, str] = {}
+    for key in sorted(model_keys, key=lambda item: (normalized_or_none(item) != item, item)):
+        normalized = normalized_or_none(key)
+        if normalized is not None:
+            by_normalized.setdefault(normalized, key)
+
+    def resolve(feature: str) -> ResolvedKey:
+        resolved = aliases.resolve(profile_id, EvidenceTargetType.PREFERENCE, feature)
+        if resolved.key in model_keys:
+            return resolved
+        normalized = normalized_or_none(resolved.key)
+        match = None if normalized is None else by_normalized.get(normalized)
+        return resolved if match is None else ResolvedKey(match, resolved.polarity)
+
+    return resolve
+
+
+def _canonical_option(option: DecisionOption, resolve: _FeatureResolver) -> DecisionOption:
+    """Fold feature keys onto canonical keys, averaging keys that collapse together."""
+    grouped: dict[str, list[float]] = {}
+    for feature, value in sorted(option.features.items()):
+        resolved = resolve(feature)
+        grouped.setdefault(resolved.key, []).append(resolved.polarity * value)
+    features = {key: sum(values) / len(values) for key, values in grouped.items()}
+    return option if features == option.features else replace(option, features=features)
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,11 +230,25 @@ class DecisionPredictor:
         snapshot: UserModelSnapshot,
         history: Sequence[ResolvedDecision],
         created_at: datetime,
+        aliases: KeyAliasMap | None = None,
     ) -> DecisionPrediction:
+        """Rank options; feature keys are compared through ``aliases`` and normalization."""
         if decision.profile_id != snapshot.profile_id:
             raise ValueError("Decision and model snapshot must belong to the same profile.")
         if len(options) < 2 or any(option.decision_id != decision.id for option in options):
             raise ValueError("Prediction requires at least two options for the decision.")
+        resolve = _feature_resolver(
+            decision.profile_id,
+            aliases if aliases is not None else KeyAliasMap(),
+            snapshot.model.preferences,
+        )
+        options = tuple(_canonical_option(option, resolve) for option in options)
+        history = tuple(
+            replace(
+                item, options=tuple(_canonical_option(option, resolve) for option in item.options)
+            )
+            for item in history
+        )
 
         matched: dict[str, _MatchedPreference] = {}
         for feature in sorted(set().union(*(option.features.keys() for option in options))):
