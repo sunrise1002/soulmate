@@ -78,6 +78,21 @@ unverified. No migration was required. Phase 13 scope, ordering, persistence pla
 and explicit authorization gate are unchanged; its plan records this impact
 review.
 
+Also on 2026-09-17, extraction key consistency was improved without starting a
+new phase. Chat evidence extraction and natural decision option extraction now
+receive known target keys plus namespaces and are asked to reuse them, so learned
+preferences and decision features share keys instead of near-duplicates that left
+predictions at chance. Models above 100 keys are filtered locally and
+deterministically to 50 keys by conversation or same-domain decision history,
+word overlap, domain, confidence, and recency; only key names leave the device.
+`pnpm check` passed locally, including 340 Python tests; `pnpm check:all`, coverage
+collection (pytest-cov is not installed), and live-provider behavior were not
+verified. No migration was required. Cross-language key matching (multilingual
+key labels or local embeddings) and post-extraction key canonicalization remain
+unimplemented; their persistence plan is recorded in the
+[key consistency increment plan](phases/key-consistency-increment-plan.md) and
+awaits owner decisions and explicit authorization.
+
 On 2026-09-16, desktop daemon restart and application-exit cleanup were corrected
 for the PyInstaller one-file sidecar. The shell now uses a private graceful
 shutdown pipe, waits for full process termination before restart, rejects an
