@@ -6,7 +6,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Literal
 from uuid import uuid4
 
-from soulmate_core.context import ContextCompiler
+from soulmate_core.context import ContextCompiler, select_known_keys
 from soulmate_core.domain import (
     Conversation,
     ConversationRepository,
@@ -26,6 +26,7 @@ from soulmate_core.preferences import ModelRebuilder
 from soulmate_llm_providers import LLMMessage, LLMProvider, ProviderError
 
 from soulmate_daemon.extraction import (
+    KEY_REUSE_RULES,
     ReviewedEvidence,
     extraction_schema,
     review_proposals,
@@ -34,14 +35,16 @@ from soulmate_daemon.extraction import (
 
 CONVERSATION_EXTRACTION_JOB = "conversation_evidence_extract"
 EXTRACTION_INITIAL_DELAY = timedelta(seconds=1)
+RECENT_USER_TURNS = 2
 
 CHAT_SYSTEM_PROMPT = """You are Soulmate, a personal assistant.
 Answer the owner directly and briefly. Use only relevant Personal Model context supplied below.
 Do not claim unsupported personal facts."""
-EXTRACTION_SYSTEM_PROMPT = """Extract only information explicitly stated by the user.
-Use the supplied schema and stable dotted target keys. Preserve the user's meaning and return empty
-lists when nothing is stated. Preference values range from -1 (strong dislike) to 1 (strong
-preference). Do not infer sensitive claims."""
+EXTRACTION_SYSTEM_PROMPT = f"""Extract only information explicitly stated by the user.
+Use the supplied schema and stable dotted English target keys. Preserve the user's meaning and
+return empty lists when nothing is stated. Preference values range from -1 (strong dislike) to 1
+(strong preference). Do not infer sensitive claims.
+{KEY_REUSE_RULES}"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,8 +87,12 @@ class ConversationService:
         source_message_id: str,
         created_at: datetime,
     ) -> ReviewedEvidence:
+        known_keys = json.dumps(
+            self._known_keys(profile_id, content, source_message_id), ensure_ascii=False
+        )
+        system_prompt = f"{EXTRACTION_SYSTEM_PROMPT}\n\nKnown keys by type: {known_keys}"
         raw_proposals = await self._provider.generate_structured(
-            [LLMMessage("system", EXTRACTION_SYSTEM_PROMPT), LLMMessage("user", content)],
+            [LLMMessage("system", system_prompt), LLMMessage("user", content)],
             extraction_schema(),
         )
         proposals = validate_proposals(raw_proposals)
@@ -96,6 +103,37 @@ class ConversationService:
             source_message_id=source_message_id,
             extractor_model=self._provider.model_name,
             created_at=created_at,
+        )
+
+    def _known_keys(
+        self, profile_id: str, content: str, source_message_id: str
+    ) -> dict[str, list[str]]:
+        """Select known keys using the message and earlier turns of its conversation."""
+        message = self._messages.get(source_message_id)
+        earlier = (
+            ()
+            if message is None
+            else tuple(
+                item
+                for item in self._messages.list_for_conversation(message.conversation_id)
+                if item.id != source_message_id and item.created_at <= message.created_at
+            )
+        )
+        earlier_ids = {item.id for item in earlier}
+        recent_keys = {
+            item.target_key
+            for item in self._evidence.list_for_profile(profile_id)
+            if item.source_message_id in earlier_ids
+        }
+        earlier_text = " ".join(
+            item.content
+            for item in earlier[-RECENT_USER_TURNS * 2 :]
+            if item.role is MessageRole.USER
+        )
+        return select_known_keys(
+            ModelRebuilder(self._evidence, self._models).current_model(profile_id),
+            query=f"{content} {earlier_text}",
+            recent_keys=recent_keys,
         )
 
     def _accept(self, profile_id: str, reviewed: ReviewedEvidence, now: datetime) -> int | None:

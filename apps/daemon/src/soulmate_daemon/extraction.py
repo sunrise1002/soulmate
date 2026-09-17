@@ -10,6 +10,10 @@ from pydantic import BaseModel, ConfigDict, Field, JsonValue
 from soulmate_core.domain import Evidence, EvidenceTargetType
 
 EXTRACTOR_VERSION = "conversation-evidence-v1"
+KEY_REUSE_RULES = """Key rules: when a key in the supplied known keys describes the same concept,
+reuse that exact key instead of inventing a variant. Otherwise prefer placing a new key under a
+listed namespace. Represent one concept as one signed axis (for example ui.theme.dark with -1..1)
+rather than separate keys for each opposite."""
 SENSITIVE_TERMS = frozenset(
     {"finance", "health", "identity", "medical", "politics", "religion", "sexual"}
 )

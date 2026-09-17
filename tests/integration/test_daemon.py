@@ -19,7 +19,7 @@ from fastapi.testclient import TestClient
 from soulmate_daemon.app import create_app
 from soulmate_daemon.config import Settings
 from soulmate_daemon.conversation import ConversationService
-from soulmate_llm_providers import FakeLLMProvider
+from soulmate_llm_providers import FakeLLMProvider, ProviderError
 from soulmate_storage_sqlite import Database, Repositories
 
 pytestmark = pytest.mark.integration
@@ -494,6 +494,116 @@ def test_chat_extracts_preferences_and_persists_context_across_restart(tmp_path:
     ]
 
 
+def _learn_from_chat(app: FastAPI, provider: FakeLLMProvider, message_id: str) -> None:
+    repositories = app.state.runtime["repositories"]
+    job = repositories.jobs.get(f"job_extract_{message_id}")
+    assert job is not None
+    asyncio.run(
+        ConversationService(
+            conversations=repositories.conversations,
+            messages=repositories.messages,
+            raw_events=repositories.raw_events,
+            evidence=repositories.evidence,
+            models=repositories.personal_models,
+            provider=provider,
+            jobs=repositories.jobs,
+        ).retry_learning(job.payload)
+    )
+
+
+def _extraction_known_keys(provider: FakeLLMProvider) -> dict[str, list[str]]:
+    system_prompt = provider.requests[-1][0].content
+    assert "reuse that exact key" in system_prompt
+    assert "one signed axis" in system_prompt
+    return dict(json.loads(system_prompt.split("Known keys by type: ", 1)[1]))
+
+
+def test_chat_extraction_receives_known_keys_to_reuse(tmp_path: Path) -> None:
+    # Given: an existing preference and a provider that reuses its key
+    provider = FakeLLMProvider(
+        responses=["Noted."],
+        structured_responses=[
+            {
+                "facts": [],
+                "preferences": [
+                    {
+                        "target_key": "ui.theme.dark",
+                        "value": 0.7,
+                        "strength": 0.8,
+                        "confidence": 0.9,
+                        "context": [],
+                    }
+                ],
+                "goals": [],
+                "constraints": [],
+            }
+        ],
+    )
+    app = create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
+    with owner_client(app) as client:
+        correction = client.post(
+            "/v1/preferences/corrections", json={"target_key": "ui.theme.dark", "value": 0.8}
+        )
+        assert correction.status_code == 201
+
+        # When: a related chat message is learned
+        chat = client.post("/v1/chat", json={"content": "I still like dark mode."})
+        assert chat.status_code == 200
+        _learn_from_chat(app, provider, chat.json()["user_message_id"])
+
+        # Then: the extractor saw the key and both statements reinforce one preference
+        assert _extraction_known_keys(provider) == {
+            "namespaces": ["ui.theme"],
+            "facts": [],
+            "preferences": ["ui.theme.dark"],
+            "goals": [],
+            "constraints": [],
+        }
+        preferences = client.get("/v1/preferences").json()
+        assert [item["key"] for item in preferences] == ["ui.theme.dark"]
+
+
+def test_chat_extraction_receives_empty_known_keys_without_a_model(tmp_path: Path) -> None:
+    # Given: an empty Personal Model and a provider that proposes nothing
+    provider = FakeLLMProvider(
+        responses=["Hello."],
+        structured_responses=[{"facts": [], "preferences": [], "goals": [], "constraints": []}],
+    )
+    app = create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
+    with owner_client(app) as client:
+        # When: a chat message is learned
+        chat = client.post("/v1/chat", json={"content": "Hello"})
+        _learn_from_chat(app, provider, chat.json()["user_message_id"])
+
+    # Then: every known-key type is present and empty
+    assert _extraction_known_keys(provider) == {
+        "namespaces": [],
+        "facts": [],
+        "preferences": [],
+        "goals": [],
+        "constraints": [],
+    }
+
+
+def test_chat_learning_failure_keeps_evidence_unchanged_with_known_keys(tmp_path: Path) -> None:
+    # Given: an existing preference and a provider without a structured response
+    provider = FakeLLMProvider(responses=["Noted."])
+    app = create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
+    with owner_client(app) as client:
+        client.post(
+            "/v1/preferences/corrections", json={"target_key": "ui.theme.dark", "value": 0.8}
+        )
+        chat = client.post("/v1/chat", json={"content": "I still like dark mode."})
+        assert chat.status_code == 200
+
+        # When: learning runs and the provider fails
+        # Then: the provider error surfaces and no evidence is added
+        with pytest.raises(ProviderError, match="no structured response configured"):
+            _learn_from_chat(app, provider, chat.json()["user_message_id"])
+        repositories = app.state.runtime["repositories"]
+        assert len(repositories.evidence.list_for_profile("profile_default")) == 1
+
+
 def test_chat_preserves_reply_when_learning_output_is_invalid(tmp_path: Path) -> None:
     provider = FakeLLMProvider(
         responses=["Synthetic response"],
@@ -819,6 +929,112 @@ def test_decision_extracts_natural_option_features_with_validated_provider_outpu
         assert response.json()["options"][0]["features"] == {"cost.low": 1.0}
         assert response.json()["options"][1]["feature_confidence"] == 0.9
     assert len(provider.requests) == 1
+
+
+def _theme_payload() -> dict[str, object]:
+    return {
+        "domain": "general",
+        "question": "Which theme do I prefer?",
+        "options": [
+            {"label": "Dark", "description": "Dark theme"},
+            {"label": "Light", "description": "Light theme"},
+        ],
+    }
+
+
+def test_decision_extraction_reuses_known_preference_keys_for_prediction(
+    tmp_path: Path,
+) -> None:
+    # Given: chat-style preferences for the dark and light theme keys
+    provider = FakeLLMProvider(
+        structured_responses=[
+            {
+                "options": [
+                    {
+                        "option_index": 0,
+                        "features": {"ui.theme.dark": 1.0, "ui.theme.light": -1.0},
+                        "confidence": 0.95,
+                    },
+                    {
+                        "option_index": 1,
+                        "features": {"ui.theme.dark": -1.0, "ui.theme.light": 1.0},
+                        "confidence": 0.95,
+                    },
+                ]
+            }
+        ]
+    )
+    with owner_client(
+        create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
+    ) as client:
+        for key, value in (("ui.theme.dark", 0.8), ("ui.theme.light", -0.6)):
+            correction = client.post(
+                "/v1/preferences/corrections", json={"target_key": key, "value": value}
+            )
+            assert correction.status_code == 201
+
+        # When: a natural-language decision is created and predicted
+        decision = client.post("/v1/decisions", json=_theme_payload())
+        assert decision.status_code == 201
+        prediction = client.post(f"/v1/decisions/{decision.json()['id']}/predict")
+
+    # Then: the provider sees the existing keys and the prediction uses them
+    request = json.loads(provider.requests[0][1].content)
+    assert request["known_keys"] == {
+        "namespaces": ["ui.theme"],
+        "preferences": ["ui.theme.dark", "ui.theme.light"],
+    }
+    assert prediction.status_code == 201
+    body = prediction.json()
+    assert body["predicted_choice"] == "Dark"
+    assert body["ranking"][0]["probability"] > 0.5
+    assert body["important_factors"] == ["ui.theme.dark", "ui.theme.light"]
+
+
+def test_decision_extraction_sends_empty_known_keys_without_preferences(
+    tmp_path: Path,
+) -> None:
+    # Given: an empty Personal Model
+    provider = FakeLLMProvider(
+        structured_responses=[
+            {
+                "options": [
+                    {"option_index": 0, "features": {"ui.theme.dark": 1.0}, "confidence": 0.9},
+                    {"option_index": 1, "features": {"ui.theme.dark": -1.0}, "confidence": 0.9},
+                ]
+            }
+        ]
+    )
+    with owner_client(
+        create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
+    ) as client:
+        # When: a natural-language decision is created and predicted
+        decision = client.post("/v1/decisions", json=_theme_payload())
+        prediction = client.post(f"/v1/decisions/{decision.json()['id']}/predict")
+
+    # Then: no keys are offered and the prediction stays at chance
+    assert decision.status_code == 201
+    request = json.loads(provider.requests[0][1].content)
+    assert request["known_keys"] == {"namespaces": [], "preferences": []}
+    assert prediction.json()["ranking"][0]["probability"] == pytest.approx(0.5)
+    assert prediction.json()["uncertain_factors"] == ["ui.theme.dark"]
+
+
+def test_decision_extraction_reports_provider_failure_without_persisting(
+    tmp_path: Path,
+) -> None:
+    # Given: a provider with no structured response, which raises ProviderError
+    provider = FakeLLMProvider()
+    with owner_client(
+        create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
+    ) as client:
+        # When: a natural-language decision is created
+        response = client.post("/v1/decisions", json=_theme_payload())
+
+        # Then: the failure is reported and no decision is stored
+        assert response.status_code == 502
+        assert response.json()["detail"] == "The model provider request failed."
+        assert client.get("/v1/decisions").json() == []
 
 
 def test_decision_prediction_without_prior_model_creates_snapshot_and_validates_input(

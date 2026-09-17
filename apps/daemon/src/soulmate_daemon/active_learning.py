@@ -44,10 +44,7 @@ class ActiveLearningService:
         self, profile_id: str, limit: int, target_key: str | None = None
     ) -> tuple[ActiveQuestion, ...]:
         now = datetime.now(UTC)
-        snapshot = self._models.latest_snapshot(profile_id)
-        revision = self._evidence.current_revision(profile_id)
-        if snapshot is None or snapshot.evidence_revision != revision:
-            snapshot = ModelRebuilder(self._evidence, self._models).rebuild(profile_id, now)
+        snapshot = ModelRebuilder(self._evidence, self._models).current(profile_id, now)
         generated = generate_active_questions(
             snapshot=snapshot,
             existing=self._questions.list_for_profile(profile_id),

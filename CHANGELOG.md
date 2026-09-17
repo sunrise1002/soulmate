@@ -181,6 +181,24 @@ Evidence.
 
 ### Changed
 
+- Natural-language decision feature extraction now sends the current Personal
+  Model preference keys (keys only, no values) to the provider and asks it to
+  reuse them, so options such as `ui.theme.dark` match preferences learned from
+  chat instead of near-duplicate keys like `ui.theme.dark_mode` that left
+  predictions at chance. Existing decisions keep their stored features.
+- Conversation evidence extraction now receives known fact, preference, goal,
+  and constraint keys (keys only) and shared key rules: reuse a matching known
+  key, otherwise prefer a listed namespace, and model opposites as one signed
+  axis, so repeated statements reinforce one Personal Model entry.
+- Deterministic local known-key selection (`select_known_keys`): models with at
+  most 100 keys are shared whole; larger models share every key namespace plus
+  the 50 highest-scoring keys, ranked by use earlier in the same conversation
+  (or in resolved decisions of the same domain), word overlap with the message,
+  earlier user turns, or option text, and domain match, then by confidence and
+  recency. Word overlap cannot bridge languages, so a missed key falls back to
+  its listed namespace.
+  `ModelRebuilder.current()` and the read-only `current_model()` replace
+  duplicated snapshot-freshness checks; learning does not persist extra snapshots.
 - Corrected managed desktop daemon restart and exit cleanup for the PyInstaller
   one-file sidecar: the shell now requests graceful shutdown over a private stdin
   control pipe, waits for the complete sidecar process to exit before restarting,

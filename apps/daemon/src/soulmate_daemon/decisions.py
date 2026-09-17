@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from soulmate_core.context import select_known_keys
 from soulmate_core.decisions import (
     DecisionAdvisor,
     DecisionPredictor,
@@ -32,10 +33,14 @@ from soulmate_core.domain import (
 from soulmate_core.preferences import ModelRebuilder
 from soulmate_llm_providers import LLMMessage, LLMProvider
 
-FEATURE_EXTRACTION_PROMPT = """Extract comparable preference features for each decision option.
-Use stable dotted English keys that can match Personal Model preferences. Values must be normalized
-from -1 (feature strongly absent/opposed) to 1 (feature strongly present), using 0 when neutral.
-Return every option index exactly once. Do not make a choice or provide advice."""
+from soulmate_daemon.extraction import KEY_REUSE_RULES
+
+FEATURE_EXTRACTION_PROMPT = f"""Extract comparable preference features for each decision option.
+Use stable dotted English keys; known_keys lists known preference keys and namespaces.
+Values must be normalized from -1 (feature strongly absent/opposed) to 1 (feature strongly
+present), using 0 when neutral. Return every option index exactly once. Do not make a choice or
+provide advice.
+{KEY_REUSE_RULES}"""
 
 
 class ExtractedOption(BaseModel):
@@ -107,6 +112,23 @@ class DecisionService:
         if missing:
             if self._provider is None:
                 raise RuntimeError("A model provider is required for natural option extraction.")
+            snapshot = ModelRebuilder(self._evidence, self._models).current(profile_id)
+            resolved_keys = {
+                key
+                for item, historical_options, _ in self._decisions.list_resolved(profile_id)
+                if item.domain.casefold() == domain.casefold()
+                for option in historical_options
+                for key in option.features
+            }
+            known_keys = select_known_keys(
+                snapshot.model,
+                query=" ".join(
+                    [question, *(f"{item.label} {item.description}" for item in option_inputs)]
+                ),
+                recent_keys=resolved_keys,
+                domain=domain,
+                key_types=("preferences",),
+            )
             raw = await self._provider.generate_structured(
                 [
                     LLMMessage("system", FEATURE_EXTRACTION_PROMPT),
@@ -116,6 +138,7 @@ class DecisionService:
                             {
                                 "domain": domain,
                                 "question": question,
+                                "known_keys": known_keys,
                                 "options": [
                                     {
                                         "option_index": index,
@@ -180,10 +203,7 @@ class DecisionService:
         if decision.status is DecisionStatus.RESOLVED:
             raise ValueError("Resolved decisions cannot receive new predictions.")
         now = datetime.now(UTC)
-        snapshot = self._models.latest_snapshot(profile_id)
-        evidence_revision = self._evidence.current_revision(profile_id)
-        if snapshot is None or snapshot.evidence_revision != evidence_revision:
-            snapshot = ModelRebuilder(self._evidence, self._models).rebuild(profile_id, now)
+        snapshot = ModelRebuilder(self._evidence, self._models).current(profile_id, now)
         history = tuple(
             ResolvedDecision(item, historical_options, resolution)
             for item, historical_options, resolution in self._decisions.list_resolved(profile_id)
@@ -292,12 +312,9 @@ class DecisionService:
         decision, options = stored
         if decision.status is DecisionStatus.RESOLVED:
             raise ValueError("Resolved decisions cannot receive new advice.")
-        snapshot = self._models.latest_snapshot(profile_id)
-        evidence_revision = self._evidence.current_revision(profile_id)
-        if snapshot is None or snapshot.evidence_revision != evidence_revision:
-            snapshot = ModelRebuilder(self._evidence, self._models).rebuild(
-                profile_id, datetime.now(UTC)
-            )
+        snapshot = ModelRebuilder(self._evidence, self._models).current(
+            profile_id, datetime.now(UTC)
+        )
         prediction = self._decisions.latest_prediction(decision_id)
         if prediction is None or prediction.model_snapshot_version != snapshot.version:
             prediction = self.predict(profile_id, decision_id)

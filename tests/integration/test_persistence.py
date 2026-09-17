@@ -341,6 +341,87 @@ def test_evidence_rebuild_persists_provenance_snapshots_and_removal(tmp_path: Pa
     database.close()
 
 
+def _add_synthetic_preference(repositories: Repositories, index: int, now: datetime) -> None:
+    event = RawEvent(
+        id=f"event_current_{index}",
+        profile_id="profile_test",
+        source_id=None,
+        event_type="synthetic_preference",
+        content={},
+        created_at=now,
+        ingested_at=now,
+    )
+    repositories.raw_events.add(event)
+    repositories.evidence.add(
+        Evidence(
+            id=f"evidence_current_{index}",
+            profile_id="profile_test",
+            target_type=EvidenceTargetType.PREFERENCE,
+            target_key="ui.theme.dark",
+            value=0.8,
+            strength=1.0,
+            confidence=1.0,
+            context={},
+            source_type="explicit_statement",
+            source_event_id=event.id,
+            extractor_version="synthetic-v1",
+            created_at=now,
+        )
+    )
+
+
+def test_current_snapshot_rebuilds_only_when_missing_or_stale(tmp_path: Path) -> None:
+    # Given: a profile with evidence but no snapshot
+    database, repositories = _storage(tmp_path)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    repositories.profiles.add(Profile("profile_test", "Synthetic Owner", now))
+    _add_synthetic_preference(repositories, 1, now)
+    rebuilder = ModelRebuilder(repositories.evidence, repositories.personal_models)
+
+    # When: the current snapshot is requested without any snapshot
+    first = rebuilder.current("profile_test", now)
+    # Then: a first snapshot is built from the evidence
+    assert first.version == 1
+    assert [item.key for item in first.model.preferences] == ["ui.theme.dark"]
+
+    # When: the snapshot is requested again without new evidence
+    # Then: the existing snapshot is reused
+    assert rebuilder.current("profile_test", now).version == 1
+
+    # When: new evidence makes the snapshot stale
+    _add_synthetic_preference(repositories, 2, now)
+    second = rebuilder.current("profile_test", now)
+    # Then: the snapshot is rebuilt against the new revision
+    assert second.version == 2
+    assert second.evidence_revision == repositories.evidence.current_revision("profile_test")
+    database.close()
+
+
+def test_current_model_reads_without_persisting_snapshots(tmp_path: Path) -> None:
+    # Given: evidence without any snapshot
+    database, repositories = _storage(tmp_path)
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    repositories.profiles.add(Profile("profile_test", "Synthetic Owner", now))
+    rebuilder = ModelRebuilder(repositories.evidence, repositories.personal_models)
+    # When: the model is read for an empty profile
+    # Then: it is empty and no snapshot is created
+    assert rebuilder.current_model("profile_test").preferences == ()
+    _add_synthetic_preference(repositories, 1, now)
+
+    # When: the model is read while no snapshot exists
+    stale = rebuilder.current_model("profile_test")
+    # Then: evidence is aggregated in memory and still no snapshot is persisted
+    assert [item.key for item in stale.preferences] == ["ui.theme.dark"]
+    assert repositories.personal_models.latest_snapshot("profile_test") is None
+
+    # When: a fresh snapshot exists
+    snapshot = rebuilder.rebuild("profile_test", now)
+    # Then: its model is returned as-is
+    assert rebuilder.current_model("profile_test") == snapshot.model
+    assert repositories.personal_models.latest_snapshot("profile_test") == snapshot
+    database.close()
+
+
 def test_evidence_requires_provenance_from_same_profile(tmp_path: Path) -> None:
     database, repositories = _storage(tmp_path)
     now = datetime.now(UTC)
