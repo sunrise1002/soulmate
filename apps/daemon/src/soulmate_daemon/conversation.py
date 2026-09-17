@@ -3,6 +3,7 @@
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 from uuid import uuid4
 
 from soulmate_core.context import ContextCompiler
@@ -11,6 +12,9 @@ from soulmate_core.domain import (
     ConversationRepository,
     Evidence,
     EvidenceRepository,
+    Job,
+    JobRepository,
+    JobStatus,
     Message,
     MessageRepository,
     MessageRole,
@@ -22,10 +26,14 @@ from soulmate_core.preferences import ModelRebuilder
 from soulmate_llm_providers import LLMMessage, LLMProvider, ProviderError
 
 from soulmate_daemon.extraction import (
-    EvidenceProposals,
+    ReviewedEvidence,
     extraction_schema,
     review_proposals,
+    validate_proposals,
 )
+
+CONVERSATION_EXTRACTION_JOB = "conversation_evidence_extract"
+EXTRACTION_INITIAL_DELAY = timedelta(seconds=1)
 
 CHAT_SYSTEM_PROMPT = """You are Soulmate, a personal assistant.
 Answer the owner directly and briefly. Use only relevant Personal Model context supplied below.
@@ -44,6 +52,8 @@ class ChatResult:
     accepted_evidence: tuple[Evidence, ...]
     rejected_evidence_count: int
     snapshot_version: int | None
+    learning_status: Literal["learned", "no_evidence", "pending"]
+    learning_error: str | None
 
 
 class ConversationService:
@@ -56,6 +66,7 @@ class ConversationService:
         evidence: EvidenceRepository,
         models: PersonalModelRepository,
         provider: LLMProvider,
+        jobs: JobRepository | None = None,
     ) -> None:
         self._conversations = conversations
         self._messages = messages
@@ -63,6 +74,99 @@ class ConversationService:
         self._evidence = evidence
         self._models = models
         self._provider = provider
+        self._jobs = jobs
+
+    async def _extract(
+        self,
+        profile_id: str,
+        content: str,
+        source_event_id: str,
+        source_message_id: str,
+        created_at: datetime,
+    ) -> ReviewedEvidence:
+        raw_proposals = await self._provider.generate_structured(
+            [LLMMessage("system", EXTRACTION_SYSTEM_PROMPT), LLMMessage("user", content)],
+            extraction_schema(),
+        )
+        proposals = validate_proposals(raw_proposals)
+        return review_proposals(
+            proposals,
+            profile_id=profile_id,
+            source_event_id=source_event_id,
+            source_message_id=source_message_id,
+            extractor_model=self._provider.model_name,
+            created_at=created_at,
+        )
+
+    def _accept(self, profile_id: str, reviewed: ReviewedEvidence, now: datetime) -> int | None:
+        for item in reviewed.accepted:
+            self._evidence.add(item)
+        if not reviewed.accepted:
+            return None
+        return ModelRebuilder(self._evidence, self._models).rebuild(profile_id, now).version
+
+    def _enqueue_learning(
+        self,
+        *,
+        profile_id: str,
+        source_event_id: str,
+        source_message_id: str,
+        created_at: datetime,
+    ) -> None:
+        if self._jobs is None:
+            raise RuntimeError("A job repository is required for deferred conversation learning.")
+        self._jobs.enqueue(
+            Job(
+                id=f"job_extract_{source_message_id}",
+                job_type=CONVERSATION_EXTRACTION_JOB,
+                payload={
+                    "profile_id": profile_id,
+                    "source_event_id": source_event_id,
+                    "source_message_id": source_message_id,
+                },
+                status=JobStatus.QUEUED,
+                attempts=0,
+                max_attempts=3,
+                available_at=created_at + EXTRACTION_INITIAL_DELAY,
+                created_at=created_at,
+                updated_at=created_at,
+            )
+        )
+
+    async def retry_learning(self, payload: dict[str, object]) -> None:
+        """Retry one persisted message without putting private content in the job payload."""
+        profile_id = payload.get("profile_id")
+        source_event_id = payload.get("source_event_id")
+        source_message_id = payload.get("source_message_id")
+        if (
+            not isinstance(profile_id, str)
+            or not isinstance(source_event_id, str)
+            or not isinstance(source_message_id, str)
+        ):
+            raise ValueError("Conversation extraction job payload is invalid.")
+        if any(
+            item.source_event_id == source_event_id
+            for item in self._evidence.list_for_profile(profile_id)
+        ):
+            return
+        event = self._raw_events.get(source_event_id)
+        message = self._messages.get(source_message_id)
+        if (
+            event is None
+            or message is None
+            or event.profile_id != profile_id
+            or event.event_type != "conversation_message"
+            or event.content.get("message_id") != source_message_id
+        ):
+            raise ValueError("Conversation extraction source is unavailable.")
+        reviewed = await self._extract(
+            profile_id,
+            message.content,
+            source_event_id,
+            source_message_id,
+            message.created_at,
+        )
+        self._accept(profile_id, reviewed, datetime.now(UTC))
 
     async def chat(
         self, profile_id: str, content: str, conversation_id: str | None = None
@@ -89,11 +193,6 @@ class ConversationService:
         assistant_content = await self._provider.generate(prompt)
         if not assistant_content.strip():
             raise ProviderError("Model provider returned an empty response.")
-        raw_proposals = await self._provider.generate_structured(
-            [LLMMessage("system", EXTRACTION_SYSTEM_PROMPT), LLMMessage("user", content)],
-            extraction_schema(),
-        )
-        proposals = EvidenceProposals.model_validate(raw_proposals)
         event = RawEvent(
             id=f"event_{uuid4().hex}",
             profile_id=profile_id,
@@ -106,14 +205,6 @@ class ConversationService:
             },
             created_at=now,
             ingested_at=now,
-        )
-        reviewed = review_proposals(
-            proposals,
-            profile_id=profile_id,
-            source_event_id=event.id,
-            source_message_id=user_message_id,
-            extractor_model=self._provider.model_name,
-            created_at=now,
         )
         if conversation is None:
             self._conversations.add(Conversation(resolved_id, profile_id, now, now))
@@ -130,13 +221,38 @@ class ConversationService:
         self._messages.add(user_message)
         self._raw_events.add(event)
         self._messages.add(assistant_message)
-        for item in reviewed.accepted:
-            self._evidence.add(item)
         self._conversations.touch(resolved_id, assistant_created_at)
-        snapshot_version = None
-        if reviewed.accepted:
-            snapshot = ModelRebuilder(self._evidence, self._models).rebuild(profile_id, now)
-            snapshot_version = snapshot.version
+        if self._jobs is not None:
+            self._enqueue_learning(
+                profile_id=profile_id,
+                source_event_id=event.id,
+                source_message_id=user_message_id,
+                created_at=now,
+            )
+            return ChatResult(
+                resolved_id,
+                user_message_id,
+                assistant_message,
+                (),
+                0,
+                None,
+                "pending",
+                None,
+            )
+        try:
+            reviewed = await self._extract(profile_id, content, event.id, user_message_id, now)
+        except (ProviderError, ValueError):
+            return ChatResult(
+                resolved_id,
+                user_message_id,
+                assistant_message,
+                (),
+                0,
+                None,
+                "pending",
+                "The reply was saved, but learning could not be completed.",
+            )
+        snapshot_version = self._accept(profile_id, reviewed, now)
         return ChatResult(
             resolved_id,
             user_message_id,
@@ -144,4 +260,6 @@ class ConversationService:
             reviewed.accepted,
             reviewed.rejected_count,
             snapshot_version,
+            "learned" if reviewed.accepted else "no_evidence",
+            None,
         )

@@ -11,6 +11,8 @@ from soulmate_llm_providers import (
     LLMMessage,
     OllamaProvider,
     OpenAICompatibleProvider,
+    ProviderError,
+    StructuredOutputMode,
 )
 
 
@@ -102,3 +104,119 @@ def test_openai_compatible_adapter_sends_schema_and_authorization() -> None:
             "schema": {"type": "object"},
         },
     }
+
+
+def test_openai_compatible_adapter_negotiates_json_object_fallback() -> None:
+    requests: list[dict[str, object]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload: dict[str, object] = json.loads(request.content)
+        requests.append(payload)
+        response_format = payload.get("response_format")
+        if isinstance(response_format, dict) and response_format.get("type") == "json_schema":
+            return httpx.Response(400, json={"error": {"message": "unsupported schema"}})
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"facts":[]}'}}]},
+        )
+
+    async def exercise() -> tuple[
+        dict[str, object], dict[str, object], StructuredOutputMode | None
+    ]:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            provider = OpenAICompatibleProvider(
+                base_url="https://models.example.test/v1",
+                model="synthetic-model",
+                api_key=None,
+                policy=EgressPolicy("hybrid"),
+                client=client,
+            )
+            result = await provider.generate_structured(
+                [LLMMessage("user", "Synthetic message")], {"type": "object"}
+            )
+            cached = await provider.generate_structured(
+                [LLMMessage("user", "Second synthetic message")], {"type": "object"}
+            )
+            return result, cached, provider.active_structured_output_mode
+
+    result, cached, mode = asyncio.run(exercise())
+    assert result == {"facts": []}
+    assert cached == {"facts": []}
+    assert mode is StructuredOutputMode.JSON_OBJECT
+    assert len(requests) == 3
+    assert requests[1]["response_format"] == {"type": "json_object"}
+    assert requests[2]["response_format"] == {"type": "json_object"}
+    request_messages = requests[1]["messages"]
+    assert isinstance(request_messages, list)
+    assert "JSON schema" in request_messages[0]["content"]
+
+
+def test_openai_compatible_adapter_falls_back_to_prompted_json() -> None:
+    formats: list[object] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload: dict[str, object] = json.loads(request.content)
+        formats.append(payload.get("response_format"))
+        if "response_format" in payload:
+            return httpx.Response(422, json={"error": {"message": "unsupported format"}})
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '```json\n{"preferences": []}\n```'}}]},
+        )
+
+    async def exercise() -> tuple[dict[str, object], StructuredOutputMode | None]:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            provider = OpenAICompatibleProvider(
+                base_url="https://models.example.test/v1",
+                model="synthetic-model",
+                policy=EgressPolicy("hybrid"),
+                client=client,
+            )
+            result = await provider.generate_structured(
+                [LLMMessage("user", "Synthetic message")], {"type": "object"}
+            )
+            return result, provider.active_structured_output_mode
+
+    result, mode = asyncio.run(exercise())
+    assert result == {"preferences": []}
+    assert mode is StructuredOutputMode.PROMPTED_JSON
+    assert formats == [
+        {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "evidence_proposals",
+                "strict": True,
+                "schema": {"type": "object"},
+            },
+        },
+        {"type": "json_object"},
+        None,
+    ]
+
+
+@pytest.mark.parametrize("status_code", [401, 403, 429])
+def test_openai_compatible_adapter_does_not_negotiate_auth_or_rate_errors(
+    status_code: int,
+) -> None:
+    request_count = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal request_count
+        request_count += 1
+        return httpx.Response(status_code, json={"error": {"message": "denied"}})
+
+    async def exercise() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            provider = OpenAICompatibleProvider(
+                base_url="https://models.example.test/v1",
+                model="synthetic-model",
+                policy=EgressPolicy("hybrid"),
+                client=client,
+            )
+            await provider.generate_structured(
+                [LLMMessage("user", "Synthetic message")], {"type": "object"}
+            )
+
+    with pytest.raises(ProviderError):
+        asyncio.run(exercise())
+    assert request_count == 1

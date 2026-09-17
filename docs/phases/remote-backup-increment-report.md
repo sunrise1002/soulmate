@@ -90,8 +90,9 @@ Local verification on macOS arm64 with Python 3.12.14, Node.js 24.19.0, and pnpm
 - Encrypted local copies are retained under `DATA_DIR/backups`; automatic pruning
   is not implemented.
 - The Phase 10 512 MiB archive bound and fresh-install-only restore rule remain.
-- The desktop proxy retains its existing 30-second request timeout; large or slow
-  remote transfers should use the CLI.
+- The desktop proxy now uses a 75-second request timeout so model requests can
+  finish before the local bridge gives up; larger or slower remote transfers
+  should still use the CLI.
 - Desktop users can configure remote backup without a terminal. Secrets are
   write-only from the UI and remain in the operating-system credential store;
   daemon/CLI deployments continue to use process environment variables.

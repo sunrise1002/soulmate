@@ -41,7 +41,7 @@ from soulmate_daemon.active_learning import ActiveAnswerResult, ActiveLearningSe
 from soulmate_daemon.config import Settings
 from soulmate_daemon.connector_api import build_connector_router
 from soulmate_daemon.connectors import CONNECTOR_SYNC_JOB, ConnectorService
-from soulmate_daemon.conversation import ConversationService
+from soulmate_daemon.conversation import CONVERSATION_EXTRACTION_JOB, ConversationService
 from soulmate_daemon.data_api import build_data_router
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
 from soulmate_daemon.delegation_api import build_delegation_router
@@ -170,6 +170,8 @@ class ChatResponse(BaseModel):
     accepted_evidence: list[EvidenceResponse]
     rejected_evidence_count: int
     snapshot_version: int | None
+    learning_status: Literal["learned", "no_evidence", "pending"]
+    learning_error: str | None
 
 
 class DecisionOptionRequest(BaseModel):
@@ -671,10 +673,28 @@ def create_app(
                 )
             )
 
-        handlers = {CONNECTOR_SYNC_JOB: sync_connector}
+        async def retry_conversation_extraction(payload: dict[str, object]) -> None:
+            await ConversationService(
+                conversations=repositories.conversations,
+                messages=repositories.messages,
+                raw_events=repositories.raw_events,
+                evidence=repositories.evidence,
+                models=repositories.personal_models,
+                provider=_resolve_provider(_state(app)),
+                jobs=repositories.jobs,
+            ).retry_learning(payload)
+
+        handlers = {
+            CONNECTOR_SYNC_JOB: sync_connector,
+            CONVERSATION_EXTRACTION_JOB: retry_conversation_extraction,
+        }
         if remote_backup is not None:
             handlers[REMOTE_BACKUP_JOB] = create_remote_backup
-        worker = DurableJobWorker(repositories.jobs, handlers)
+        worker = DurableJobWorker(
+            repositories.jobs,
+            handlers,
+            retry_delays={CONVERSATION_EXTRACTION_JOB: timedelta(seconds=30)},
+        )
         worker_task = asyncio.create_task(worker.run(stop), name="soulmate-durable-worker")
         scheduler_task: asyncio.Task[None] | None = None
         if remote_backup is not None and resolved_settings.remote_backup.automatic_daily:
@@ -1261,6 +1281,7 @@ def create_app(
             evidence=repositories.evidence,
             models=repositories.personal_models,
             provider=resolved_provider,
+            jobs=repositories.jobs,
         )
         try:
             result = await service.chat(
@@ -1293,6 +1314,8 @@ def create_app(
             accepted_evidence=[_evidence_response(item) for item in result.accepted_evidence],
             rejected_evidence_count=result.rejected_evidence_count,
             snapshot_version=result.snapshot_version,
+            learning_status=result.learning_status,
+            learning_error=result.learning_error,
         )
 
     app.include_router(build_access_router(app))

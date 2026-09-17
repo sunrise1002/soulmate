@@ -24,7 +24,7 @@ or authorize a later phase. See the
 | Phase 0 | Complete locally | [Phase 0 report](phases/phase-0-report.md) | Remote CI unverified |
 | Phase 1 | Complete locally | [Phase 1 report](phases/phase-1-report.md) | Remote CI unverified; deferred diagnostics documented |
 | Phase 2 | Complete locally | [Phase 2 report](phases/phase-2-report.md) | Remote CI unverified; extraction intentionally deferred |
-| Phase 3 | Complete locally | [Phase 3 report](phases/phase-3-report.md) | Remote CI and real provider availability unverified |
+| Phase 3 | Complete locally; compatibility maintenance verified | [Phase 3 report](phases/phase-3-report.md) | Remote CI and broad live-provider coverage unverified |
 | Phase 4 | Complete locally | [Phase 4 report](phases/phase-4-report.md) | Remote CI, real provider extraction, and calibration unverified |
 | Phase 5 | Complete locally | [Phase 5 report](phases/phase-5-report.md) | Remote CI and external-dataset calibration unverified |
 | Phase 6 | Complete locally | [Phase 6 report](phases/phase-6-report.md) | Remote cross-platform installers, signing, and real providers unverified |
@@ -61,6 +61,22 @@ and maintainer repository settings are documented under the
 phase boundary above. Remote CI and GitHub ruleset activation remain unverified.
 
 ## Repository maintenance
+
+On 2026-09-17, model-provider compatibility was strengthened without starting a
+new phase. OpenAI-compatible endpoints now negotiate strict schema, JSON-object,
+and validated prompted-JSON strategies; Ollama has a native-to-prompt fallback;
+Evidence extraction uses a portable wire schema; and successful chat is retained
+and returned before a durable ID-only learning job runs behind the same
+validation/review boundary. Failed jobs use bounded exponential backoff instead of
+immediately consuming all retries and provider quota. The existing
+Gemini configuration completed a synthetic extraction through negotiated
+`json_object` mode. `pnpm check:all` passed locally with 310 Python, 87 TypeScript,
+and seven Rust tests, seven Python package builds, a clean macOS arm64 PyInstaller
+sidecar build, repository hooks, and web and desktop production builds. Remote CI,
+broad live-provider interoperability, and packaged Windows/Linux behavior remain
+unverified. No migration was required. Phase 13 scope, ordering, persistence plan,
+and explicit authorization gate are unchanged; its plan records this impact
+review.
 
 On 2026-09-16, desktop daemon restart and application-exit cleanup were corrected
 for the PyInstaller one-file sidecar. The shell now uses a private graceful

@@ -135,7 +135,7 @@ loopback. Device and data management stay on the owner's machine.
 | --- | --- |
 | `packages/core-python/src/soulmate_core/` | Personalization Kernel: infrastructure-independent entities, ports, and deterministic algorithms |
 | `packages/storage-sqlite/` | SQLAlchemy adapter and packaged Alembic migrations |
-| `packages/llm-providers/` | Provider protocol, egress policy, fake, Ollama, and OpenAI-compatible adapters |
+| `packages/llm-providers/` | Provider protocol, capability negotiation, egress policy, fake, Ollama, and OpenAI-compatible adapters |
 | `packages/connector-sdk/` | Stable permission manifest, event, sync, discovery, and persistence contracts |
 | `packages/connectors-local/` | Independently packaged Local Notes reference connector |
 | `packages/sdk-typescript/` | Typed REST client and pairing rules shared by clients |

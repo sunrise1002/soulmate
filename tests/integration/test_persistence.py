@@ -484,13 +484,19 @@ def test_worker_retries_without_persisting_exception_message(tmp_path: Path) -> 
     async def handler(_payload: dict[str, object]) -> None:
         raise ValueError(private_message)
 
-    worker = DurableJobWorker(repositories.jobs, {"synthetic_job": handler})
+    worker = DurableJobWorker(
+        repositories.jobs,
+        {"synthetic_job": handler},
+        retry_delays={"synthetic_job": timedelta(seconds=30)},
+    )
     assert asyncio.run(worker.process_once()) is True
     retried = repositories.jobs.get("job_failure")
     assert retried is not None
     assert retried.status is JobStatus.QUEUED
     assert retried.last_error == "Handler failed with ValueError"
     assert private_message not in retried.last_error
+    assert retried.available_at >= retried.updated_at + timedelta(seconds=29)
+    assert asyncio.run(worker.process_once()) is False
     database.close()
 
 

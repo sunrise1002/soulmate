@@ -1352,16 +1352,21 @@ class SqliteJobRepository:
     def mark_succeeded(self, job_id: str, completed_at: datetime) -> None:
         self._finish(job_id, completed_at, JobStatus.SUCCEEDED, None)
 
-    def mark_failed(self, job_id: str, error: str, failed_at: datetime) -> None:
+    def mark_failed(
+        self,
+        job_id: str,
+        error: str,
+        failed_at: datetime,
+        retry_at: datetime | None = None,
+    ) -> None:
         with self._sessions.begin() as session:
             row = session.get(JobRow, job_id)
             if row is None:
                 raise KeyError(job_id)
-            row.status = (
-                JobStatus.FAILED.value
-                if row.attempts >= row.max_attempts
-                else JobStatus.QUEUED.value
-            )
+            exhausted = row.attempts >= row.max_attempts
+            row.status = JobStatus.FAILED.value if exhausted else JobStatus.QUEUED.value
+            if not exhausted and retry_at is not None:
+                row.available_at = retry_at
             row.locked_at = None
             row.last_error = error
             row.updated_at = failed_at

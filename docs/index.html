@@ -474,7 +474,7 @@
             <tbody>
               <tr><td><code>packages/core-python/</code></td><td><strong>The kernel.</strong> Entities, repository ports, deterministic algorithms: preferences, decisions, learning, delegation policy, evaluation, access rules.</td></tr>
               <tr><td><code>packages/storage-sqlite/</code></td><td>SQLAlchemy adapter, schema, repositories, packaged Alembic migrations.</td></tr>
-              <tr><td><code>packages/llm-providers/</code></td><td>Provider protocol, egress policy, fake provider, Ollama and OpenAI-compatible adapters.</td></tr>
+              <tr><td><code>packages/llm-providers/</code></td><td>Provider protocol, capability negotiation, egress policy, fake provider, Ollama and OpenAI-compatible adapters.</td></tr>
               <tr><td><code>packages/connector-sdk/</code></td><td>Dependency-free permission manifest, event, sync, discovery, and persistence contracts for plugins.</td></tr>
               <tr><td><code>packages/connectors-local/</code></td><td>Local Notes reference connector, packaged independently of the daemon.</td></tr>
               <tr><td><code>packages/sdk-typescript/</code></td><td>Typed REST client and pairing rules shared by web and mobile.</td></tr>
@@ -514,7 +514,7 @@
               <tr><td>Core &amp; daemon</td><td>Python 3.12+, FastAPI, Uvicorn, Pydantic v2</td><td>Kernel is plain Python with no framework dependency.</td></tr>
               <tr><td>Persistence</td><td>SQLite (WAL), SQLAlchemy, Alembic</td><td>Migrations are packaged and applied automatically on <code>serve</code>.</td></tr>
               <tr><td>Crypto</td><td><code>cryptography</code></td><td>Self-signed TLS, scrypt + AES-256-GCM archives, SHA-256 credential hashes.</td></tr>
-              <tr><td>Model providers</td><td>Ollama (default), generic OpenAI-compatible HTTP</td><td>No vendor SDK required; every call passes the central egress policy.</td></tr>
+              <tr><td>Model providers</td><td>Ollama (default), generic OpenAI-compatible HTTP</td><td>No vendor SDK required; every call passes the central egress policy. Structured extraction negotiates schema, JSON-object, and validated prompted-JSON modes.</td></tr>
               <tr><td>Desktop</td><td>Tauri 2 (Rust 1.88+), React 19, Vite, TypeScript</td><td>Ships the daemon as a platform-specific sidecar; webview talks through a fixed loopback proxy.</td></tr>
               <tr><td>Web / mobile</td><td>React 19 + Vite; Expo React Native</td><td>Both built on the shared <code>@soulmate/sdk</code> TypeScript client.</td></tr>
               <tr><td>Integration</td><td>REST <code>/v1</code>, stdio MCP</td><td>MCP adapter is a REST consumer, not a second data path.</td></tr>
@@ -629,7 +629,7 @@ pnpm --filter @soulmate/desktop tauri build   # native installer → src-tauri/t
           <table>
             <thead><tr><th>Screen</th><th>What it does</th><th>Desktop</th><th>Web / mobile</th></tr></thead>
             <tbody>
-              <tr><td><strong>Chat</strong></td><td>Conversation that persists messages and proposes evidence for review.</td><td>✓</td><td>✓</td></tr>
+              <tr><td><strong>Chat</strong></td><td>Conversation that persists and returns each reply before an ID-only durable job extracts and validates learning in the background.</td><td>✓</td><td>✓</td></tr>
               <tr><td><strong>Decide</strong></td><td>Create a decision, get separate Predict Me and Advise Me results, resolve it, record the outcome.</td><td>✓</td><td>✓</td></tr>
               <tr><td><strong>My Model</strong></td><td>Inspect preferences and provenance, add corrections, delete evidence, answer uncertainty-targeting pairwise questions.</td><td>✓</td><td>✓</td></tr>
               <tr><td><strong>History</strong></td><td>Past conversations and decisions.</td><td>✓</td><td>✓</td></tr>

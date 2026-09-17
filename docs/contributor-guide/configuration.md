@@ -63,9 +63,16 @@ uppercase, and separating nested names with two underscores. For example,
 | `llm.provider` | `SOULMATE_LLM__PROVIDER` | `ollama` | Selects `ollama` or `openai_compatible`. |
 | `llm.ollama.base_url` | `SOULMATE_LLM__OLLAMA__BASE_URL` | `http://127.0.0.1:11434` | Local Ollama HTTP endpoint. It must remain literal loopback. |
 | `llm.ollama.model` | `SOULMATE_LLM__OLLAMA__MODEL` | empty | Exact installed Ollama model name. Empty means chat provider unavailable. |
-| `llm.openai_compatible.base_url` | `SOULMATE_LLM__OPENAI_COMPATIBLE__BASE_URL` | `http://127.0.0.1:8000/v1` | Generic OpenAI-compatible base URL. A remote URL requires `hybrid` and HTTPS. |
+| `llm.openai_compatible.base_url` | `SOULMATE_LLM__OPENAI_COMPATIBLE__BASE_URL` | `http://127.0.0.1:8000/v1` | Generic OpenAI-compatible base URL for GPT, Gemini, Claude compatibility, DeepSeek, GLM, Kimi, or a compatible local runtime. A remote URL requires `hybrid` and HTTPS. |
 | `llm.openai_compatible.model` | `SOULMATE_LLM__OPENAI_COMPATIBLE__MODEL` | empty | Model identifier sent to the compatible provider. Empty means chat provider unavailable. |
 | `llm.openai_compatible.api_key` | `SOULMATE_LLM__OPENAI_COMPATIBLE__API_KEY` | unset | Optional bearer secret. Supply only through the process environment; never commit it or put it in TOML. |
+
+Compatible endpoints do not have identical structured-output behavior. Soulmate
+negotiates strict JSON Schema, JSON-object mode, then schema-guided JSON text and
+validates the result locally before accepting Evidence. The reply is retained and
+returned with pending learning while extraction runs as a durable background job.
+Invalid output never updates the Personal Model, and failed attempts use bounded
+exponential backoff.
 
 ### Optional encrypted remote backup
 

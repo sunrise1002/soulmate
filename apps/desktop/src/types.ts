@@ -232,6 +232,8 @@ export interface ChatResponse {
   accepted_evidence: Evidence[];
   rejected_evidence_count: number;
   snapshot_version: number | null;
+  learning_status: "learned" | "no_evidence" | "pending";
+  learning_error: string | null;
 }
 
 export interface DecisionOption {

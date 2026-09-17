@@ -9,6 +9,15 @@ Planning is approved. Implementation has not started and requires a separate,
 explicit owner instruction. This document authorizes neither Phase 14 work nor
 automatic continuation beyond the Phase 13 exit review.
 
+The 2026-09-17 provider-compatibility maintenance increment does not change this
+plan's scope, ordering, migration number, or authorization gate. It strengthens the
+existing Phase 3 LLM adapter boundary only. Phase 13 Decision I/O remains
+provider-neutral and must not depend on a negotiated model-output mode; any future
+LLM-assisted detection remains outside Phase 13 as already stated below. The
+subsequent chat-path hardening that moved Evidence extraction to a backoff-enabled
+durable job also leaves Phase 13 scope, ordering, persistence plan, and authorization
+gate unchanged.
+
 ## Inputs and precedence
 
 Phase 13 must preserve the existing technical specification unless this plan and

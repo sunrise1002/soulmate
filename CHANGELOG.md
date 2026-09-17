@@ -4,6 +4,22 @@
 
 ### Added
 
+- Provider capability negotiation for OpenAI-compatible endpoints: strict JSON
+  Schema, JSON-object mode, and validated schema-guided JSON fallback, with the
+  successful mode cached per configured provider instance; Ollama also gains a
+  validated prompted-JSON fallback.
+- A restricted portable Evidence-extraction schema that avoids recursive,
+  unconstrained, and dynamic JSON Schema constructs that differ across GPT,
+  Gemini, Claude compatibility, DeepSeek, GLM, Kimi, Ollama, and local runtimes.
+- Separate chat and learning execution: successful replies and RawEvents persist
+  before extraction, every extraction runs as a durable ID-only background job,
+  and only validated/reviewed output can update the Personal Model. Failed jobs
+  retry with bounded exponential backoff instead of immediately consuming model
+  quota; the desktop bridge waits longer than the provider transport so it does
+  not abandon a reply that the daemon may still persist.
+- Pure desktop settings projection in native tests so capability/UI checks do not
+  access the operating-system credential store during offline Rust tests.
+
 - Desktop remote-backup setup for non-technical users, including R2/S3 endpoint,
   private bucket, schedule, and write-only keychain storage for access keys and
   the archive passphrase; no `.env` file is required for the managed daemon.

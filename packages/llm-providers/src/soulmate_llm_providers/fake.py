@@ -3,7 +3,12 @@
 from collections import deque
 from collections.abc import Mapping, Sequence
 
-from soulmate_llm_providers.interface import LLMMessage, ProviderError
+from soulmate_llm_providers.interface import (
+    LLMMessage,
+    ProviderCapabilities,
+    ProviderError,
+    StructuredOutputMode,
+)
 
 
 class FakeLLMProvider:
@@ -18,10 +23,19 @@ class FakeLLMProvider:
         self._structured_responses = deque(dict(item) for item in structured_responses)
         self._model_name = model_name
         self.requests: list[tuple[LLMMessage, ...]] = []
+        self._active_structured_output_mode: StructuredOutputMode | None = None
 
     @property
     def model_name(self) -> str:
         return self._model_name
+
+    @property
+    def capabilities(self) -> ProviderCapabilities:
+        return ProviderCapabilities(True, (StructuredOutputMode.JSON_SCHEMA,))
+
+    @property
+    def active_structured_output_mode(self) -> StructuredOutputMode | None:
+        return self._active_structured_output_mode
 
     async def generate(self, messages: Sequence[LLMMessage]) -> str:
         self.requests.append(tuple(messages))
@@ -36,4 +50,5 @@ class FakeLLMProvider:
         self.requests.append(tuple(messages))
         if not self._structured_responses:
             raise ProviderError("Fake provider has no structured response configured.")
+        self._active_structured_output_mode = StructuredOutputMode.JSON_SCHEMA
         return self._structured_responses.popleft()

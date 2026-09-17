@@ -271,7 +271,9 @@ export function SettingsScreen({
               }
             >
               <option value="ollama">Ollama · local</option>
-              <option value="openai_compatible">OpenAI-compatible</option>
+              <option value="openai_compatible">
+                OpenAI-compatible · hosted or local
+              </option>
             </select>
           </label>
           {settings.provider === "ollama" ? (
@@ -335,6 +337,12 @@ export function SettingsScreen({
                   }
                 />
               </label>
+              <p className="setting-help">
+                Use the compatibility endpoint published by GPT, Claude, Gemini,
+                DeepSeek, GLM, Kimi, vLLM, LM Studio, or another compatible
+                service. Soulmate negotiates the model&apos;s JSON capabilities
+                automatically.
+              </p>
               <label>
                 <span>
                   API key{" "}
@@ -347,7 +355,6 @@ export function SettingsScreen({
                       ? "Leave blank to keep current key"
                       : "Optional for local endpoints"
                   }
-                  required={!remoteBackup.hasAccessKeyId}
                   type="password"
                   value={apiKey}
                   onChange={(event) => {

@@ -1,5 +1,6 @@
 """Exercise local APIs, persistence, restart, and installed CLI behavior."""
 
+import asyncio
 import json
 import os
 import shutil
@@ -17,6 +18,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from soulmate_daemon.app import create_app
 from soulmate_daemon.config import Settings
+from soulmate_daemon.conversation import ConversationService
 from soulmate_llm_providers import FakeLLMProvider
 from soulmate_storage_sqlite import Database, Repositories
 
@@ -424,29 +426,63 @@ def test_chat_extracts_preferences_and_persists_context_across_restart(tmp_path:
             }
         ],
     )
-    with owner_client(create_app(settings, provider=first_provider)) as client:
+    first_app = create_app(settings, provider=first_provider)
+    with owner_client(first_app) as client:
         response = client.post("/v1/chat", json={"content": "I strongly prefer remote work."})
         assert response.status_code == 200
         body = response.json()
         conversation_id = body["conversation_id"]
-        evidence = body["accepted_evidence"][0]
-        assert body["snapshot_version"] == 1
-        assert evidence["target_key"] == "work.remote"
-        assert evidence["extractor_model"] == "fake-model-v1"
-        assert evidence["source_message_id"] == body["user_message_id"]
+        assert body["accepted_evidence"] == []
+        assert body["snapshot_version"] is None
+        assert body["learning_status"] == "pending"
+        assert body["learning_error"] is None
+        repositories = first_app.state.runtime["repositories"]
+        job = repositories.jobs.get(f"job_extract_{body['user_message_id']}")
+        assert job is not None
+        asyncio.run(
+            ConversationService(
+                conversations=repositories.conversations,
+                messages=repositories.messages,
+                raw_events=repositories.raw_events,
+                evidence=repositories.evidence,
+                models=repositories.personal_models,
+                provider=first_provider,
+                jobs=repositories.jobs,
+            ).retry_learning(job.payload)
+        )
+        evidence = repositories.evidence.list_for_profile("profile_default")[0]
+        assert evidence.target_key == "work.remote"
+        assert evidence.extractor_model == "fake-model-v1"
+        assert evidence.source_message_id == body["user_message_id"]
         assert client.get("/v1/preferences").json()[0]["value"] == pytest.approx(0.9)
 
     second_provider = FakeLLMProvider(
         responses=["Your remote-work preference is relevant."],
         structured_responses=[{"facts": [], "preferences": [], "goals": [], "constraints": []}],
     )
-    with owner_client(create_app(settings, provider=second_provider)) as client:
+    second_app = create_app(settings, provider=second_provider)
+    with owner_client(second_app) as client:
         response = client.post(
             "/v1/chat",
             json={"conversation_id": conversation_id, "content": "What about remote work?"},
         )
         assert response.status_code == 200
         assert response.json()["snapshot_version"] is None
+        assert response.json()["learning_status"] == "pending"
+        repositories = second_app.state.runtime["repositories"]
+        job = repositories.jobs.get(f"job_extract_{response.json()['user_message_id']}")
+        assert job is not None
+        asyncio.run(
+            ConversationService(
+                conversations=repositories.conversations,
+                messages=repositories.messages,
+                raw_events=repositories.raw_events,
+                evidence=repositories.evidence,
+                models=repositories.personal_models,
+                provider=second_provider,
+                jobs=repositories.jobs,
+            ).retry_learning(job.payload)
+        )
         assert client.get("/v1/model/summary").json()["version"] == 1
 
     chat_prompt = second_provider.requests[0]
@@ -458,7 +494,7 @@ def test_chat_extracts_preferences_and_persists_context_across_restart(tmp_path:
     ]
 
 
-def test_chat_rejects_invalid_provider_output_without_persisting_message(tmp_path: Path) -> None:
+def test_chat_preserves_reply_when_learning_output_is_invalid(tmp_path: Path) -> None:
     provider = FakeLLMProvider(
         responses=["Synthetic response"],
         structured_responses=[
@@ -472,15 +508,62 @@ def test_chat_rejects_invalid_provider_output_without_persisting_message(tmp_pat
                         "context": {},
                     }
                 ]
-            }
+            },
+            {
+                "facts": [],
+                "preferences": [
+                    {
+                        "target_key": "work.remote",
+                        "value": 0.8,
+                        "strength": 0.9,
+                        "confidence": 0.9,
+                        "context": {},
+                    }
+                ],
+                "goals": [],
+                "constraints": [],
+            },
         ],
     )
     settings = Settings(data_dir=tmp_path / "owner-data")
-    with owner_client(create_app(settings, provider=provider)) as client:
+    app = create_app(settings, provider=provider)
+    with owner_client(app) as client:
         response = client.post("/v1/chat", json={"content": "Synthetic message"})
-        assert response.status_code == 502
-        assert response.json()["detail"] == "The model provider returned invalid structured output."
+        assert response.status_code == 200
+        body = response.json()
+        assert body["message"]["content"] == "Synthetic response"
+        assert body["learning_status"] == "pending"
+        assert body["learning_error"] is None
+        assert len(provider.requests) == 1
+        conversations = client.get("/v1/conversations").json()
+        assert [item["content"] for item in conversations[0]["messages"]] == [
+            "Synthetic message",
+            "Synthetic response",
+        ]
         assert client.get("/v1/model/summary").json()["evidence_revision"] == 0
+        repositories = app.state.runtime["repositories"]
+        job = repositories.jobs.get(f"job_extract_{body['user_message_id']}")
+        assert job is not None
+        assert set(job.payload) == {"profile_id", "source_event_id", "source_message_id"}
+        assert "Synthetic message" not in json.dumps(job.payload)
+
+        service = ConversationService(
+            conversations=repositories.conversations,
+            messages=repositories.messages,
+            raw_events=repositories.raw_events,
+            evidence=repositories.evidence,
+            models=repositories.personal_models,
+            provider=provider,
+            jobs=repositories.jobs,
+        )
+        with pytest.raises(ValueError):
+            asyncio.run(service.retry_learning(job.payload))
+        assert [item["content"] for item in conversations[0]["messages"]] == [
+            "Synthetic message",
+            "Synthetic response",
+        ]
+        asyncio.run(service.retry_learning(job.payload))
+        assert client.get("/v1/preferences").json()[0]["key"] == "work.remote"
 
 
 def _decision_payload() -> dict[str, object]:

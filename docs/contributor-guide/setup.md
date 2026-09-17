@@ -164,6 +164,16 @@ export SOULMATE_LLM__OPENAI_COMPATIBLE__API_KEY=replace-me
 uv run --locked soulmate serve
 ```
 
+The generic adapter can be pointed at the compatibility endpoint published by a
+provider such as OpenAI, Anthropic, Gemini, DeepSeek, GLM, or Kimi, as well as
+local servers such as vLLM or LM Studio. Use the provider's exact base URL and
+model identifier; these values change independently of Soulmate. Compatibility
+does not imply identical structured-output support, so Soulmate automatically
+negotiates strict schema, JSON-object, and validated prompted-JSON modes. The
+reply is saved and returned before structured learning runs as a durable background
+job. A model that cannot produce valid learning data remains usable for chat and
+does not modify the Personal Model.
+
 External plaintext HTTP is always rejected. `offline` still permits loopback
 model endpoints, but denies connector network access and all external inference.
 
@@ -280,6 +290,12 @@ Use the focused commands and CI expectations in [quality gates](quality-gates.md
 - Chat says the provider is unavailable: configure a non-empty model name and
   ensure the model service is running. `doctor` reports `provider_check` as
   `not_configured` when the model name is empty.
+- Chat answers and reports pending learning: this is the normal decoupled flow;
+  the reply is already retained while an ID-only background job extracts Evidence.
+  Failed attempts retry with exponential backoff and never reach the Personal
+  Model. If the model does not update later, confirm the exact model identifier,
+  quota, and JSON reliability, then inspect the bounded desktop daemon log without
+  pasting private prompts or credentials.
 - Port 7432 is already in use: stop the existing daemon or set the same alternate
   `server.port` for every CLI command and client. A daemon orphaned by a desktop
   development build from before the managed-shutdown fix must be stopped once;

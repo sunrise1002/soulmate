@@ -17,6 +17,7 @@ export function ChatScreen({ onModelChanged }: ChatScreenProps) {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [learningNotice, setLearningNotice] = useState<string | null>(null);
 
   const loadConversations = useCallback(async () => {
     try {
@@ -49,6 +50,7 @@ export function ChatScreen({ onModelChanged }: ChatScreenProps) {
     if (!content || sending) return;
     setSending(true);
     setError(null);
+    setLearningNotice(null);
     const optimistic: Message = {
       id: "pending-user",
       role: "user",
@@ -74,6 +76,12 @@ export function ChatScreen({ onModelChanged }: ChatScreenProps) {
       await loadConversations();
       setActiveId(result.conversation_id);
       if (result.snapshot_version !== null) onModelChanged();
+      if (result.learning_status === "pending") {
+        setLearningNotice(
+          result.learning_error ??
+            "The reply was saved. Learning continues privately in the background.",
+        );
+      }
     } catch (reason) {
       setError(
         reason instanceof Error
@@ -153,6 +161,9 @@ export function ChatScreen({ onModelChanged }: ChatScreenProps) {
             {sending ? <div className="thinking">Thinking locally…</div> : null}
           </div>
           {error ? <div className="inline-error">{error}</div> : null}
+          {learningNotice ? (
+            <div className="inline-notice">{learningNotice}</div>
+          ) : null}
           <form className="composer" onSubmit={(event) => void submit(event)}>
             <textarea
               aria-label="Message"

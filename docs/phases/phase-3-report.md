@@ -68,8 +68,9 @@ observed for this phase.
 
 ## Known issues and limitations
 
-- Extraction and model rebuild run synchronously in the chat request. Durable job
-  offloading is deferred until measured local workloads require it.
+- Extraction and model rebuild now run through the durable worker after a reply is
+  saved and returned. The API reports pending learning; there is not yet a
+  per-message learning-job status surface in the clients.
 - The V1 review policy blocks named sensitive target-key categories but is not a
   complete semantic safety classifier. Rejected proposals are counted but not
   persisted because a user review interface does not exist yet.
@@ -95,3 +96,42 @@ Phase 4 may introduce the Decision MVP only after explicit authorization. It mus
 store the model snapshot used by every prediction, keep Predict Me separate from
 advice, and keep deterministic scoring independent of LLM providers. Do not add
 evaluation learning, clients, MCP, or later-phase integrations during Phase 4.
+
+## 2026-09-17 provider compatibility maintenance
+
+Owner-authorized maintenance strengthened the existing Phase 3 provider boundary
+without changing the kernel, database schema, evidence authority, privacy modes,
+or phase ordering:
+
+- provider adapters now advertise structured-output capabilities and negotiate an
+  ordered strategy instead of assuming strict OpenAI JSON Schema support;
+- OpenAI-compatible endpoints try strict JSON Schema, JSON-object mode, then
+  validated schema-guided JSON, caching the successful mode for the provider
+  instance; Ollama has an equivalent native-schema-to-prompt fallback;
+- conversation extraction uses an inline portable wire schema without recursive
+  references, unconstrained values, or dynamic object properties, while Pydantic
+  remains the authoritative validation boundary;
+- a successful text response, its messages, and RawEvent persist before structured
+  extraction begins; the response reports `learning_status=pending`, and an
+  ID-only durable job performs validation, review, and model rebuild in the
+  background;
+- failed learning jobs use bounded exponential backoff rather than consuming all
+  retry attempts and provider quota immediately, and the desktop request timeout
+  exceeds the provider transport timeout;
+- desktop and web clients surface pending learning separately from chat failure,
+  and the desktop settings explain the broad compatible-provider family rather
+  than implying one vendor.
+
+This maintenance reuses the existing jobs schema and requires no migration. Its
+generic worker change is configured only for conversation-extraction jobs;
+connector and remote-backup retry behavior is unchanged.
+
+`pnpm check:all` passed locally on macOS arm64: locked dependency checks; Ruff and
+formatting; strict mypy across 116 source files; 310 Python tests; 87 TypeScript
+tests; seven Rust tests; repository hooks; seven Python source/wheel package
+builds; a clean macOS arm64 PyInstaller sidecar build; and web/desktop production
+builds. A live synthetic extraction through the
+owner-configured Gemini OpenAI-compatible endpoint succeeded using negotiated
+`json_object` mode after strict-schema incompatibility. No private owner content
+was used. Other live providers, remote CI, and packaged Windows/Linux behavior
+remain unverified.

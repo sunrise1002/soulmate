@@ -11,6 +11,7 @@ export function ChatScreen({ client, onAuthError }: Props) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [learningNotice, setLearningNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export function ChatScreen({ client, onAuthError }: Props) {
   const send = async () => {
     setPending(true);
     setError(null);
+    setLearningNotice(null);
     try {
       const response = await client.chat(
         draft.trim(),
@@ -46,6 +48,12 @@ export function ChatScreen({ client, onAuthError }: Props) {
         },
         response.message,
       ]);
+      if (response.learning_status === "pending") {
+        setLearningNotice(
+          response.learning_error ??
+            "The reply was saved. Learning continues in the background.",
+        );
+      }
       setDraft("");
     } catch (caught) {
       onAuthError(caught);
@@ -87,6 +95,7 @@ export function ChatScreen({ client, onAuthError }: Props) {
         {pending ? "Sending…" : "Send"}
       </button>
       {error !== null && <p role="alert">{error}</p>}
+      {learningNotice !== null && <p role="status">{learningNotice}</p>}
     </section>
   );
 }

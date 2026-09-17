@@ -18,11 +18,15 @@ class DurableJobWorker:
         *,
         poll_interval: float = 0.25,
         lease_timeout: timedelta = timedelta(minutes=5),
+        retry_delays: Mapping[str, timedelta] | None = None,
+        max_retry_delay: timedelta = timedelta(minutes=15),
     ) -> None:
         self._repository = repository
         self._handlers = dict(handlers)
         self._poll_interval = poll_interval
         self._lease_timeout = lease_timeout
+        self._retry_delays = dict(retry_delays or {})
+        self._max_retry_delay = max_retry_delay
 
     async def process_once(self) -> bool:
         """Run one available supported job, including a stale interrupted job."""
@@ -35,7 +39,21 @@ class DurableJobWorker:
             await handler(job.payload)
         except Exception as exc:
             error = f"Handler failed with {type(exc).__name__}"
-            self._repository.mark_failed(job.id, error, datetime.now(UTC))
+            failed_at = datetime.now(UTC)
+            initial_delay = self._retry_delays.get(job.job_type)
+            retry_at = None
+            if initial_delay is not None:
+                delay_seconds = min(
+                    initial_delay.total_seconds() * (2 ** max(job.attempts - 1, 0)),
+                    self._max_retry_delay.total_seconds(),
+                )
+                retry_at = failed_at + timedelta(seconds=delay_seconds)
+            self._repository.mark_failed(
+                job.id,
+                error,
+                failed_at,
+                retry_at,
+            )
         else:
             self._repository.mark_succeeded(job.id, datetime.now(UTC))
         return True

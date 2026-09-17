@@ -25,7 +25,12 @@ Phase 3 added conversation and message ports to the kernel, deterministic minima
 context compilation, and concrete provider adapters outside the kernel. The daemon
 owns prompts, Pydantic proposal validation, review policy, and composition. Model
 providers can only propose Evidence; they cannot mutate derived Personal Model
-state. Phase 6 packages the daemon as a platform-specific sidecar managed by the
+state. A 2026-09-17 compatibility increment adds portable extraction schemas and
+adapter-level structured-output negotiation. A successful reply is persisted and
+returned before an ID-only durable learning job runs; failed attempts use bounded
+exponential backoff and the same validation boundary without accepting failed
+output. Phase 6 packages the
+daemon as a platform-specific sidecar managed by the
 Tauri desktop shell. The webview talks only through a fixed loopback native proxy.
 Phase 7 added device pairing ports and rules to the kernel, an opt-in TLS listener
 on an explicit LAN address, a single authorization boundary in front of every

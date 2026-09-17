@@ -295,7 +295,7 @@ fn remote_backup_desktop_settings(
     }
 }
 
-fn desktop_settings(stored: StoredSettings) -> DesktopSettings {
+fn desktop_settings(stored: StoredSettings, has_api_key: bool) -> DesktopSettings {
     DesktopSettings {
         privacy_mode: stored.privacy_mode,
         provider: stored.provider,
@@ -303,7 +303,7 @@ fn desktop_settings(stored: StoredSettings) -> DesktopSettings {
         ollama_model: stored.ollama_model,
         openai_base_url: stored.openai_base_url,
         openai_model: stored.openai_model,
-        has_api_key: stored_api_key().is_some(),
+        has_api_key,
         lan_enabled: stored.lan_enabled,
     }
 }
@@ -729,7 +729,8 @@ fn stop_daemon_internal(state: &ServiceState) -> Result<ServiceStatus, String> {
 
 #[tauri::command]
 fn get_desktop_settings(app: AppHandle) -> Result<DesktopSettings, String> {
-    load_stored_settings(&app).map(desktop_settings)
+    load_stored_settings(&app)
+        .map(|settings| desktop_settings(settings, stored_api_key().is_some()))
 }
 
 #[tauri::command]
@@ -767,7 +768,7 @@ fn save_desktop_settings(
         save_credential(API_KEY_USER, api_key.trim(), "provider credential")?;
     }
     write_stored_settings(&app, &stored)?;
-    Ok(desktop_settings(stored))
+    Ok(desktop_settings(stored, stored_api_key().is_some()))
 }
 
 #[tauri::command]
@@ -882,7 +883,9 @@ async fn api_request(request: ApiRequest) -> Result<ApiResponse, String> {
     }
     let client = reqwest::Client::builder()
         .redirect(reqwest::redirect::Policy::none())
-        .timeout(std::time::Duration::from_secs(30))
+        // The provider transport allows up to 60 seconds. Keep the local bridge
+        // alive slightly longer so it does not abandon a reply the daemon may persist.
+        .timeout(std::time::Duration::from_secs(75))
         .build()
         .map_err(|_| "The private local service client is unavailable.".to_string())?;
     let url = format!("{API_ORIGIN}{}", request.path);
@@ -977,7 +980,7 @@ mod tests {
     fn access_from_other_devices_is_off_until_the_owner_enables_it() {
         let defaults = StoredSettings::default();
         assert!(!defaults.lan_enabled);
-        assert!(!desktop_settings(defaults).lan_enabled);
+        assert!(!desktop_settings(defaults, false).lan_enabled);
 
         let enabled = StoredSettings {
             ollama_model: "model".into(),
@@ -985,7 +988,7 @@ mod tests {
             ..StoredSettings::default()
         };
         assert!(validate_settings(&enabled).is_ok());
-        assert!(desktop_settings(enabled).lan_enabled);
+        assert!(desktop_settings(enabled, false).lan_enabled);
     }
 
     #[test]

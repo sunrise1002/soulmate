@@ -37,6 +37,13 @@ private control pipe and waits for the loopback listener to close before a
 restart. Closing the desktop also closes that pipe, so its managed daemon cannot
 remain behind as an orphan process.
 
+The generic compatible-provider setting supports provider-published
+OpenAI-compatible endpoints rather than a fixed vendor list. Structured learning
+negotiates the endpoint's available mode. Chat saves and returns the reply before
+starting structured learning, then shows a notice while an ID-only durable job
+runs behind the same validation boundary. Failed learning attempts use bounded
+exponential backoff so they do not immediately consume provider quota.
+
 The External Agents screen creates scoped service identities, shows each new API
 key once, manages key rotation and revocation, defines exact delegated-action
 policies, approves or rejects pending actions, and displays the local audit trail.
@@ -50,8 +57,8 @@ run before the restored data is served. Desktop archive uploads are limited to 6
 MiB; use the CLI for larger supported archives. When an optional S3-compatible
 backend is configured in the daemon environment, the same screen can manually
 upload an encrypted remote backup or stage the newest remote backup for restore;
-the daemon can also schedule the upload daily. The desktop proxy retains its
-30-second request timeout, so use the CLI for remote transfers that may exceed it.
+the daemon can also schedule the upload daily. The desktop proxy uses a 75-second
+request timeout, so use the CLI for remote transfers that may exceed it.
 
 The Connections screen discovers independently packaged connector entry points,
 shows their complete permission declarations, and requires owner approval before

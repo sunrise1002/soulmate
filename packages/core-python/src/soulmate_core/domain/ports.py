@@ -185,7 +185,13 @@ class JobRepository(Protocol):
 
     def mark_succeeded(self, job_id: str, completed_at: datetime) -> None: ...
 
-    def mark_failed(self, job_id: str, error: str, failed_at: datetime) -> None: ...
+    def mark_failed(
+        self,
+        job_id: str,
+        error: str,
+        failed_at: datetime,
+        retry_at: datetime | None = None,
+    ) -> None: ...
 
 
 class PairingTokenRepository(Protocol):

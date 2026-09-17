@@ -49,7 +49,78 @@ class ReviewedEvidence:
 
 
 def extraction_schema() -> dict[str, object]:
-    return EvidenceProposals.model_json_schema()
+    """Return the portable wire schema shared by provider adapter families.
+
+    Provider JSON-schema dialects disagree on unconstrained values, dynamic object
+    properties, references, and optional fields. Keep this boundary deliberately
+    small; Pydantic still performs the authoritative validation after normalization.
+    """
+
+    context_entry: dict[str, object] = {
+        "type": "object",
+        "properties": {"key": {"type": "string"}, "value": {"type": "string"}},
+        "required": ["key", "value"],
+        "additionalProperties": False,
+    }
+    common_properties: dict[str, object] = {
+        "target_key": {"type": "string"},
+        "strength": {"type": "number"},
+        "confidence": {"type": "number"},
+        "context": {"type": "array", "items": context_entry},
+    }
+
+    def proposal(value_schema: dict[str, object]) -> dict[str, object]:
+        return {
+            "type": "object",
+            "properties": {**common_properties, "value": value_schema},
+            "required": ["target_key", "value", "strength", "confidence", "context"],
+            "additionalProperties": False,
+        }
+
+    categorical = proposal({"type": "string"})
+    preference = proposal({"type": "number"})
+    return {
+        "type": "object",
+        "properties": {
+            "facts": {"type": "array", "items": categorical},
+            "preferences": {"type": "array", "items": preference},
+            "goals": {"type": "array", "items": categorical},
+            "constraints": {"type": "array", "items": categorical},
+        },
+        "required": ["facts", "preferences", "goals", "constraints"],
+        "additionalProperties": False,
+    }
+
+
+def validate_proposals(raw: object) -> EvidenceProposals:
+    """Normalize the portable wire representation and validate all provider output."""
+    if not isinstance(raw, dict):
+        return EvidenceProposals.model_validate(raw)
+    normalized: dict[str, object] = dict(raw)
+    for group_name in ("facts", "preferences", "goals", "constraints"):
+        group = normalized.get(group_name)
+        if not isinstance(group, list):
+            continue
+        normalized_group: list[object] = []
+        for proposal in group:
+            if not isinstance(proposal, dict):
+                normalized_group.append(proposal)
+                continue
+            normalized_proposal = dict(proposal)
+            context = normalized_proposal.get("context")
+            if isinstance(context, list):
+                normalized_context: dict[str, JsonValue] = {}
+                for entry in context:
+                    if (
+                        isinstance(entry, dict)
+                        and isinstance(entry.get("key"), str)
+                        and isinstance(entry.get("value"), str)
+                    ):
+                        normalized_context[entry["key"]] = entry["value"]
+                normalized_proposal["context"] = normalized_context
+            normalized_group.append(normalized_proposal)
+        normalized[group_name] = normalized_group
+    return EvidenceProposals.model_validate(normalized)
 
 
 def _is_low_risk(target_key: str) -> bool:
