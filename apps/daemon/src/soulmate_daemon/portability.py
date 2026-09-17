@@ -43,6 +43,8 @@ FRESHNESS_QUERIES = (
     ("conversations", "SELECT count(*) FROM conversations"),
     ("decision_events", "SELECT count(*) FROM decision_events"),
     ("evidence", "SELECT count(*) FROM evidence"),
+    ("target_key_aliases", "SELECT count(*) FROM target_key_aliases"),
+    ("target_key_catalog", "SELECT count(*) FROM target_key_catalog"),
     ("service_identities", "SELECT count(*) FROM service_identities"),
     ("paired_devices", "SELECT count(*) FROM paired_devices"),
 )
@@ -51,6 +53,9 @@ SANITIZE_QUERIES = (
     ("pairing_tokens", "DELETE FROM pairing_tokens"),
     ("paired_devices", "DELETE FROM paired_devices"),
 )
+# Derived vectors are tied to one local model; portable exports rebuild them instead.
+PORTABLE_EXPORT_QUERIES = (("target_key_embeddings", "DELETE FROM target_key_embeddings"),)
+PORTABLE_EXPORT = "encrypted_export"
 
 
 class PortabilityError(ValueError):
@@ -106,10 +111,13 @@ def is_fresh_installation(database_path: Path) -> bool:
     return True
 
 
-def _sanitize_snapshot(path: Path) -> None:
+def _sanitize_snapshot(path: Path, artifact_type: str) -> None:
+    queries: tuple[tuple[str, str], ...] = SANITIZE_QUERIES
+    if artifact_type == PORTABLE_EXPORT:
+        queries += PORTABLE_EXPORT_QUERIES
     with sqlite3.connect(path) as connection:
         connection.execute("PRAGMA foreign_keys=ON")
-        for table, query in SANITIZE_QUERIES:
+        for table, query in queries:
             if _table_exists(connection, table):
                 connection.execute(query)
         if _table_exists(connection, "system_metadata"):
@@ -364,21 +372,22 @@ class ArchiveService:
             workspace = Path(temporary)
             snapshot = workspace / "database.sqlite"
             payload_path = workspace / "payload.zip"
+            resolved_type = (
+                artifact_type
+                if artifact_type is not None
+                else PORTABLE_EXPORT
+                if passphrase is not None
+                else "local_backup"
+            )
             self._database.backup_to(snapshot)
-            _sanitize_snapshot(snapshot)
+            _sanitize_snapshot(snapshot, resolved_type)
             _zip_payload(
                 self._settings.data_dir.expanduser().resolve(),
                 snapshot,
                 payload_path,
                 created_at=now,
                 schema_revision=schema_revision,
-                artifact_type=(
-                    artifact_type
-                    if artifact_type is not None
-                    else "encrypted_export"
-                    if passphrase is not None
-                    else "local_backup"
-                ),
+                artifact_type=resolved_type,
             )
             payload = payload_path.read_bytes()
             encrypted = passphrase is not None

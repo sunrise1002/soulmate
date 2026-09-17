@@ -63,6 +63,7 @@ from soulmate_core.domain.ports import (
     ServiceIdentityRepository,
     SourceRepository,
     SystemMetadataRepository,
+    TargetKeyAliasRepository,
 )
 
 __all__ = [
@@ -124,6 +125,7 @@ __all__ = [
     "SystemMetadataRepository",
     "TargetKeyAlias",
     "TargetKeyAliasMethod",
+    "TargetKeyAliasRepository",
     "TargetKeyAliasStatus",
     "UserModelSnapshot",
 ]

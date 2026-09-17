@@ -358,7 +358,7 @@ def test_portability_cli_imports_backs_up_exports_and_restores(tmp_path: Path) -
     assert json.loads(imported.stdout)["message_count"] == 2
     assert json.loads(backup.stdout)["encrypted"] is False
     assert json.loads(exported.stdout)["encrypted"] is True
-    assert json.loads(restored.stdout)["schema_revision_after"] == "0010_phase_12"
+    assert json.loads(restored.stdout)["schema_revision_after"] == "0011_key_consistency"
     target_database = Database(target_dir / "soulmate.db")
     target_database.migrate()
     target_repositories = Repositories(target_database.sessions())

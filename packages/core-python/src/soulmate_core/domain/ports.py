@@ -20,6 +20,7 @@ from soulmate_core.domain.models import (
     DelegationStatus,
     DerivedModel,
     Evidence,
+    EvidenceTargetType,
     Job,
     Message,
     PairedDevice,
@@ -31,6 +32,8 @@ from soulmate_core.domain.models import (
     ServiceIdentity,
     Source,
     SourceDeletion,
+    TargetKeyAlias,
+    TargetKeyAliasStatus,
     UserModelSnapshot,
 )
 
@@ -147,6 +150,22 @@ class EvidenceRepository(Protocol):
     def remove(self, evidence_id: str) -> bool: ...
 
     def current_revision(self, profile_id: str) -> int: ...
+
+
+class TargetKeyAliasRepository(Protocol):
+    """Owner-reviewable key aliases; every write advances the evidence revision."""
+
+    def upsert(self, alias: TargetKeyAlias) -> TargetKeyAlias: ...
+
+    def get(
+        self, profile_id: str, target_type: EvidenceTargetType, alias_key: str
+    ) -> TargetKeyAlias | None: ...
+
+    def list_for_profile(
+        self, profile_id: str, status: TargetKeyAliasStatus | None = None
+    ) -> tuple[TargetKeyAlias, ...]: ...
+
+    def remove(self, profile_id: str, target_type: EvidenceTargetType, alias_key: str) -> bool: ...
 
 
 class PersonalModelRepository(Protocol):

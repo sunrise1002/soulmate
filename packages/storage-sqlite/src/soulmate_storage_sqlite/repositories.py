@@ -58,6 +58,11 @@ from sqlalchemy import and_, case, delete, func, or_, select, update
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session, sessionmaker
 
+from soulmate_storage_sqlite.key_aliases import (
+    SqliteTargetKeyAliasRepository,
+    bump_evidence_revision,
+    prune_unsupported_keys,
+)
 from soulmate_storage_sqlite.schema import (
     ActiveQuestionRow,
     ApiCredentialRow,
@@ -286,13 +291,8 @@ class SqliteSourceRepository:
             session.execute(delete(ConversationRow).where(ConversationRow.source_id == source_id))
             session.delete(source)
             if counts.evidence_count:
-                statement = insert(EvidenceRevisionRow).values(profile_id=profile_id, revision=1)
-                session.execute(
-                    statement.on_conflict_do_update(
-                        index_elements=[EvidenceRevisionRow.profile_id],
-                        set_={"revision": EvidenceRevisionRow.revision + 1},
-                    )
-                )
+                prune_unsupported_keys(session, profile_id)
+                bump_evidence_revision(session, profile_id)
             return counts
 
 
@@ -894,16 +894,6 @@ class SqliteEvidenceRepository:
     def __init__(self, sessions: sessionmaker[Session]) -> None:
         self._sessions = sessions
 
-    @staticmethod
-    def _bump_revision(session: Session, profile_id: str) -> None:
-        statement = insert(EvidenceRevisionRow).values(profile_id=profile_id, revision=1)
-        session.execute(
-            statement.on_conflict_do_update(
-                index_elements=[EvidenceRevisionRow.profile_id],
-                set_={"revision": EvidenceRevisionRow.revision + 1},
-            )
-        )
-
     def add(self, evidence: Evidence) -> None:
         with self._sessions.begin() as session:
             source_event = session.get(RawEventRow, evidence.source_event_id)
@@ -936,7 +926,7 @@ class SqliteEvidenceRepository:
                     created_at=evidence.created_at,
                 )
             )
-            self._bump_revision(session, evidence.profile_id)
+            bump_evidence_revision(session, evidence.profile_id)
 
     def get(self, evidence_id: str) -> Evidence | None:
         with self._sessions() as session:
@@ -976,7 +966,9 @@ class SqliteEvidenceRepository:
                 return False
             profile_id = row.profile_id
             session.delete(row)
-            self._bump_revision(session, profile_id)
+            session.flush()
+            prune_unsupported_keys(session, profile_id)
+            bump_evidence_revision(session, profile_id)
             return True
 
     def current_revision(self, profile_id: str) -> int:
@@ -2084,13 +2076,8 @@ class SqliteConnectorRegistrationRepository:
             if source is not None:
                 session.delete(source)
             if evidence_count:
-                statement = insert(EvidenceRevisionRow).values(profile_id=profile_id, revision=1)
-                session.execute(
-                    statement.on_conflict_do_update(
-                        index_elements=[EvidenceRevisionRow.profile_id],
-                        set_={"revision": EvidenceRevisionRow.revision + 1},
-                    )
-                )
+                prune_unsupported_keys(session, profile_id)
+                bump_evidence_revision(session, profile_id)
             return result
 
     @staticmethod
@@ -2169,6 +2156,7 @@ class Repositories:
         self.outcomes = SqliteOutcomeRepository(sessions)
         self.active_questions = SqliteActiveQuestionRepository(sessions)
         self.evidence = SqliteEvidenceRepository(sessions)
+        self.key_aliases = SqliteTargetKeyAliasRepository(sessions)
         self.personal_models = SqlitePersonalModelRepository(sessions)
         self.audit_events = SqliteAuditEventRepository(sessions)
         self.jobs = SqliteJobRepository(sessions)

@@ -4,6 +4,17 @@
 
 ### Added
 
+- Persistence for the key consistency increment (step P2): migration
+  `0011_key_consistency` adds `target_key_aliases`, `target_key_catalog`, and
+  `target_key_embeddings` with a downgrade that drops them;
+  `SqliteTargetKeyAliasRepository` behind the new `TargetKeyAliasRepository` port
+  rejects active alias cycles at write time and advances the evidence revision on
+  every change; `ModelRebuilder` optionally applies active aliases. Evidence
+  deletion (single evidence, import removal, connector removal) prunes aliases,
+  labels, and embeddings that no remaining evidence supports. Local and remote
+  backups include all three tables; encrypted portable exports drop the derived
+  embeddings; restore treats stored aliases or labels as owner data. The daemon
+  does not pass aliases to model rebuilds yet, and nothing creates aliases.
 - Infrastructure-free key canonicalization core for the key consistency
   increment (step P1): a versioned `key-normalizer-v1` `normalize_key`, a
   `TargetKeyAlias` domain record with polarity, review status, and provenance

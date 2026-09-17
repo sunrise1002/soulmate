@@ -22,7 +22,9 @@ its [plan](phases/key-consistency-increment-plan.md) is implemented locally:
 `normalize_key`, the `TargetKeyAlias` domain record, and alias-aware aggregation
 inside the kernel, with no persistence, no wiring, and no new dependency. Steps
 P0 and P2 to P6 are not implemented. This does not start Phase 13 or authorize a
-later phase.
+later phase. Step P2 (migration `0011`, alias repository, revision bump, deletion
+cleanup, and archive coverage) followed on the same day; steps P0 and P3 to P6 are
+not implemented.
 
 ## Reports
 
@@ -114,6 +116,27 @@ so removing an alias and rebuilding restores the previous grouping. `ruff check`
 client behavior were not verified. No migration, dependency, persistence, API, or
 client change was made; the alias tables, extraction and predictor wiring, owner
 review API and UI, embeddings, and the P0 model spike remain unimplemented.
+
+Step P2 was implemented later on 2026-09-17. Migration `0011_key_consistency`
+creates `target_key_aliases` (natural key `profile_id`, `target_type`,
+`alias_key`, with database checks mirroring the domain rules),
+`target_key_catalog`, and `target_key_embeddings`; its downgrade drops only those
+tables. `SqliteTargetKeyAliasRepository` implements the new
+`TargetKeyAliasRepository` port, rejects active aliases that would close a direct
+or transitive cycle, keeps the first `created_at`, and advances the evidence
+revision on every upsert and removal, so `ModelRebuilder.current()` rebuilds.
+`ModelRebuilder` accepts an optional alias repository and applies only active
+aliases. Deleting evidence, an import, or a connector prunes aliases, catalog
+labels, and embeddings whose keys no remaining evidence supports (active aliases
+carry support onto their canonical key; suggested and rejected aliases need both
+keys supported). Local and remote backups keep all three tables, encrypted
+portable exports drop embeddings, and restore refuses targets holding aliases or
+labels. Migration from a real `0010` schema, downgrade, restart, cycle
+rejection, deletion, backup, export, and restore tests were added. `ruff check`,
+`ruff format --check`, strict `mypy`, `pre-commit run --all-files`, and 430 Python
+tests passed locally; `pnpm check:all` and coverage were not run. Limitations: the
+daemon still constructs `ModelRebuilder` without aliases, catalog and embedding
+tables have no repositories yet, and no code creates aliases.
 
 On 2026-09-16, desktop daemon restart and application-exit cleanup were corrected
 for the PyInstaller one-file sidecar. The shell now uses a private graceful
