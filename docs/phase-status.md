@@ -34,9 +34,13 @@ so semantic merges must stay owner-reviewed. The owner confirmed `bge-m3` int8 a
 the default model and quantization. Step P4 followed on 2026-09-18 with the
 kernel embedding port, the lazily loaded local ONNX adapter, the pinned artifact
 manager, and the owner-only `/v1/embedding-model` API; `embedding.provider`
-defaults to `none`, so no model is downloaded or loaded unless the owner asks,
-and no code computes key embeddings yet. Steps P5 and P6 are not implemented. See
-the [P0 spike report](phases/key-consistency-p0-spike-report.md).
+defaults to `none`, so no model is downloaded or loaded unless the owner asks.
+Step P5 followed on 2026-09-18 with extracted key labels, a durable key embedding
+refresh job, semantic key retrieval, and owner-reviewed semantic merge
+suggestions. Step P6 (sidecar packaging with `onnxruntime`, the first run against
+the real artifact, the model download UI, and final documentation) is not
+implemented. See the
+[P0 spike report](phases/key-consistency-p0-spike-report.md).
 
 ## Reports
 
@@ -203,6 +207,31 @@ not run. Limitations: `onnxruntime`, `tokenizers`, and `numpy` are still not in
 `uv.lock`, so the real ONNX session is exercised by no test; the pinned hashes
 were copied from the P0 spike report rather than re-downloaded; no client screen
 offers the download button; and nothing computes or uses key embeddings yet.
+
+Step P5 was implemented on 2026-09-18. Chat extraction may now propose an
+owner-language `label` and comma-separated `aliases` for each key, which are
+stored in `target_key_catalog` and never overwrite a label the owner edited. A
+durable `key_embedding_refresh` job, queued only when a model is installed and
+only once per evidence revision and model, embeds the text of every used key into
+`target_key_embeddings`, re-embeds only keys whose text changed, and removes the
+vectors of any other model; it runs off the chat path, and every embedding failure
+falls back to word-overlap ranking instead of surfacing an error.
+`select_known_keys` now mixes a semantic score into its existing recency, word
+overlap, and domain signals, so a Vietnamese message shares the matching English
+key even with no shared word and low confidence, which an integration test
+verifies with a fake embedder. Key pairs that only look alike become `suggested`
+aliases carrying their similarity, reviewed in the existing desktop and web
+duplicate-key screens, which now state why a pair was suggested; nothing merges on
+similarity alone, as the P0 measurements require. `key_aliases.semantic_threshold`
+(default 0.85) sets the review threshold, and `embedding.provider` still defaults
+to `none`. `pnpm check` passed locally with 698 Python tests, 50 SDK, 20 desktop,
+28 web, and 27 mobile client tests, and seven Rust tests, with `ruff`,
+`ruff format`, and strict `mypy` clean. `pnpm check:all` and coverage collection
+(pytest-cov is still not installed) were not run. Limitations: no real embedding
+model has ever run, so semantic quality rests on the P0 measurements and fakes;
+brute-force cosine scoring is pure Python rather than `numpy`; the model download
+UI is still missing; and the owner cannot yet edit a key label through an API or
+screen.
 
 On 2026-09-16, desktop daemon restart and application-exit cleanup were corrected
 for the PyInstaller one-file sidecar. The shell now uses a private graceful

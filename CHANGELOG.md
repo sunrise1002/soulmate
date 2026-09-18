@@ -4,6 +4,25 @@
 
 ### Added
 
+- Multilingual key retrieval for the key consistency increment (step P5): key
+  labels, derived key vectors, semantic key retrieval, and reviewed semantic
+  merge suggestions. Chat extraction may now return an optional `label` and
+  comma-separated `aliases` per key in the language the owner wrote, stored in
+  `target_key_catalog`; an owner edit of a label is never overwritten by later
+  extraction. A durable `key_embedding_refresh` job embeds the text of every used
+  key (`ui theme dark | giao diện tối`) into `target_key_embeddings`, recomputes
+  only the keys whose text changed, drops the vectors of any other model, and runs
+  outside the chat path, so chat latency is unchanged and a missing or broken model
+  degrades to the existing word-overlap ranking. `select_known_keys` adds a
+  semantic score, so a Vietnamese message now shares the matching English key even
+  when it has no word in common with it and its confidence is low. Key pairs that
+  only look alike are stored as `suggested` aliases with their similarity and wait
+  for owner review in the existing duplicate-key screens, which now show why a
+  pair was suggested; similarity still never merges anything automatically,
+  because opposite keys score just as high. `embedding.provider` still defaults to
+  `none`, and nothing is embedded, suggested, or downloaded until the owner enables
+  a model. New `key_aliases.semantic_threshold` (default 0.85) sets when a pair is
+  worth reviewing.
 - Local embedding port for the key consistency increment (step P4): the kernel
   gained an `EmbeddingProvider` port with a `NullEmbedding` default, and the
   daemon gained a `LocalOnnxEmbedding` adapter that imports `onnxruntime`,

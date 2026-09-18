@@ -41,6 +41,9 @@ from soulmate_core.domain.models import (
     TargetKeyAlias,
     TargetKeyAliasMethod,
     TargetKeyAliasStatus,
+    TargetKeyEmbedding,
+    TargetKeyLabel,
+    TargetKeyLabelSource,
     UserModelSnapshot,
 )
 from soulmate_core.domain.ports import (
@@ -64,6 +67,8 @@ from soulmate_core.domain.ports import (
     SourceRepository,
     SystemMetadataRepository,
     TargetKeyAliasRepository,
+    TargetKeyCatalogRepository,
+    TargetKeyEmbeddingRepository,
 )
 
 __all__ = [
@@ -127,5 +132,10 @@ __all__ = [
     "TargetKeyAliasMethod",
     "TargetKeyAliasRepository",
     "TargetKeyAliasStatus",
+    "TargetKeyCatalogRepository",
+    "TargetKeyEmbedding",
+    "TargetKeyEmbeddingRepository",
+    "TargetKeyLabel",
+    "TargetKeyLabelSource",
     "UserModelSnapshot",
 ]

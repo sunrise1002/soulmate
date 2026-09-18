@@ -204,3 +204,91 @@ def test_negative_budget_is_rejected(field: str) -> None:
     # Then: a validation error is raised
     with pytest.raises(ValueError, match=r"^Key selection budgets must not be negative\.$"):
         KeySelectionPolicy(**{field: -1})
+
+
+def test_semantic_score_shares_a_key_with_no_shared_words() -> None:
+    # Given: the same Vietnamese query and English keys as the lexical fallback case
+    model = _model(_preference("ui.theme.dark", 0.1), _preference("work.remote", 0.9))
+    # When: an embedding scores the matching key well above the floor
+    result = select_known_keys(
+        model,
+        query="Tôi thích giao diện tối",
+        semantic_scores={"ui.theme.dark": 0.7, "work.remote": 0.2},
+        policy=FILTER,
+    )
+    # Then: the semantic match wins over the more confident unrelated key
+    assert result["preferences"] == ["ui.theme.dark"]
+
+
+def test_semantic_score_below_the_floor_is_ignored() -> None:
+    # Given: a weak similarity for the low-confidence key
+    model = _model(_preference("ui.theme.dark", 0.1), _preference("work.remote", 0.9))
+    # When: keys are selected with a similarity under the floor
+    result = select_known_keys(
+        model,
+        query="Tôi thích giao diện tối",
+        semantic_scores={"ui.theme.dark": 0.29},
+        policy=KeySelectionPolicy(send_all_threshold=0, limit=1, semantic_floor=0.3),
+    )
+    # Then: confidence decides again, exactly as without embeddings
+    assert result["preferences"] == ["work.remote"]
+
+
+def test_semantic_score_exactly_at_the_floor_counts() -> None:
+    # Given: a similarity equal to the floor
+    model = _model(_preference("ui.theme.dark", 0.1), _preference("work.remote", 0.9))
+    # When: keys are selected
+    result = select_known_keys(
+        model,
+        query="Tôi thích giao diện tối",
+        semantic_scores={"ui.theme.dark": 0.3},
+        policy=KeySelectionPolicy(send_all_threshold=0, limit=1, semantic_floor=0.3),
+    )
+    # Then: the boundary value is included
+    assert result["preferences"] == ["ui.theme.dark"]
+
+
+def test_recent_use_still_outranks_a_strong_semantic_match() -> None:
+    # Given: a key used earlier in the conversation and a semantically closer key
+    model = _model(_preference("food.spicy"), _preference("ui.theme.dark"))
+    # When: keys are selected with the maximum similarity on the other key
+    result = select_known_keys(
+        model,
+        query="unrelated",
+        recent_keys={"food.spicy"},
+        semantic_scores={"ui.theme.dark": 1.0},
+        policy=KeySelectionPolicy(send_all_threshold=0, limit=1, semantic_weight=3.0),
+    )
+    # Then: the conversation signal keeps precedence
+    assert result["preferences"] == ["food.spicy"]
+
+
+@pytest.mark.parametrize("scores", [None, {}, {"unknown.key": 1.0}])
+def test_missing_semantic_scores_leave_lexical_behavior_unchanged(
+    scores: dict[str, float] | None,
+) -> None:
+    # Given: no usable similarity for any known key
+    model = _model(_preference("ui.theme.dark", 0.1), _preference("work.remote", 0.9))
+    # When: keys are selected
+    result = select_known_keys(
+        model, query="Tôi thích giao diện tối", semantic_scores=scores, policy=FILTER
+    )
+    # Then: the step-A ranking is preserved
+    assert result["preferences"] == ["work.remote"]
+
+
+def test_negative_semantic_weight_is_rejected() -> None:
+    # Given: a negative semantic weight
+    # When: the policy is created
+    # Then: a validation error is raised
+    with pytest.raises(ValueError, match=r"^The semantic weight must not be negative\.$"):
+        KeySelectionPolicy(semantic_weight=-0.1)
+
+
+@pytest.mark.parametrize("floor", [-0.01, 1.01])
+def test_semantic_floor_outside_the_similarity_range_is_rejected(floor: float) -> None:
+    # Given: a floor outside the cosine range a caller may supply
+    # When: the policy is created
+    # Then: a validation error names the range
+    with pytest.raises(ValueError, match=r"^The semantic floor must be between zero and one\.$"):
+        KeySelectionPolicy(semantic_floor=floor)

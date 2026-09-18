@@ -26,6 +26,7 @@ from soulmate_core.domain import (
     Preference,
     RawEvent,
 )
+from soulmate_core.embeddings import EmbeddingProvider
 from soulmate_core.learning import rank_uncertainties
 from soulmate_llm_providers import EgressDeniedError, LLMProvider, ProviderError
 from soulmate_storage_sqlite import Database, Repositories
@@ -46,6 +47,7 @@ from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, Reso
 from soulmate_daemon.delegation_api import build_delegation_router
 from soulmate_daemon.embedding_api import build_embedding_router
 from soulmate_daemon.embedding_models import EmbeddingModelService
+from soulmate_daemon.embeddings import embedding_provider as build_embedding_provider
 from soulmate_daemon.external_api import build_external_router
 from soulmate_daemon.jobs import DurableJobWorker
 from soulmate_daemon.key_alias_api import build_key_alias_router
@@ -53,6 +55,13 @@ from soulmate_daemon.key_aliases import (
     alias_repository,
     model_rebuilder,
     register_normalized_aliases,
+)
+from soulmate_daemon.key_semantics import (
+    KEY_EMBEDDING_INTERVAL_SECONDS,
+    KEY_EMBEDDING_REFRESH_JOB,
+    enqueue_key_embedding_refresh,
+    key_semantics_service,
+    refresh_from_payload,
 )
 from soulmate_daemon.network import (
     LanEndpoint,
@@ -582,6 +591,7 @@ def create_app(
     lan: LanEndpoint | None = None,
     connectors: tuple[SourceConnector, ...] = (),
     remote_backup_store: RemoteBackupStore | None = None,
+    embeddings: EmbeddingProvider | None = None,
 ) -> FastAPI:
     resolved_settings = settings if settings is not None else Settings()
 
@@ -620,6 +630,15 @@ def create_app(
         embedding_models = EmbeddingModelService(
             resolved_settings, repositories.audit_events, profile_id=DEFAULT_PROFILE_ID
         )
+        semantics = None
+        if embeddings is not None or resolved_settings.embedding.provider != "none":
+            semantics = key_semantics_service(
+                repositories,
+                resolved_settings,
+                embeddings
+                if embeddings is not None
+                else build_embedding_provider(resolved_settings),
+            )
         app.state.runtime = AppState(
             settings=resolved_settings,
             database=database,
@@ -631,6 +650,7 @@ def create_app(
             connector_catalog=connector_catalog,
             remote_backup=remote_backup,
             embedding_models=embedding_models,
+            key_semantics=semantics,
         )
         stop = asyncio.Event()
 
@@ -696,7 +716,14 @@ def create_app(
                 provider=_resolve_provider(_state(app)),
                 jobs=repositories.jobs,
                 aliases=alias_repository(repositories, resolved_settings),
+                catalog=repositories.key_catalog,
+                semantics=semantics,
             ).retry_learning(payload)
+
+        async def refresh_key_embeddings(payload: dict[str, object]) -> None:
+            if semantics is None:
+                raise ValueError("Key embeddings are disabled, so no refresh may run.")
+            await asyncio.to_thread(refresh_from_payload, semantics, payload)
 
         handlers = {
             CONNECTOR_SYNC_JOB: sync_connector,
@@ -704,6 +731,8 @@ def create_app(
         }
         if remote_backup is not None:
             handlers[REMOTE_BACKUP_JOB] = create_remote_backup
+        if semantics is not None:
+            handlers[KEY_EMBEDDING_REFRESH_JOB] = refresh_key_embeddings
         worker = DurableJobWorker(
             repositories.jobs,
             handlers,
@@ -730,6 +759,31 @@ def create_app(
             scheduler_task = asyncio.create_task(
                 schedule_remote_backup(), name="soulmate-remote-backup-scheduler"
             )
+        embedding_task: asyncio.Task[None] | None = None
+        if semantics is not None:
+
+            async def schedule_key_embeddings() -> None:
+                """Queue a refresh when evidence or the installed model changed.
+
+                Polling keeps the chat path free of embedding work and covers every
+                evidence source; the job identity makes a repeated check free.
+                """
+                while not stop.is_set():
+                    await asyncio.to_thread(
+                        enqueue_key_embedding_refresh,
+                        repositories.jobs,
+                        repositories.evidence,
+                        semantics,
+                        DEFAULT_PROFILE_ID,
+                    )
+                    try:
+                        await asyncio.wait_for(stop.wait(), timeout=KEY_EMBEDDING_INTERVAL_SECONDS)
+                    except TimeoutError:
+                        continue
+
+            embedding_task = asyncio.create_task(
+                schedule_key_embeddings(), name="soulmate-key-embedding-scheduler"
+            )
         try:
             yield
         finally:
@@ -738,6 +792,8 @@ def create_app(
             tasks = [worker_task]
             if scheduler_task is not None:
                 tasks.append(scheduler_task)
+            if embedding_task is not None:
+                tasks.append(embedding_task)
             await asyncio.gather(*tasks)
             if database.engine is not None:
                 database.engine.dispose()
@@ -1121,6 +1177,7 @@ def create_app(
             outcomes=repositories.outcomes,
             provider=provider,
             aliases=alias_repository(repositories, runtime["settings"]),
+            semantics=runtime["key_semantics"],
         )
         try:
             decision, options = await service.create(
@@ -1311,6 +1368,8 @@ def create_app(
             provider=resolved_provider,
             jobs=repositories.jobs,
             aliases=alias_repository(repositories, runtime["settings"]),
+            catalog=repositories.key_catalog,
+            semantics=runtime["key_semantics"],
         )
         try:
             result = await service.chat(

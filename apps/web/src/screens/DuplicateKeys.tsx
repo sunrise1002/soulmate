@@ -19,6 +19,13 @@ const TITLES: Record<KeyAlias["status"], string> = {
 
 type Change = KeyAliasReviewAction | "remove";
 
+/** Explain a semantic suggestion, which similar wording alone produced. */
+function reason(alias: KeyAlias): string | null {
+  if (alias.method !== "semantic" || alias.similarity === null) return null;
+  const percent = Math.round(alias.similarity * 100).toString();
+  return `Similar wording, ${percent}% alike`;
+}
+
 /** Owner-only review of merged target keys; never render it for paired devices. */
 export function DuplicateKeys({ client, onChanged }: Props) {
   const [list, setList] = useState<KeyAliasList | null>(null);
@@ -99,6 +106,7 @@ export function DuplicateKeys({ client, onChanged }: Props) {
               {alias.polarity === -1 ? "opposite of" : "same as"}{" "}
               <span className="key">{alias.canonical_key}</span>
             </span>
+            {reason(alias) && <span className="hint">{reason(alias)}</span>}
             {list.enabled &&
               actions(alias).map(([label, action]) => (
                 <button

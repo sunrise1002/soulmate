@@ -48,6 +48,13 @@ class TargetKeyAliasStatus(StrEnum):
     REJECTED = "rejected"
 
 
+class TargetKeyLabelSource(StrEnum):
+    """Who wrote a target key label; owner labels outrank extracted ones."""
+
+    EXTRACTED = "extracted"
+    OWNER = "owner"
+
+
 class MessageRole(StrEnum):
     """Conversation roles persisted by the provider-neutral kernel."""
 
@@ -432,6 +439,62 @@ class TargetKeyAlias:
             raise ValueError("Target key alias similarity must be between 0 and 1.")
         if self.method is TargetKeyAliasMethod.SEMANTIC and self.similarity is None:
             raise ValueError("Semantic target key aliases must record a similarity.")
+
+
+@dataclass(frozen=True, slots=True)
+class TargetKeyLabel:
+    """Owner-language name and synonyms of one target key.
+
+    Extraction proposes a label in the language the owner used; the owner may
+    replace it. An owner label is never overwritten by extraction, because it
+    cannot be derived from evidence again.
+    """
+
+    profile_id: str
+    target_type: EvidenceTargetType
+    key: str
+    label: str | None
+    aliases: tuple[str, ...]
+    source: TargetKeyLabelSource
+    created_at: datetime
+    updated_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at, self.updated_at)
+        if not self.key:
+            raise ValueError("Target key label key must not be empty.")
+        if self.label is not None and not self.label.strip():
+            raise ValueError("A target key label must be absent or non-empty.")
+        if any(not value.strip() for value in self.aliases):
+            raise ValueError("Target key label aliases must not be empty.")
+        if len(set(self.aliases)) != len(self.aliases):
+            raise ValueError("Target key label aliases must be unique.")
+        if self.label is None and not self.aliases:
+            raise ValueError("A target key label must carry a label or aliases.")
+
+
+@dataclass(frozen=True, slots=True)
+class TargetKeyEmbedding:
+    """Derived vector of one key's embedded text, rebuildable from the catalog."""
+
+    profile_id: str
+    target_type: EvidenceTargetType
+    key: str
+    model_id: str
+    text_hash: str
+    vector: tuple[float, ...]
+    created_at: datetime
+
+    def __post_init__(self) -> None:
+        _require_utc_aware(self.created_at)
+        if not self.key or not self.model_id or not self.text_hash:
+            raise ValueError("Target key embedding identity fields must not be empty.")
+        if not self.vector:
+            raise ValueError("Target key embedding vector must not be empty.")
+
+    @property
+    def dim(self) -> int:
+        return len(self.vector)
 
 
 @dataclass(frozen=True, slots=True)

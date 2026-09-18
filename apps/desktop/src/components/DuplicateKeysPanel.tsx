@@ -26,7 +26,11 @@ function aliasId(alias: KeyAlias): string {
 
 function describe(alias: KeyAlias): string {
   const relation = alias.polarity === -1 ? "opposite of" : "same as";
-  return `${humanizeKey(alias.alias_key)} → ${relation} ${humanizeKey(alias.canonical_key)}`;
+  const pair = `${humanizeKey(alias.alias_key)} → ${relation} ${humanizeKey(alias.canonical_key)}`;
+  // Only similar wording proposed a semantic alias, so say so before a merge.
+  if (alias.method !== "semantic" || alias.similarity === null) return pair;
+  const percent = Math.round(alias.similarity * 100).toString();
+  return `${pair} (similar wording, ${percent}% alike)`;
 }
 
 export function DuplicateKeysPanel({

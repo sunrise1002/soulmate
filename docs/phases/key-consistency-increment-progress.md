@@ -123,6 +123,74 @@ documentation. Authoritative documents stay
   fakes: `httpx.MockTransport` for downloads, a fake session loader for the
   adapter, and a synthetic artifact pinned into `MODEL_ARTIFACTS` by monkeypatch.
 
+### P5 (2026-09-18) — labels, key vectors, semantic retrieval and suggestions
+
+- Kernel: `soulmate_core/keys/semantics.py` with `key_embedding_text`
+  (dotted segments as words, then `" | "` and the owner label and catalog
+  aliases), `key_text_hash`, `cosine_similarity`, `semantic_key_scores`,
+  `EmbeddedKey`, `SemanticAliasProposal`, and `propose_semantic_aliases`
+  (`SEMANTIC_ALIAS_VERSION = "semantic-alias-v1:key-text-v1"`,
+  `DEFAULT_SEMANTIC_ALIAS_THRESHOLD = 0.85`, limit 20). Suggestions are always
+  `suggested` with polarity `+1`; the earlier-used key is canonical; a key with an
+  alias row of **any** status is skipped; pairs with equal normalized forms are
+  left to the normalized rule; each key takes part in at most one suggestion per
+  run; target types are never crossed.
+- Kernel: `select_known_keys(..., semantic_scores=Mapping[str, float] | None)`
+  adds `semantic_weight * similarity` (weight 3.0, floor 0.3, both on
+  `KeySelectionPolicy`) to the existing recency (4), word overlap (2), and domain
+  (1) signals. Scores are floats now. An empty mapping reproduces step A exactly.
+- Kernel: `TargetKeyLabel` + `TargetKeyLabelSource` and `TargetKeyEmbedding`
+  (with a derived `dim`) in `domain/models.py`; `TargetKeyCatalogRepository` and
+  `TargetKeyEmbeddingRepository` ports (`replace_many`, `list_for_model`,
+  `remove_other_models`).
+- Storage: `soulmate_storage_sqlite/key_metadata.py` with
+  `SqliteTargetKeyCatalogRepository` and `SqliteTargetKeyEmbeddingRepository` as
+  `Repositories.key_catalog` and `Repositories.key_embeddings`, over the existing
+  `0011` tables (**no migration change**). Vectors are `struct.pack("<{n}f")`, so
+  a database file stays portable. An `extracted` label never replaces an `owner`
+  label, and `created_at` is preserved across upserts.
+- Daemon: `soulmate_daemon/extraction.py` gained `LabelledProposal` with optional
+  `label` and comma-separated `aliases` (both required strings in the portable
+  wire schema, both may be empty), `KEY_LABEL_RULES` in the extraction prompt, and
+  `ReviewedEvidence.labels`. Labels travel only with accepted evidence, so a
+  rejected sensitive claim leaves no wording behind; at most 5 aliases, trimmed
+  and deduplicated, and an alias equal to the label is dropped.
+- Daemon: `soulmate_daemon/key_semantics.py` with `KeySemanticsService`
+  (`ready`, `model_id`, `query_scores`, `refresh`), `key_semantics_service`,
+  `enqueue_key_embedding_refresh`, `refresh_from_payload`,
+  `KEY_EMBEDDING_REFRESH_JOB`, and `KEY_EMBEDDING_INTERVAL_SECONDS`.
+  `refresh` embeds only keys whose text hash changed, in batches of 32, then calls
+  `remove_other_models` and proposes suggestions. Every
+  `EmbeddingUnavailableError` (and a provider returning the wrong number of
+  vectors) results in zero writes, a `release()`, and no raised error.
+- Daemon: `create_app(..., embeddings=EmbeddingProvider | None)` injects a
+  provider for tests; `AppState` gained `key_semantics` (None when
+  `embedding.provider == "none"` and no provider was injected). A
+  `soulmate-key-embedding-scheduler` task calls `enqueue_key_embedding_refresh`
+  every 60 s; the job id is
+  `job_key_embeddings_{profile}_{model_id}_{evidence_revision}`, so new evidence
+  and a newly installed or changed model each queue exactly one refresh and a
+  repeated check is free. Nothing is queued while no model is installed, so
+  polling can never trigger a download.
+- Daemon: `ConversationService` gained `catalog` and `semantics` keywords (both
+  optional, both default `None`); it writes `reviewed.labels` and passes semantic
+  scores into `select_known_keys`. `DecisionService` gained `semantics` for the
+  natural-decision path.
+- Config: `key_aliases.semantic_threshold` (default 0.85, 0.5–1.0), documented in
+  `config.example.toml`.
+- Clients: `DuplicateKeysPanel` and the web `DuplicateKeys` screen now state why a
+  semantic pair was suggested ("similar wording, 92% alike"); nothing else
+  changed, because P3 already rendered `suggested` aliases with
+  approve/invert/reject.
+- Tests: `tests/key_embedding_support.py` (a deterministic concept embedder shared
+  by unit and integration tests; `tests/__init__.py` was added so both packages can
+  import it and mypy resolves one module name), `tests/unit/test_key_semantics.py`
+  (42), `tests/unit/test_key_semantics_service.py` (31),
+  `tests/integration/test_key_metadata_persistence.py` (19), label cases in
+  `test_extraction.py`, semantic cases in `test_key_selection.py`, three cases in
+  `tests/integration/test_key_selection_flow.py` (including the P5 verification),
+  and client cases in `DuplicateKeysPanel.test.tsx` and `DuplicateKeys.test.tsx`.
+
 ### P0 (2026-09-18) — spike, ADR-016, owner decision
 
 Full detail in the [P0 spike report](key-consistency-p0-spike-report.md); only
@@ -144,17 +212,19 @@ what P4/P5 must act on is repeated here.
 
 ## Not done
 
-- P5: extraction `label`/`aliases` fields, catalog and embedding repositories and
-  domain records, backfill job, semantic scoring, **semantic alias suggestions**
-  (the review UI already renders `suggested` aliases and sends
-  approve/invert/reject, so P5 only has to create the rows). Nothing calls
-  `embedding_provider(settings)` yet — P4 only built it.
 - P6: sidecar packaging (`onnxruntime`, `tokenizers`, `numpy` in `uv.lock`), size
   check, smoke test against the real artifact, final documentation. **No client
   UI exists for the model yet**: the API is complete and owner-only, but the
   TypeScript SDK has no `embeddingModel*` methods and no screen shows the
-  download button, size, memory warning, or progress. That UI is unassigned in
-  the plan; P5 or P6 should take it.
+  download button, size, memory warning, or progress. P5 left this to P6 on
+  purpose, because it needs the real artifact to be meaningful.
+- P6 also owns the **owner-editable key label**: `target_key_catalog` accepts
+  `label_source = "owner"` and the repository protects such a label from later
+  extraction, but no API or screen writes one yet. Only extraction fills labels
+  today, and labels are a quality improvement, not a prerequisite (P0 decision 4).
+- Not planned in this increment: `numpy` brute-force scoring. `query_scores` uses
+  pure Python dot products, which is fine for the hundreds of keys measured here;
+  revisit it only with a real model and a key set in the thousands.
 
 ## Decisions that later steps must honor
 
@@ -192,6 +262,21 @@ what P4/P5 must act on is repeated here.
   code and the report in sync; P6 must download the real files once and confirm
   both hashes before release.
 
+- From P5: the embedded text of a key is
+  `key_embedding_text(key, label, aliases)` and its `text_hash` decides whether a
+  vector is stale. Changing that function invalidates every stored vector, so bump
+  `KEY_EMBEDDING_TEXT_VERSION` and let the job recompute instead of migrating rows.
+- From P5: embedding work is queued, never inline. Only
+  `enqueue_key_embedding_refresh` creates the job, it refuses to queue while no
+  model is installed, and the job id carries the evidence revision and the model
+  id. Do not call `KeySemanticsService.refresh` from a request handler.
+- From P5: `query_scores` and `refresh` must stay silent on failure. Both return
+  empty results on `EmbeddingUnavailableError`, which is what keeps step A as the
+  fallback; do not turn either into an HTTP error.
+- From P5: semantic aliases are written only as `suggested`, and only
+  `KeyAliasService` (owner review) may make one active. `propose_semantic_aliases`
+  never sets polarity `-1`; the owner's "merge as opposite" action does.
+
 - From P1/P2: evidence is never rewritten; polarity `-1` only for preferences; a
   `semantic` alias needs `similarity`; `upsert` rejects active cycles, keeps the
   first `created_at`, and bumps the evidence revision on every write; pruning
@@ -215,9 +300,9 @@ what P4/P5 must act on is repeated here.
 - Handled in P4: `ARCHIVE_DIRECTORIES` no longer includes `models`, so artifacts
   stay out of the 512 MB archive cap. An archive written before P4 that contains
   `models/` entries is now rejected on restore; no such archive should exist.
-- Catalog and embedding rows still have no repository or domain record. P5 should
-  use the existing `0011` columns; amend `0011` only if no user database has it
-  yet — otherwise stop and ask the owner, because `0012` belongs to Phase 13.
+- Handled in P5: catalog and embedding rows now have repositories and domain
+  records over the unchanged `0011` columns. `0011` was **not** amended, and `0012`
+  still belongs to Phase 13.
 - A decision option key that no evidence uses is matched by normalization at
   prediction time but stores no alias until the decision is resolved. If P5 wants
   the alias earlier, add it where options are created, and remember pruning
@@ -229,7 +314,13 @@ what P4/P5 must act on is repeated here.
 - Tests that construct daemon services must pass `aliases=repositories.key_aliases`
   (the keyword is required); passing `None` produces snapshots with a different
   algorithm version, which the daemon then rebuilds.
-- `pytest-cov` is not installed, so P0 to P4 still have no coverage number.
+- P5 added `tests/__init__.py`. Without it, mypy sees
+  `tests/key_embedding_support.py` under two module names and stops checking.
+- No real embedding model has run yet, in any step. Every P5 number comes from the
+  P0 spike or from `FakeConceptEmbedding`, which is deliberately built so opposite
+  concepts stay close; treat the semantic weight (3.0) and floor (0.3) in
+  `KeySelectionPolicy` as unmeasured against real vectors, and re-run the P0
+  harness in P6 before defending them.
 - The real `_OnnxSession` in `soulmate_daemon/embeddings.py` has no automated
   test: `numpy`, `onnxruntime`, and `tokenizers` are not installed, so mypy skips
   them through a `pyproject.toml` override and every test injects a fake loader.
@@ -261,7 +352,9 @@ uv run --locked pytest
 pnpm check
 ```
 
-Result for P4: `pnpm check` passed locally (582 Python tests, 50 SDK, 18 desktop,
-27 web, 27 mobile client tests, 7 Rust tests), with `ruff`, `ruff format`, and
-strict `mypy` clean. `pnpm check:all` (lockfile check, pre-commit, builds) was
-not run in P3 or P4.
+Result for P5: `pnpm check` passed locally (698 Python tests, 50 SDK, 20 desktop,
+28 web, 27 mobile client tests, 7 Rust tests), with `ruff`, `ruff format`, and
+strict `mypy` clean. P4 passed the same gate with 582 Python tests.
+`pnpm check:all` (lockfile check, pre-commit, builds) was not run in P3, P4, or
+P5, and `pytest-cov` is still not installed, so the increment has no coverage
+number.

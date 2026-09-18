@@ -160,6 +160,7 @@ class KeyAliasesConfig(ConfigModel):
     """Canonical target key aliases; disabling them rebuilds from original keys."""
 
     enabled: bool = True
+    semantic_threshold: float = Field(default=0.85, ge=0.5, le=1.0)
 
 
 class Settings(ConfigModel):

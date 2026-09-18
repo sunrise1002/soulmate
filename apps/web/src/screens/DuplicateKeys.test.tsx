@@ -153,6 +153,31 @@ describe("duplicate keys review", () => {
     ).toHaveLength(1);
   });
 
+  it("explains a semantic suggestion with its similarity", async () => {
+    // Given: a suggestion that only similar wording produced, and an automatic one
+    const { client } = clientFor({
+      enabled: true,
+      aliases: [
+        alias({
+          alias_key: "appearance.night",
+          method: "semantic",
+          status: "suggested",
+          similarity: 0.917,
+        }),
+        alias({}),
+      ],
+    });
+
+    // When: the review renders
+    render(<DuplicateKeys client={client} onChanged={vi.fn()} />);
+
+    // Then: only the semantic pair claims a similarity
+    expect(
+      await screen.findByText(/Similar wording, 92% alike/i),
+    ).not.toBeNull();
+    expect(screen.getAllByText(/Similar wording/i)).toHaveLength(1);
+  });
+
   it("is read-only when key merging is disabled", async () => {
     // Given: aliases disabled by configuration
     const { client } = clientFor({ enabled: false, aliases: [alias({})] });
