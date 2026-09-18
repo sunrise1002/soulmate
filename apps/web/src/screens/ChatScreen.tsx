@@ -1,5 +1,28 @@
-import { useEffect, useState } from "react";
-import type { Conversation, Message, SoulmateClient } from "@soulmate/sdk";
+import { useCallback, useEffect, useState } from "react";
+import type {
+  Conversation,
+  LearningStatus,
+  Message,
+  SoulmateClient,
+} from "@soulmate/sdk";
+
+export const LEARNING_POLL_MS = 5000;
+
+const LEARNING_LABELS: Record<LearningStatus, string> = {
+  pending: "Learning…",
+  retrying: "Model provider busy, retrying…",
+  learned: "Learned",
+  no_evidence: "Nothing new to learn",
+  failed: "Learning failed",
+};
+
+function learningActive(messages: Message[]) {
+  return messages.some(
+    (message) =>
+      message.learning?.status === "pending" ||
+      message.learning?.status === "retrying",
+  );
+}
 
 interface Props {
   client: SoulmateClient;
@@ -13,19 +36,57 @@ export function ChatScreen({ client, onAuthError }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [learningNotice, setLearningNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
+  const reload = useCallback(
+    (id: string | null) =>
+      client
+        .conversations()
+        .then((conversations: Conversation[]) => {
+          const current =
+            conversations.find((item) => item.id === id) ?? conversations[0];
+          if (current !== undefined) {
+            setConversationId(current.id);
+            setMessages(current.messages);
+          }
+        })
+        .catch(onAuthError),
+    [client, onAuthError],
+  );
+
+  useEffect(() => void reload(null), [reload]);
+
+  const polling = learningActive(messages);
   useEffect(() => {
-    client
-      .conversations()
-      .then((conversations: Conversation[]) => {
-        const latest = conversations[0];
-        if (latest !== undefined) {
-          setConversationId(latest.id);
-          setMessages(latest.messages);
-        }
-      })
-      .catch(onAuthError);
-  }, [client, onAuthError]);
+    if (!polling) return;
+    const timer = window.setInterval(
+      () => void reload(conversationId),
+      LEARNING_POLL_MS,
+    );
+    return () => window.clearInterval(timer);
+  }, [polling, conversationId, reload]);
+
+  const retryLearning = async (messageId: string) => {
+    setRetryingId(messageId);
+    setError(null);
+    try {
+      const learning = await client.retryLearning(messageId);
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId ? { ...message, learning } : message,
+        ),
+      );
+    } catch (caught) {
+      onAuthError(caught);
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Learning could not be retried.",
+      );
+    } finally {
+      setRetryingId(null);
+    }
+  };
 
   const send = async () => {
     setPending(true);
@@ -55,6 +116,7 @@ export function ChatScreen({ client, onAuthError }: Props) {
         );
       }
       setDraft("");
+      await reload(response.conversation_id);
     } catch (caught) {
       onAuthError(caught);
       setError(
@@ -75,6 +137,20 @@ export function ChatScreen({ client, onAuthError }: Props) {
           <li key={message.id} className={message.role}>
             <span className="role">{message.role}</span>
             <p>{message.content}</p>
+            {message.learning ? (
+              <p className={`learning ${message.learning.status}`}>
+                {LEARNING_LABELS[message.learning.status]}
+                {message.learning.status === "failed" && (
+                  <button
+                    type="button"
+                    disabled={retryingId === message.id}
+                    onClick={() => void retryLearning(message.id)}
+                  >
+                    Retry learning
+                  </button>
+                )}
+              </p>
+            ) : null}
           </li>
         ))}
       </ol>

@@ -106,6 +106,52 @@ describe("SoulmateClient", () => {
     );
   });
 
+  it("retries failed learning for an escaped message id", async () => {
+    // Given: a daemon that requeues the learning
+    const learning = {
+      message_id: "message/1",
+      status: "pending",
+      attempts: 0,
+      max_attempts: 8,
+    };
+    const { fetch, calls } = stub(200, learning);
+    const client = new SoulmateClient({
+      baseUrl: "https://192.168.1.20:7433",
+      fetch,
+    });
+
+    // When: learning is retried
+    const result = await client.retryLearning("message/1");
+
+    // Then: the POST targets the escaped path and returns the new status
+    expect(result).toEqual(learning);
+    expect(calls[0]?.init?.method).toBe("POST");
+    expect(calls[0]?.url).toBe(
+      "https://192.168.1.20:7433/v1/messages/message%2F1/learning/retry",
+    );
+  });
+
+  it("surfaces a rejected learning retry as an ApiError", async () => {
+    // Given: learning that has not failed
+    const { fetch } = stub(409, {
+      detail: "Only failed learning can be retried.",
+    });
+    const client = new SoulmateClient({
+      baseUrl: "https://192.168.1.20:7433",
+      fetch,
+    });
+
+    // When: learning is retried
+    const attempt = client.retryLearning("message_1");
+
+    // Then: the status and daemon detail are preserved
+    await expect(attempt).rejects.toBeInstanceOf(ApiError);
+    await expect(attempt).rejects.toMatchObject({
+      status: 409,
+      message: "Only failed learning can be retried.",
+    });
+  });
+
   it("escapes identifiers used in paths", async () => {
     // Given: an identifier containing path characters
     const { fetch, calls } = stub(200, []);

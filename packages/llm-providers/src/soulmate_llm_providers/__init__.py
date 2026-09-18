@@ -7,6 +7,7 @@ from soulmate_llm_providers.interface import (
     LLMProvider,
     ProviderCapabilities,
     ProviderError,
+    ProviderUnavailableError,
     StructuredOutputMode,
 )
 from soulmate_llm_providers.policy import (
@@ -28,5 +29,6 @@ __all__ = [
     "PrivacyMode",
     "ProviderCapabilities",
     "ProviderError",
+    "ProviderUnavailableError",
     "StructuredOutputMode",
 ]

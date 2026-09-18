@@ -104,3 +104,16 @@ button:disabled {
 [role="alert"] {
   color: #b3261e;
 }
+
+.messages .learning {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  opacity: 0.75;
+}
+
+.messages .learning.failed {
+  color: #b3261e;
+  opacity: 1;
+}

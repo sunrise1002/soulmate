@@ -238,6 +238,10 @@ class JobRepository(Protocol):
         retry_at: datetime | None = None,
     ) -> None: ...
 
+    def requeue_failed(self, job_id: str, now: datetime) -> bool:
+        """Give an exhausted job a fresh attempt budget; ``False`` unless it had failed."""
+        ...
+
 
 class PairingTokenRepository(Protocol):
     def add(self, token: PairingToken) -> None: ...

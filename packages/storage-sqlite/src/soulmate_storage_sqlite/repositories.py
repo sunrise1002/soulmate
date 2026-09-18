@@ -1367,6 +1367,23 @@ class SqliteJobRepository:
             row.last_error = error
             row.updated_at = failed_at
 
+    def requeue_failed(self, job_id: str, now: datetime) -> bool:
+        with self._sessions.begin() as session:
+            updated_id = session.execute(
+                update(JobRow)
+                .where(JobRow.id == job_id, JobRow.status == JobStatus.FAILED.value)
+                .values(
+                    status=JobStatus.QUEUED.value,
+                    attempts=0,
+                    available_at=now,
+                    locked_at=None,
+                    last_error=None,
+                    updated_at=now,
+                )
+                .returning(JobRow.id)
+            ).scalar_one_or_none()
+            return updated_id is not None
+
     def _finish(self, job_id: str, now: datetime, status: JobStatus, error: str | None) -> None:
         with self._sessions.begin() as session:
             updated_id = session.execute(

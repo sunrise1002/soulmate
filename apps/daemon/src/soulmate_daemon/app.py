@@ -23,12 +23,18 @@ from soulmate_core.domain import (
     DecisionResolution,
     Evidence,
     EvidenceTargetType,
+    MessageRole,
     Preference,
     RawEvent,
 )
 from soulmate_core.embeddings import EmbeddingProvider
 from soulmate_core.learning import rank_uncertainties
-from soulmate_llm_providers import EgressDeniedError, LLMProvider, ProviderError
+from soulmate_llm_providers import (
+    EgressDeniedError,
+    LLMProvider,
+    ProviderError,
+    ProviderUnavailableError,
+)
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
@@ -41,7 +47,11 @@ from soulmate_daemon.active_learning import ActiveAnswerResult, ActiveLearningSe
 from soulmate_daemon.config import Settings
 from soulmate_daemon.connector_api import build_connector_router
 from soulmate_daemon.connectors import CONNECTOR_SYNC_JOB, ConnectorService
-from soulmate_daemon.conversation import CONVERSATION_EXTRACTION_JOB, ConversationService
+from soulmate_daemon.conversation import (
+    CONVERSATION_EXTRACTION_JOB,
+    EXTRACTION_RETRY_DELAY,
+    ConversationService,
+)
 from soulmate_daemon.data_api import build_data_router
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
 from soulmate_daemon.delegation_api import build_delegation_router
@@ -63,6 +73,11 @@ from soulmate_daemon.key_semantics import (
     enqueue_key_embedding_refresh,
     key_semantics_service,
     refresh_from_payload,
+)
+from soulmate_daemon.learning_api import (
+    MessageLearningResponse,
+    build_learning_router,
+    message_learning,
 )
 from soulmate_daemon.network import (
     LanEndpoint,
@@ -171,6 +186,7 @@ class MessageResponse(BaseModel):
     content: str
     provider_model: str | None
     created_at: datetime
+    learning: MessageLearningResponse | None = None
 
 
 class ConversationResponse(BaseModel):
@@ -737,7 +753,7 @@ def create_app(
         worker = DurableJobWorker(
             repositories.jobs,
             handlers,
-            retry_delays={CONVERSATION_EXTRACTION_JOB: timedelta(seconds=30)},
+            retry_delays={CONVERSATION_EXTRACTION_JOB: EXTRACTION_RETRY_DELAY},
         )
         worker_task = asyncio.create_task(worker.run(stop), name="soulmate-durable-worker")
         scheduler_task: asyncio.Task[None] | None = None
@@ -1025,6 +1041,21 @@ def create_app(
         records: tuple[Conversation, ...] = repositories.conversations.list_for_profile(
             DEFAULT_PROFILE_ID
         )
+        messages = {
+            conversation.id: repositories.messages.list_for_conversation(conversation.id)
+            for conversation in records
+        }
+        learning = message_learning(
+            repositories.jobs,
+            repositories.evidence,
+            DEFAULT_PROFILE_ID,
+            (
+                message.id
+                for items in messages.values()
+                for message in items
+                if message.role is MessageRole.USER
+            ),
+        )
         return [
             ConversationResponse(
                 id=conversation.id,
@@ -1037,8 +1068,9 @@ def create_app(
                         content=message.content,
                         provider_model=message.provider_model,
                         created_at=message.created_at,
+                        learning=learning.get(message.id),
                     )
-                    for message in repositories.messages.list_for_conversation(conversation.id)
+                    for message in messages[conversation.id]
                 ],
             )
             for conversation in records
@@ -1382,6 +1414,11 @@ def create_app(
             raise HTTPException(
                 status_code=403, detail="The configured privacy mode denied model egress."
             ) from exc
+        except ProviderUnavailableError as exc:
+            raise HTTPException(
+                status_code=503,
+                detail="The model provider is busy or unreachable. Try again shortly.",
+            ) from exc
         except ProviderError as exc:
             raise HTTPException(
                 status_code=502, detail="The model provider request failed."
@@ -1414,6 +1451,7 @@ def create_app(
     app.include_router(build_delegation_router(app))
     app.include_router(build_key_alias_router(app))
     app.include_router(build_key_label_router(app))
+    app.include_router(build_learning_router(app))
     app.include_router(build_embedding_router(app))
     mount_web_client(app, resolved_settings.web_client_directory)
     return app

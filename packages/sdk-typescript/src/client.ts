@@ -54,6 +54,7 @@ import type {
   KeyAliasReviewAction,
   KeyLabel,
   KeyLabelList,
+  MessageLearning,
   EmbeddingModel,
   RestoreStaged,
   RemoteBackup,
@@ -321,6 +322,14 @@ export class SoulmateClient {
       content,
       conversation_id: conversationId ?? null,
     });
+  }
+
+  /** Queue failed background learning from one user message again. */
+  retryLearning(messageId: string): Promise<MessageLearning> {
+    return this.request<MessageLearning>(
+      "POST",
+      `/v1/messages/${encodeURIComponent(messageId)}/learning/retry`,
+    );
   }
 
   decisionHistory(): Promise<DecisionHistoryItem[]> {

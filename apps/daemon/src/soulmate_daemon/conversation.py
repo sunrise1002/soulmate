@@ -40,6 +40,10 @@ from soulmate_daemon.key_semantics import KeySemanticsService
 
 CONVERSATION_EXTRACTION_JOB = "conversation_evidence_extract"
 EXTRACTION_INITIAL_DELAY = timedelta(seconds=1)
+# With the worker's doubling 30 s backoff capped at 15 min, eight attempts ride
+# out roughly 45 minutes of provider overload before learning gives up.
+EXTRACTION_MAX_ATTEMPTS = 8
+EXTRACTION_RETRY_DELAY = timedelta(seconds=30)
 RECENT_USER_TURNS = 2
 
 CHAT_SYSTEM_PROMPT = """You are Soulmate, a personal assistant.
@@ -51,6 +55,11 @@ return empty lists when nothing is stated. Preference values range from -1 (stro
 (strong preference). Do not infer sensitive claims.
 {KEY_REUSE_RULES}
 {KEY_LABEL_RULES}"""
+
+
+def extraction_job_id(message_id: str) -> str:
+    """Return the durable job identity that learns from one user message."""
+    return f"job_extract_{message_id}"
 
 
 @dataclass(frozen=True, slots=True)
@@ -176,7 +185,7 @@ class ConversationService:
             raise RuntimeError("A job repository is required for deferred conversation learning.")
         self._jobs.enqueue(
             Job(
-                id=f"job_extract_{source_message_id}",
+                id=extraction_job_id(source_message_id),
                 job_type=CONVERSATION_EXTRACTION_JOB,
                 payload={
                     "profile_id": profile_id,
@@ -185,7 +194,7 @@ class ConversationService:
                 },
                 status=JobStatus.QUEUED,
                 attempts=0,
-                max_attempts=3,
+                max_attempts=EXTRACTION_MAX_ATTEMPTS,
                 available_at=created_at + EXTRACTION_INITIAL_DELAY,
                 created_at=created_at,
                 updated_at=created_at,

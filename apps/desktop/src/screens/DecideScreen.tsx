@@ -22,6 +22,9 @@ interface DecideScreenProps {
   onDecisionSaved: () => void;
 }
 
+export const NO_PREFERENCE_NOTICE =
+  "None of your learned preferences apply to these options yet, so this ranking is close to chance. Tell Soulmate what you prefer in Chat, or record what you choose below.";
+
 function newOption(index: number): DraftOption {
   return {
     key: crypto.randomUUID(),
@@ -172,6 +175,11 @@ export function DecideScreen({ onDecisionSaved }: DecideScreenProps) {
             {percentage(prediction.ranking[0]?.probability ?? 0)} likelihood ·{" "}
             {percentage(prediction.confidence)} confidence
           </p>
+          {prediction.important_factors.length === 0 ? (
+            <div className="inline-notice" role="status">
+              {NO_PREFERENCE_NOTICE}
+            </div>
+          ) : null}
         </div>
         <div className="result-grid">
           <article className="card ranking-card">

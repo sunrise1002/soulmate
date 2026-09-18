@@ -10,6 +10,10 @@ class ProviderError(RuntimeError):
     """A provider request or response failed without exposing private payloads."""
 
 
+class ProviderUnavailableError(ProviderError):
+    """The provider is temporarily overloaded or unreachable; retry the same request later."""
+
+
 class StructuredOutputMode(StrEnum):
     """Provider strategies ordered from strongest to most portable."""
 

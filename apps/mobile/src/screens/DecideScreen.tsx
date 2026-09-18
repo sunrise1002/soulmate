@@ -9,6 +9,9 @@ import type {
 
 import { styles } from "../theme.ts";
 
+export const NO_PREFERENCE_NOTICE =
+  "None of your learned preferences apply to these options yet, so this ranking is close to chance. Tell Soulmate what you prefer in Chat, or record what you choose.";
+
 interface Props {
   client: SoulmateClient;
   onError: (error: unknown) => void;
@@ -107,6 +110,11 @@ export function DecideScreen({ client, onError }: Props) {
           <Text style={styles.hint}>
             Confidence {(prediction.confidence * 100).toFixed(0)}%
           </Text>
+          {prediction.important_factors.length === 0 && (
+            <Text accessibilityRole="alert" style={styles.hint}>
+              {NO_PREFERENCE_NOTICE}
+            </Text>
+          )}
           {prediction.ranking.map((item) => (
             <Button
               disabled={resolved}

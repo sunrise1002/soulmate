@@ -9,11 +9,15 @@ from soulmate_llm_providers.interface import (
     LLMMessage,
     ProviderCapabilities,
     ProviderError,
+    ProviderUnavailableError,
     StructuredOutputMode,
 )
 from soulmate_llm_providers.policy import EgressPolicy
 
-_STRUCTURED_NEGOTIATION_STATUSES = {400, 404, 415, 422, 500, 501, 502, 503, 504}
+_STRUCTURED_NEGOTIATION_STATUSES = {400, 404, 415, 422, 500, 501, 502}
+# Overload and timeout statuses say nothing about format support, so a weaker
+# structured mode would only fail the same way; the caller retries later instead.
+_TRANSIENT_STATUSES = {408, 429, 503, 504}
 
 
 def _messages(messages: Sequence[LLMMessage]) -> list[dict[str, str]]:
@@ -74,6 +78,10 @@ class _ProviderHTTPError(ProviderError):
         self.status_code = status_code
 
 
+class _ProviderUnavailableHTTPError(_ProviderHTTPError, ProviderUnavailableError):
+    pass
+
+
 class _HttpProvider:
     def __init__(
         self,
@@ -108,7 +116,12 @@ class _HttpProvider:
                 raise ValueError
             return result
         except httpx.HTTPStatusError as exc:
-            raise _ProviderHTTPError(exc.response.status_code) from exc
+            status_code = exc.response.status_code
+            if status_code in _TRANSIENT_STATUSES:
+                raise _ProviderUnavailableHTTPError(status_code) from exc
+            raise _ProviderHTTPError(status_code) from exc
+        except (httpx.TimeoutException, httpx.NetworkError) as exc:
+            raise ProviderUnavailableError("Model provider is temporarily unavailable.") from exc
         except (httpx.HTTPError, ValueError) as exc:
             raise ProviderError("Model provider request failed.") from exc
 
@@ -294,6 +307,8 @@ class OpenAICompatibleProvider(_HttpProvider):
                 if exc.status_code not in _STRUCTURED_NEGOTIATION_STATUSES:
                     raise
                 continue
+            except ProviderUnavailableError:
+                raise
             except ProviderError as exc:
                 last_error = exc
                 continue

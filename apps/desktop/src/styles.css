@@ -1647,3 +1647,17 @@ select {
   flex-direction: column;
   gap: 5px;
 }
+.learning-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.learning-status.failed {
+  color: var(--red);
+}
+.learning-status .text-button {
+  font-size: 11px;
+}

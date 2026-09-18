@@ -273,12 +273,24 @@ export interface ModelSummary {
   constraint_count: number;
 }
 
+export type LearningStatus =
+  "pending" | "retrying" | "learned" | "no_evidence" | "failed";
+
+/** Background learning from one user message; absent when none was queued. */
+export interface MessageLearning {
+  message_id: string;
+  status: LearningStatus;
+  attempts: number;
+  max_attempts: number;
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   provider_model: string | null;
   created_at: string;
+  learning?: MessageLearning | null;
 }
 
 export interface Conversation {

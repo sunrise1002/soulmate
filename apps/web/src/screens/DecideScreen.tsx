@@ -6,6 +6,9 @@ import type {
   SoulmateClient,
 } from "@soulmate/sdk";
 
+export const NO_PREFERENCE_NOTICE =
+  "None of your learned preferences apply to these options yet, so this ranking is close to chance. Tell Soulmate what you prefer in Chat, or record what you choose.";
+
 interface Props {
   client: SoulmateClient;
   onAuthError: (error: unknown) => void;
@@ -136,6 +139,9 @@ export function DecideScreen({ client, onAuthError }: Props) {
           <p className="hint">
             Confidence {(prediction.confidence * 100).toFixed(0)}%
           </p>
+          {prediction.important_factors.length === 0 && (
+            <p role="status">{NO_PREFERENCE_NOTICE}</p>
+          )}
           <ul>
             {prediction.ranking.map((item) => (
               <li key={item.option_id}>
