@@ -25,6 +25,8 @@ from soulmate_daemon.connectors import credential_environment_name
 from soulmate_daemon.system import DEFAULT_PROFILE_ID
 from sqlalchemy import text
 
+from .key_alias_support import alias
+
 pytestmark = pytest.mark.integration
 OWNER_CLIENT = ("127.0.0.1", 50000)
 REMOTE_CLIENT = ("192.168.1.50", 51000)
@@ -164,9 +166,12 @@ def test_local_notes_sync_is_idempotent_persistent_and_provenance_deletable(
                 created_at=now,
             )
         )
-        ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-            DEFAULT_PROFILE_ID, now
+        repositories.key_aliases.upsert(
+            alias("work.focus", "work.deep_focus", profile_id=DEFAULT_PROFILE_ID)
         )
+        ModelRebuilder(
+            repositories.evidence, repositories.personal_models, repositories.key_aliases
+        ).rebuild(DEFAULT_PROFILE_ID, now)
 
     restarted = create_app(settings)
     with _owner(restarted) as owner:
@@ -186,6 +191,8 @@ def test_local_notes_sync_is_idempotent_persistent_and_provenance_deletable(
         assert _raw_events(restarted) == []
         assert owner.get("/v1/connectors").json() == []
         assert owner.get("/v1/preferences/work.focus/evidence").json() == []
+        runtime_repositories = restarted.state.runtime["repositories"]
+        assert runtime_repositories.key_aliases.list_for_profile(DEFAULT_PROFILE_ID) == ()
 
 
 def test_connector_management_is_owner_only(tmp_path: Path) -> None:

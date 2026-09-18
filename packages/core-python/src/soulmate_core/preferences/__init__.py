@@ -6,10 +6,11 @@ from soulmate_core.preferences.aggregation import (
     EvidenceWeightingStrategy,
     aggregate_evidence,
 )
-from soulmate_core.preferences.service import ModelRebuilder
+from soulmate_core.preferences.service import ALIASED_ALGORITHM_VERSION, ModelRebuilder
 
 __all__ = [
     "ALGORITHM_VERSION",
+    "ALIASED_ALGORITHM_VERSION",
     "DEFAULT_WEIGHTING_STRATEGY",
     "EvidenceWeightingStrategy",
     "ModelRebuilder",

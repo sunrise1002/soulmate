@@ -25,6 +25,7 @@ import type {
   DelegationRequest,
   DelegationRequestInput,
   Evidence,
+  EvidenceTargetType,
   ExternalDecision,
   ExternalDecisionInput,
   ExternalOutcome,
@@ -46,6 +47,14 @@ import type {
   IssuedApiCredential,
   IssuedServiceIdentity,
   ImportFormat,
+  KeyAlias,
+  KeyAliasChange,
+  KeyAliasList,
+  KeyAliasRemoval,
+  KeyAliasReviewAction,
+  KeyLabel,
+  KeyLabelList,
+  EmbeddingModel,
   RestoreStaged,
   RemoteBackup,
   RemoteBackupStatus,
@@ -203,6 +212,104 @@ export class SoulmateClient {
       value,
       context,
     });
+  }
+
+  /** List key aliases; owner-only, so paired devices receive 403. */
+  keyAliases(): Promise<KeyAliasList> {
+    return this.request<KeyAliasList>("GET", "/v1/key-aliases");
+  }
+
+  mergeKeys(
+    targetType: EvidenceTargetType,
+    aliasKey: string,
+    canonicalKey: string,
+    polarity: KeyAlias["polarity"] = 1,
+  ): Promise<KeyAliasChange> {
+    return this.request<KeyAliasChange>("POST", "/v1/key-aliases", {
+      target_type: targetType,
+      alias_key: aliasKey,
+      canonical_key: canonicalKey,
+      polarity,
+    });
+  }
+
+  reviewKeyAlias(
+    alias: Pick<KeyAlias, "target_type" | "alias_key">,
+    action: KeyAliasReviewAction,
+  ): Promise<KeyAliasChange> {
+    return this.request<KeyAliasChange>("POST", "/v1/key-aliases/review", {
+      target_type: alias.target_type,
+      alias_key: alias.alias_key,
+      action,
+    });
+  }
+
+  removeKeyAlias(
+    alias: Pick<KeyAlias, "target_type" | "alias_key">,
+  ): Promise<KeyAliasRemoval> {
+    return this.request<KeyAliasRemoval>("POST", "/v1/key-aliases/remove", {
+      target_type: alias.target_type,
+      alias_key: alias.alias_key,
+    });
+  }
+
+  /** List owner-language key names; owner-only, so paired devices receive 403. */
+  keyLabels(): Promise<KeyLabelList> {
+    return this.request<KeyLabelList>("GET", "/v1/key-labels");
+  }
+
+  setKeyLabel(
+    targetType: EvidenceTargetType,
+    key: string,
+    label: string | null,
+    aliases: string[] = [],
+  ): Promise<KeyLabel> {
+    return this.request<KeyLabel>("POST", "/v1/key-labels", {
+      target_type: targetType,
+      key,
+      label,
+      aliases,
+    });
+  }
+
+  async removeKeyLabel(
+    label: Pick<KeyLabel, "target_type" | "key">,
+  ): Promise<void> {
+    // The daemon answers 204, so there is no body to hand back to the caller.
+    await this.request<null>("POST", "/v1/key-labels/remove", {
+      target_type: label.target_type,
+      key: label.key,
+    });
+  }
+
+  /** Read the local embedding model; reading never starts a download. */
+  embeddingModel(): Promise<EmbeddingModel> {
+    return this.request<EmbeddingModel>("GET", "/v1/embedding-model");
+  }
+
+  /** Start the one download an explicit owner action may create. */
+  downloadEmbeddingModel(): Promise<EmbeddingModel> {
+    return this.request<EmbeddingModel>("POST", "/v1/embedding-model/download");
+  }
+
+  /** Stop a running download; the partial file stays so it can be resumed. */
+  cancelEmbeddingModelDownload(): Promise<EmbeddingModel> {
+    return this.request<EmbeddingModel>("POST", "/v1/embedding-model/cancel");
+  }
+
+  /** Offline fallback: install one pinned file the owner obtained elsewhere. */
+  importEmbeddingModelFile(
+    fileName: string,
+    sourcePath: string,
+  ): Promise<EmbeddingModel> {
+    return this.request<EmbeddingModel>("POST", "/v1/embedding-model/import", {
+      file_name: fileName,
+      source_path: sourcePath,
+    });
+  }
+
+  removeEmbeddingModel(): Promise<EmbeddingModel> {
+    return this.request<EmbeddingModel>("POST", "/v1/embedding-model/remove");
   }
 
   conversations(): Promise<Conversation[]> {

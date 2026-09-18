@@ -72,15 +72,15 @@ def test_import_is_atomic_and_source_deletion_removes_derivatives(tmp_path: Path
             source_message_id=message_id,
         )
     )
-    before = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-        DEFAULT_PROFILE_ID, NOW
-    )
+    before = ModelRebuilder(
+        repositories.evidence, repositories.personal_models, repositories.key_aliases
+    ).rebuild(DEFAULT_PROFILE_ID, NOW)
 
     deletion = repositories.sources.remove_import(DEFAULT_PROFILE_ID, result.source.id)
     assert deletion is not None
-    after = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-        DEFAULT_PROFILE_ID, NOW
-    )
+    after = ModelRebuilder(
+        repositories.evidence, repositories.personal_models, repositories.key_aliases
+    ).rebuild(DEFAULT_PROFILE_ID, NOW)
 
     assert result.conversation_count == 1
     assert result.message_count == 2
@@ -130,9 +130,9 @@ def test_backup_restores_data_but_not_credentials_or_installation_identity(
             NOW,
         )
     )
-    ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-        DEFAULT_PROFILE_ID, NOW
-    )
+    ModelRebuilder(
+        repositories.evidence, repositories.personal_models, repositories.key_aliases
+    ).rebuild(DEFAULT_PROFILE_ID, NOW)
     assert database.engine is not None
     with database.engine.begin() as connection:
         connection.execute(
@@ -169,7 +169,7 @@ def test_backup_restores_data_but_not_credentials_or_installation_identity(
     restored_repositories = Repositories(restored_database.sessions())
 
     assert created.encrypted is False
-    assert restored.schema_revision_after == "0010_phase_12"
+    assert restored.schema_revision_after == "0011_key_consistency"
     assert restored.installation_id != original_installation
     assert restored_repositories.raw_events.get(event.id) == event
     assert restored_repositories.evidence.get("evidence_manual") is not None
@@ -210,6 +210,7 @@ def test_encrypted_export_authenticates_and_migrates_an_older_model(
             NOW,
         )
     )
+    # The 0007 schema predates key aliases, so the old model is built without them.
     ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
         DEFAULT_PROFILE_ID, NOW
     )
@@ -228,7 +229,7 @@ def test_encrypted_export_authenticates_and_migrates_an_older_model(
     restored = restore_archive(target_settings, archive, "correct horse battery")
 
     assert restored.schema_revision_before == "0007_phase_9"
-    assert restored.schema_revision_after == "0010_phase_12"
+    assert restored.schema_revision_after == "0011_key_consistency"
     with sqlite3.connect(target_settings.database_path) as connection:
         columns = {
             row[1] for row in connection.execute("PRAGMA table_info(conversations)").fetchall()
@@ -264,3 +265,26 @@ def test_backup_manifest_contains_no_credentials(tmp_path: Path) -> None:
         manifest = json.loads(archive.read("manifest.json"))
     assert manifest["format_version"] == 1
     assert manifest["credentials_included"] is False
+
+
+def test_backups_exclude_downloaded_model_artifacts(tmp_path: Path) -> None:
+    # Given: an installation holding a downloaded model artifact and one stored object
+    settings = Settings(data_dir=tmp_path / "data")
+    database, _ = _storage(settings.database_path)
+    model_file = settings.models_directory / "bge-m3-int8" / "model_int8.onnx"
+    model_file.parent.mkdir(parents=True)
+    model_file.write_bytes(b"synthetic pinned weights")
+    objects = settings.data_dir.expanduser() / "objects"
+    objects.mkdir(parents=True, exist_ok=True)
+    (objects / "kept.bin").write_bytes(b"owner data")
+
+    # When: a local backup is created
+    archive_path = tmp_path / "backup.dtwb"
+    ArchiveService(settings, database).create(archive_path, created_at=NOW)
+    database.close()
+
+    # Then: the re-downloadable pinned artifact stays out of the size-capped archive
+    with zipfile.ZipFile(archive_path) as archive:
+        names = set(archive.namelist())
+    assert "objects/kept.bin" in names
+    assert not any(name.startswith("models/") for name in names)

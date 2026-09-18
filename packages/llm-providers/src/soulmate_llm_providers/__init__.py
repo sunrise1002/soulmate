@@ -9,9 +9,15 @@ from soulmate_llm_providers.interface import (
     ProviderError,
     StructuredOutputMode,
 )
-from soulmate_llm_providers.policy import EgressDeniedError, EgressPolicy, PrivacyMode
+from soulmate_llm_providers.policy import (
+    MODEL_ARTIFACT_CLASSIFICATION,
+    EgressDeniedError,
+    EgressPolicy,
+    PrivacyMode,
+)
 
 __all__ = [
+    "MODEL_ARTIFACT_CLASSIFICATION",
     "EgressDeniedError",
     "EgressPolicy",
     "FakeLLMProvider",

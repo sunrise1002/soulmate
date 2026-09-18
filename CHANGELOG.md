@@ -4,6 +4,116 @@
 
 ### Added
 
+- Local model packaging and owner control for the key consistency increment
+  (step P6), which completes the increment. The embedding runtimes are now a
+  pinned optional extra (`soulmate-daemon[embeddings]`: `onnxruntime`,
+  `tokenizers`, `numpy`), so a plain install is unchanged while the desktop
+  sidecar bundles them; the packaged sidecar grew from 43 MB to 75 MB, its build
+  fails above a 220 MB budget, and it now smoke-tests that the bundled runtimes
+  load. A new `soulmate embedding-model` command reports the model, its size,
+  its memory need, and the runtimes without downloading or loading anything, and
+  `soulmate embedding-model --verify` loads an installed model once and embeds a
+  synthetic probe, so a packaged build can be proven to work on a new platform.
+  The desktop and web Model screens gained the download panel the API has had
+  since P4: it names the model and its license, states the download size and the
+  memory it needs before anything is fetched, shows progress, and offers stop,
+  removal, and discarding a partial download; offline mode explains why the
+  button is unavailable. Both clients can now write the owner's own name for a
+  key through a new owner-only API (`GET`/`POST /v1/key-labels` and
+  `/v1/key-labels/remove`), which extraction may never overwrite; naming a key
+  advances the evidence revision so its stored vector is recomputed, and the
+  audit log records only the shape of the change, never the wording. The
+  TypeScript SDK gained `embeddingModel`, `downloadEmbeddingModel`,
+  `cancelEmbeddingModelDownload`, `importEmbeddingModelFile`,
+  `removeEmbeddingModel`, `keyLabels`, `setKeyLabel`, and `removeKeyLabel`.
+
+- Multilingual key retrieval for the key consistency increment (step P5): key
+  labels, derived key vectors, semantic key retrieval, and reviewed semantic
+  merge suggestions. Chat extraction may now return an optional `label` and
+  comma-separated `aliases` per key in the language the owner wrote, stored in
+  `target_key_catalog`; an owner edit of a label is never overwritten by later
+  extraction. A durable `key_embedding_refresh` job embeds the text of every used
+  key (`ui theme dark | giao diện tối`) into `target_key_embeddings`, recomputes
+  only the keys whose text changed, drops the vectors of any other model, and runs
+  outside the chat path, so chat latency is unchanged and a missing or broken model
+  degrades to the existing word-overlap ranking. `select_known_keys` adds a
+  semantic score, so a Vietnamese message now shares the matching English key even
+  when it has no word in common with it and its confidence is low. Key pairs that
+  only look alike are stored as `suggested` aliases with their similarity and wait
+  for owner review in the existing duplicate-key screens, which now show why a
+  pair was suggested; similarity still never merges anything automatically,
+  because opposite keys score just as high. `embedding.provider` still defaults to
+  `none`, and nothing is embedded, suggested, or downloaded until the owner enables
+  a model. New `key_aliases.semantic_threshold` (default 0.85) sets when a pair is
+  worth reviewing.
+- Local embedding port for the key consistency increment (step P4): the kernel
+  gained an `EmbeddingProvider` port with a `NullEmbedding` default, and the
+  daemon gained a `LocalOnnxEmbedding` adapter that imports `onnxruntime`,
+  `tokenizers`, and `numpy` only when a model is actually loaded, keeps the model
+  in memory only while it is used, and reports `EmbeddingUnavailableError` so a
+  missing or broken runtime falls back to the existing word-overlap ranking. The
+  pinned `bge-m3` int8 artifact (MIT, 568 MB) is identified by URL and SHA-256 and
+  is only fetched when the owner asks: a new owner-only API (`GET
+  /v1/embedding-model`, `POST /v1/embedding-model/download`, `/cancel`, `/import`,
+  `/remove`) reports the download size, memory need, and progress, resumes an
+  interrupted download with a range request, verifies every file before it is
+  activated, deletes a file that fails verification, and accepts a manually copied
+  file as an offline fallback. The central egress policy now recognizes a
+  `model_artifact` classification that is allowed over HTTPS even in
+  `strict_local` mode and refused in `offline` mode, while personal data stays
+  bound by the old rules. `embedding.provider` defaults to `none`, so nothing is
+  downloaded, loaded, or installed until the owner changes it, and downloaded
+  artifacts are excluded from portable archives and backups. Nothing computes key
+  embeddings yet.
+- Accuracy spike for the key consistency increment (step P0): a packaged
+  synthetic `synthetic-key-retrieval-v1` dataset (168 dotted keys with Vietnamese
+  owner labels, 84 Vietnamese and English messages, 27 opposite key pairs) and a
+  deterministic `soulmate_core.evaluation.key_retrieval` harness that measures
+  recall inside the shared key budget, mean reciprocal rank, and the rate at which
+  opposite keys would be merged automatically. Measured on macOS arm64, today's
+  word-overlap ranking shares the right key for 27.3% of Vietnamese messages
+  against 97.7% for a local `bge-m3` int8 model, and 100% once owner labels are
+  included; every opposite key pair scored closer to its opposite than a typical
+  correct match, so semantic merges stay owner-reviewed. ADR-016 records the
+  embedding port, the owner-initiated pinned download, and the owner-confirmed
+  `bge-m3` int8 default; `scripts/key_embedding_spike.py` reproduces the numbers
+  from a throwaway environment. No product code loads a model, and `onnxruntime`,
+  `tokenizers`, and `numpy` are still not dependencies.
+- Key consistency wiring for the key consistency increment (step P3): reviewed
+  evidence now creates active `normalized` aliases automatically when two used
+  keys share one `key-normalizer-v1` form, so `ui.theme.dark_mode` reinforces
+  `ui.theme.dark` instead of splitting the model. Evidence keeps its original
+  key. The decision predictor and its pairwise learner map option feature keys
+  through active aliases and, for keys the model does not know, through
+  normalization, so a decision extracted under a variant key uses the learned
+  preference instead of returning 50/50. Every daemon workflow builds its
+  `ModelRebuilder` through one factory, and snapshots record whether aliases were
+  applied, so turning `key_aliases.enabled` off rebuilds the model from the
+  original keys on the next read. A new owner-only API (`GET /v1/key-aliases`,
+  `POST /v1/key-aliases`, `/review`, `/remove`) lists, merges, approves, rejects,
+  inverts, and undoes aliases, records audits without key names, and returns the
+  rebuilt snapshot version; the desktop and web Model screens gained a
+  "Duplicate keys" review list, and the TypeScript SDK gained the matching
+  methods. Semantic suggestions, key labels, and embeddings remain unimplemented.
+- Persistence for the key consistency increment (step P2): migration
+  `0011_key_consistency` adds `target_key_aliases`, `target_key_catalog`, and
+  `target_key_embeddings` with a downgrade that drops them;
+  `SqliteTargetKeyAliasRepository` behind the new `TargetKeyAliasRepository` port
+  rejects active alias cycles at write time and advances the evidence revision on
+  every change; `ModelRebuilder` optionally applies active aliases. Evidence
+  deletion (single evidence, import removal, connector removal) prunes aliases,
+  labels, and embeddings that no remaining evidence supports. Local and remote
+  backups include all three tables; encrypted portable exports drop the derived
+  embeddings; restore treats stored aliases or labels as owner data. The daemon
+  does not pass aliases to model rebuilds yet, and nothing creates aliases.
+- Infrastructure-free key canonicalization core for the key consistency
+  increment (step P1): a versioned `key-normalizer-v1` `normalize_key`, a
+  `TargetKeyAlias` domain record with polarity, review status, and provenance
+  method, a cycle-safe `KeyAliasMap`, and alias-aware evidence aggregation that
+  groups semantically equal keys under one canonical key and folds opposite
+  preference keys into one signed axis. Evidence is never rewritten, only active
+  aliases apply, and removing an alias restores the previous grouping. Nothing is
+  persisted or wired into extraction, prediction, or clients yet.
 - Provider capability negotiation for OpenAI-compatible endpoints: strict JSON
   Schema, JSON-object mode, and validated schema-guided JSON fallback, with the
   successful mode cached per configured provider instance; Ollama also gains a
@@ -172,15 +282,28 @@
   hooks, Conventional Commit and branch validation, CI enforcement, issue/PR
   templates, security guidance, and documented GitHub ruleset settings.
 
-No embeddings, real-provider evaluation, remote MCP transport,
+Local key embeddings exist but stay switched off until the owner downloads the
+pinned model. No real-provider evaluation, remote MCP transport,
 signing/notarization, automatic updates, plugin sandbox, or live third-party
 service connector has been implemented. Delegation grants authorization but does
 not execute or verify third-party side effects. Imported and connector sources are
 normalized locally but do not automatically invoke an LLM or create derived
 Evidence.
 
+### Fixed
+
+- A corrupt or foreign local embedding model could raise an unhandled error
+  instead of falling back to the word-overlap key ranking. Every `onnxruntime`
+  exception derives directly from `Exception` rather than from `RuntimeError`, so
+  the adapter's narrower handling never caught them. Found by the first real run
+  of the pinned artifact in step P6.
+
 ### Changed
 
+- The pinned `bge-m3` int8 artifact now records the exact published file sizes
+  and a 2.0 GB peak-memory estimate, measured when step P6 downloaded and ran it
+  for the first time. Both SHA-256 pins were confirmed against the published
+  files, and the P0 retrieval numbers reproduced against the real model.
 - Natural-language decision feature extraction now sends the current Personal
   Model preference keys (keys only, no values) to the provider and asks it to
   reuse them, so options such as `ui.theme.dark` match preferences learned from

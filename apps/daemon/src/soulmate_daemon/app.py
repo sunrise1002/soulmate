@@ -26,8 +26,8 @@ from soulmate_core.domain import (
     Preference,
     RawEvent,
 )
+from soulmate_core.embeddings import EmbeddingProvider
 from soulmate_core.learning import rank_uncertainties
-from soulmate_core.preferences import ModelRebuilder
 from soulmate_llm_providers import EgressDeniedError, LLMProvider, ProviderError
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy import text
@@ -45,8 +45,25 @@ from soulmate_daemon.conversation import CONVERSATION_EXTRACTION_JOB, Conversati
 from soulmate_daemon.data_api import build_data_router
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
 from soulmate_daemon.delegation_api import build_delegation_router
+from soulmate_daemon.embedding_api import build_embedding_router
+from soulmate_daemon.embedding_models import EmbeddingModelService
+from soulmate_daemon.embeddings import embedding_provider as build_embedding_provider
 from soulmate_daemon.external_api import build_external_router
 from soulmate_daemon.jobs import DurableJobWorker
+from soulmate_daemon.key_alias_api import build_key_alias_router
+from soulmate_daemon.key_aliases import (
+    alias_repository,
+    model_rebuilder,
+    register_normalized_aliases,
+)
+from soulmate_daemon.key_label_api import build_key_label_router
+from soulmate_daemon.key_semantics import (
+    KEY_EMBEDDING_INTERVAL_SECONDS,
+    KEY_EMBEDDING_REFRESH_JOB,
+    enqueue_key_embedding_refresh,
+    key_semantics_service,
+    refresh_from_payload,
+)
 from soulmate_daemon.network import (
     LanEndpoint,
     NetworkConfigurationError,
@@ -575,6 +592,7 @@ def create_app(
     lan: LanEndpoint | None = None,
     connectors: tuple[SourceConnector, ...] = (),
     remote_backup_store: RemoteBackupStore | None = None,
+    embeddings: EmbeddingProvider | None = None,
 ) -> FastAPI:
     resolved_settings = settings if settings is not None else Settings()
 
@@ -587,10 +605,12 @@ def create_app(
             raise RuntimeError("Database session factory was not initialized.")
         repositories = Repositories(database.session_factory)
         installation_id = ensure_installation(repositories.system_metadata, repositories.profiles)
+        rebuilder = model_rebuilder(repositories, resolved_settings)
         if restored_revision is not None:
-            ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-                DEFAULT_PROFILE_ID
-            )
+            rebuilder.rebuild(DEFAULT_PROFILE_ID)
+        elif repositories.personal_models.latest_snapshot(DEFAULT_PROFILE_ID) is not None:
+            # Refresh a snapshot built before key_aliases.enabled last changed.
+            rebuilder.current(DEFAULT_PROFILE_ID)
         endpoint, lan_error = _resolve_lan(resolved_settings, lan)
         connector_catalog = discover_connectors(connectors)
         backup_store = (
@@ -608,6 +628,18 @@ def create_app(
                 backup_store,
             )
         )
+        embedding_models = EmbeddingModelService(
+            resolved_settings, repositories.audit_events, profile_id=DEFAULT_PROFILE_ID
+        )
+        semantics = None
+        if embeddings is not None or resolved_settings.embedding.provider != "none":
+            semantics = key_semantics_service(
+                repositories,
+                resolved_settings,
+                embeddings
+                if embeddings is not None
+                else build_embedding_provider(resolved_settings),
+            )
         app.state.runtime = AppState(
             settings=resolved_settings,
             database=database,
@@ -618,6 +650,8 @@ def create_app(
             lan_error=lan_error,
             connector_catalog=connector_catalog,
             remote_backup=remote_backup,
+            embedding_models=embedding_models,
+            key_semantics=semantics,
         )
         stop = asyncio.Event()
 
@@ -682,7 +716,15 @@ def create_app(
                 models=repositories.personal_models,
                 provider=_resolve_provider(_state(app)),
                 jobs=repositories.jobs,
+                aliases=alias_repository(repositories, resolved_settings),
+                catalog=repositories.key_catalog,
+                semantics=semantics,
             ).retry_learning(payload)
+
+        async def refresh_key_embeddings(payload: dict[str, object]) -> None:
+            if semantics is None:
+                raise ValueError("Key embeddings are disabled, so no refresh may run.")
+            await asyncio.to_thread(refresh_from_payload, semantics, payload)
 
         handlers = {
             CONNECTOR_SYNC_JOB: sync_connector,
@@ -690,6 +732,8 @@ def create_app(
         }
         if remote_backup is not None:
             handlers[REMOTE_BACKUP_JOB] = create_remote_backup
+        if semantics is not None:
+            handlers[KEY_EMBEDDING_REFRESH_JOB] = refresh_key_embeddings
         worker = DurableJobWorker(
             repositories.jobs,
             handlers,
@@ -716,13 +760,41 @@ def create_app(
             scheduler_task = asyncio.create_task(
                 schedule_remote_backup(), name="soulmate-remote-backup-scheduler"
             )
+        embedding_task: asyncio.Task[None] | None = None
+        if semantics is not None:
+
+            async def schedule_key_embeddings() -> None:
+                """Queue a refresh when evidence or the installed model changed.
+
+                Polling keeps the chat path free of embedding work and covers every
+                evidence source; the job identity makes a repeated check free.
+                """
+                while not stop.is_set():
+                    await asyncio.to_thread(
+                        enqueue_key_embedding_refresh,
+                        repositories.jobs,
+                        repositories.evidence,
+                        semantics,
+                        DEFAULT_PROFILE_ID,
+                    )
+                    try:
+                        await asyncio.wait_for(stop.wait(), timeout=KEY_EMBEDDING_INTERVAL_SECONDS)
+                    except TimeoutError:
+                        continue
+
+            embedding_task = asyncio.create_task(
+                schedule_key_embeddings(), name="soulmate-key-embedding-scheduler"
+            )
         try:
             yield
         finally:
             stop.set()
+            await embedding_models.shutdown()
             tasks = [worker_task]
             if scheduler_task is not None:
                 tasks.append(scheduler_task)
+            if embedding_task is not None:
+                tasks.append(embedding_task)
             await asyncio.gather(*tasks)
             if database.engine is not None:
                 database.engine.dispose()
@@ -910,6 +982,7 @@ def create_app(
             raw_events=repositories.raw_events,
             evidence=repositories.evidence,
             models=repositories.personal_models,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         questions = service.generate(DEFAULT_PROFILE_ID, request.limit, request.target_key)
         return [_active_question_response(item) for item in questions]
@@ -928,6 +1001,7 @@ def create_app(
             raw_events=repositories.raw_events,
             evidence=repositories.evidence,
             models=repositories.personal_models,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             result: ActiveAnswerResult = service.answer(
@@ -1018,7 +1092,7 @@ def create_app(
             raise HTTPException(status_code=404, detail="Evidence was not found.")
         if not repositories.evidence.remove(evidence_id):
             raise HTTPException(status_code=404, detail="Evidence was not found.")
-        snapshot = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
+        snapshot = model_rebuilder(repositories, _state(app)["settings"]).rebuild(
             DEFAULT_PROFILE_ID, datetime.now(UTC)
         )
         return EvidenceDeletionResponse(
@@ -1071,9 +1145,14 @@ def create_app(
         )
         repositories.raw_events.add(event)
         repositories.evidence.add(evidence)
-        snapshot = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
-            DEFAULT_PROFILE_ID, now
+        settings = _state(app)["settings"]
+        register_normalized_aliases(
+            repositories.evidence,
+            alias_repository(repositories, settings),
+            DEFAULT_PROFILE_ID,
+            now,
         )
+        snapshot = model_rebuilder(repositories, settings).rebuild(DEFAULT_PROFILE_ID, now)
         return PreferenceCorrectionResponse(
             evidence=_evidence_response(evidence), snapshot_version=snapshot.version
         )
@@ -1098,6 +1177,8 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=provider,
+            aliases=alias_repository(repositories, runtime["settings"]),
+            semantics=runtime["key_semantics"],
         )
         try:
             decision, options = await service.create(
@@ -1143,6 +1224,7 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=None,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             prediction = service.predict(DEFAULT_PROFILE_ID, decision_id)
@@ -1174,6 +1256,7 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=None,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             advice = service.advise(DEFAULT_PROFILE_ID, decision_id)
@@ -1202,6 +1285,7 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=None,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             result = service.resolve(DEFAULT_PROFILE_ID, decision_id, request.chosen_option_id)
@@ -1229,6 +1313,7 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=None,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             outcome = service.record_outcome(
@@ -1257,6 +1342,7 @@ def create_app(
             models=repositories.personal_models,
             outcomes=repositories.outcomes,
             provider=None,
+            aliases=alias_repository(repositories, _state(app)["settings"]),
         )
         try:
             outcome = service.delete_outcome(DEFAULT_PROFILE_ID, decision_id)
@@ -1282,6 +1368,9 @@ def create_app(
             models=repositories.personal_models,
             provider=resolved_provider,
             jobs=repositories.jobs,
+            aliases=alias_repository(repositories, runtime["settings"]),
+            catalog=repositories.key_catalog,
+            semantics=runtime["key_semantics"],
         )
         try:
             result = await service.chat(
@@ -1323,5 +1412,8 @@ def create_app(
     app.include_router(build_data_router(app))
     app.include_router(build_connector_router(app))
     app.include_router(build_delegation_router(app))
+    app.include_router(build_key_alias_router(app))
+    app.include_router(build_key_label_router(app))
+    app.include_router(build_embedding_router(app))
     mount_web_client(app, resolved_settings.web_client_directory)
     return app

@@ -21,17 +21,22 @@ from soulmate_core.domain import (
     PersonalModelRepository,
     RawEvent,
     RawEventRepository,
+    TargetKeyAliasRepository,
+    TargetKeyCatalogRepository,
 )
 from soulmate_core.preferences import ModelRebuilder
 from soulmate_llm_providers import LLMMessage, LLMProvider, ProviderError
 
 from soulmate_daemon.extraction import (
+    KEY_LABEL_RULES,
     KEY_REUSE_RULES,
     ReviewedEvidence,
     extraction_schema,
     review_proposals,
     validate_proposals,
 )
+from soulmate_daemon.key_aliases import register_normalized_aliases
+from soulmate_daemon.key_semantics import KeySemanticsService
 
 CONVERSATION_EXTRACTION_JOB = "conversation_evidence_extract"
 EXTRACTION_INITIAL_DELAY = timedelta(seconds=1)
@@ -44,7 +49,8 @@ EXTRACTION_SYSTEM_PROMPT = f"""Extract only information explicitly stated by the
 Use the supplied schema and stable dotted English target keys. Preserve the user's meaning and
 return empty lists when nothing is stated. Preference values range from -1 (strong dislike) to 1
 (strong preference). Do not infer sensitive claims.
-{KEY_REUSE_RULES}"""
+{KEY_REUSE_RULES}
+{KEY_LABEL_RULES}"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +76,9 @@ class ConversationService:
         models: PersonalModelRepository,
         provider: LLMProvider,
         jobs: JobRepository | None = None,
+        aliases: TargetKeyAliasRepository | None,
+        catalog: TargetKeyCatalogRepository | None = None,
+        semantics: KeySemanticsService | None = None,
     ) -> None:
         self._conversations = conversations
         self._messages = messages
@@ -78,6 +87,10 @@ class ConversationService:
         self._models = models
         self._provider = provider
         self._jobs = jobs
+        self._aliases = aliases
+        self._catalog = catalog
+        self._semantics = semantics
+        self._rebuilder = ModelRebuilder(evidence, models, aliases)
 
     async def _extract(
         self,
@@ -130,10 +143,14 @@ class ConversationService:
             for item in earlier[-RECENT_USER_TURNS * 2 :]
             if item.role is MessageRole.USER
         )
+        query = f"{content} {earlier_text}"
         return select_known_keys(
-            ModelRebuilder(self._evidence, self._models).current_model(profile_id),
-            query=f"{content} {earlier_text}",
+            self._rebuilder.current_model(profile_id),
+            query=query,
             recent_keys=recent_keys,
+            semantic_scores=(
+                None if self._semantics is None else self._semantics.query_scores(profile_id, query)
+            ),
         )
 
     def _accept(self, profile_id: str, reviewed: ReviewedEvidence, now: datetime) -> int | None:
@@ -141,7 +158,11 @@ class ConversationService:
             self._evidence.add(item)
         if not reviewed.accepted:
             return None
-        return ModelRebuilder(self._evidence, self._models).rebuild(profile_id, now).version
+        if self._catalog is not None:
+            for label in reviewed.labels:
+                self._catalog.upsert(label)
+        register_normalized_aliases(self._evidence, self._aliases, profile_id, now)
+        return self._rebuilder.rebuild(profile_id, now).version
 
     def _enqueue_learning(
         self,

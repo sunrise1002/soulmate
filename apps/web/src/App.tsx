@@ -135,7 +135,11 @@ export function App({ origin, storage }: AppProps) {
         <DecideScreen client={client} onAuthError={handleAuthError} />
       )}
       {tab === "model" && (
-        <ModelScreen client={client} onAuthError={handleAuthError} />
+        <ModelScreen
+          client={client}
+          isOwner={session.actor === "owner"}
+          onAuthError={handleAuthError}
+        />
       )}
       {tab === "history" && (
         <HistoryScreen client={client} onAuthError={handleAuthError} />

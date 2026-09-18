@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    LargeBinary,
     String,
     Text,
 )
@@ -334,6 +335,98 @@ class EvidenceRevisionRow(Base):
         ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True
     )
     revision: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+_TARGET_TYPES = "target_type IN ('fact', 'preference', 'goal', 'constraint')"
+
+
+class TargetKeyAliasRow(Base):
+    __tablename__ = "target_key_aliases"
+
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True
+    )
+    target_type: Mapped[str] = mapped_column(String, primary_key=True)
+    alias_key: Mapped[str] = mapped_column(String, primary_key=True)
+    canonical_key: Mapped[str] = mapped_column(String, nullable=False)
+    polarity: Mapped[int] = mapped_column(Integer, nullable=False)
+    method: Mapped[str] = mapped_column(String, nullable=False)
+    similarity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    algorithm_version: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(_TARGET_TYPES, name="ck_target_key_aliases_target_type"),
+        CheckConstraint("polarity IN (1, -1)", name="ck_target_key_aliases_polarity"),
+        CheckConstraint(
+            "polarity = 1 OR target_type = 'preference'",
+            name="ck_target_key_aliases_inversion",
+        ),
+        CheckConstraint(
+            "method IN ('normalized', 'semantic', 'owner')",
+            name="ck_target_key_aliases_method",
+        ),
+        CheckConstraint(
+            "status IN ('active', 'suggested', 'rejected')",
+            name="ck_target_key_aliases_status",
+        ),
+        CheckConstraint(
+            "similarity IS NULL OR (similarity >= 0 AND similarity <= 1)",
+            name="ck_target_key_aliases_similarity",
+        ),
+        CheckConstraint("alias_key <> canonical_key", name="ck_target_key_aliases_distinct"),
+        Index("ix_target_key_aliases_canonical", "profile_id", "target_type", "canonical_key"),
+        Index("ix_target_key_aliases_status", "profile_id", "status"),
+    )
+
+
+class TargetKeyCatalogRow(Base):
+    """Owner-language label per key; owner-edited labels cannot be derived again."""
+
+    __tablename__ = "target_key_catalog"
+
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True
+    )
+    target_type: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    label: Mapped[str | None] = mapped_column(Text, nullable=True)
+    aliases_json: Mapped[str] = mapped_column(Text, nullable=False)
+    label_source: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(_TARGET_TYPES, name="ck_target_key_catalog_target_type"),
+        CheckConstraint(
+            "label_source IN ('extracted', 'owner')",
+            name="ck_target_key_catalog_label_source",
+        ),
+    )
+
+
+class TargetKeyEmbeddingRow(Base):
+    """Derived, rebuildable key vector; excluded from portable exports."""
+
+    __tablename__ = "target_key_embeddings"
+
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), primary_key=True
+    )
+    target_type: Mapped[str] = mapped_column(String, primary_key=True)
+    key: Mapped[str] = mapped_column(String, primary_key=True)
+    model_id: Mapped[str] = mapped_column(String, primary_key=True)
+    text_hash: Mapped[str] = mapped_column(String, nullable=False)
+    dim: Mapped[int] = mapped_column(Integer, nullable=False)
+    vector: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint(_TARGET_TYPES, name="ck_target_key_embeddings_target_type"),
+        CheckConstraint("dim > 0", name="ck_target_key_embeddings_dim"),
+    )
 
 
 class PreferenceRow(Base):

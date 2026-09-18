@@ -358,7 +358,7 @@ def test_portability_cli_imports_backs_up_exports_and_restores(tmp_path: Path) -
     assert json.loads(imported.stdout)["message_count"] == 2
     assert json.loads(backup.stdout)["encrypted"] is False
     assert json.loads(exported.stdout)["encrypted"] is True
-    assert json.loads(restored.stdout)["schema_revision_after"] == "0010_phase_12"
+    assert json.loads(restored.stdout)["schema_revision_after"] == "0011_key_consistency"
     target_database = Database(target_dir / "soulmate.db")
     target_database.migrate()
     target_repositories = Repositories(target_database.sessions())
@@ -448,6 +448,7 @@ def test_chat_extracts_preferences_and_persists_context_across_restart(tmp_path:
                 models=repositories.personal_models,
                 provider=first_provider,
                 jobs=repositories.jobs,
+                aliases=repositories.key_aliases,
             ).retry_learning(job.payload)
         )
         evidence = repositories.evidence.list_for_profile("profile_default")[0]
@@ -481,6 +482,7 @@ def test_chat_extracts_preferences_and_persists_context_across_restart(tmp_path:
                 models=repositories.personal_models,
                 provider=second_provider,
                 jobs=repositories.jobs,
+                aliases=repositories.key_aliases,
             ).retry_learning(job.payload)
         )
         assert client.get("/v1/model/summary").json()["version"] == 1
@@ -507,6 +509,7 @@ def _learn_from_chat(app: FastAPI, provider: FakeLLMProvider, message_id: str) -
             models=repositories.personal_models,
             provider=provider,
             jobs=repositories.jobs,
+            aliases=repositories.key_aliases,
         ).retry_learning(job.payload)
     )
 
@@ -665,6 +668,7 @@ def test_chat_preserves_reply_when_learning_output_is_invalid(tmp_path: Path) ->
             models=repositories.personal_models,
             provider=provider,
             jobs=repositories.jobs,
+            aliases=repositories.key_aliases,
         )
         with pytest.raises(ValueError):
             asyncio.run(service.retry_learning(job.payload))

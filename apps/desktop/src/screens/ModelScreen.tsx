@@ -10,6 +10,9 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import type { SyntheticEvent } from "react";
 
+import { DuplicateKeysPanel } from "../components/DuplicateKeysPanel.tsx";
+import { EmbeddingModelPanel } from "../components/EmbeddingModelPanel.tsx";
+import { KeyLabelEditor } from "../components/KeyLabelEditor.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 import { apiRequest } from "../runtime.ts";
 import type {
@@ -263,6 +266,14 @@ export function ModelScreen({ revision, onModelChanged }: ModelScreenProps) {
           </div>
         )}
       </article>
+      <EmbeddingModelPanel />
+      <DuplicateKeysPanel
+        revision={revision}
+        onChanged={() => {
+          void load();
+          onModelChanged();
+        }}
+      />
       {preferences.length ? (
         <div className="preference-grid">
           {preferences.map((item) => (
@@ -353,6 +364,11 @@ export function ModelScreen({ revision, onModelChanged }: ModelScreenProps) {
             >
               Ask me about this
             </button>
+            <KeyLabelEditor
+              key={selected.key}
+              targetKey={selected.key}
+              onChanged={onModelChanged}
+            />
             <div className="evidence-heading">
               <span className="section-label">Why Soulmate thinks this</span>
               <b>{evidence.length} items</b>

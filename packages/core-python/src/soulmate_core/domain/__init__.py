@@ -38,6 +38,12 @@ from soulmate_core.domain.models import (
     ServiceIdentity,
     Source,
     SourceDeletion,
+    TargetKeyAlias,
+    TargetKeyAliasMethod,
+    TargetKeyAliasStatus,
+    TargetKeyEmbedding,
+    TargetKeyLabel,
+    TargetKeyLabelSource,
     UserModelSnapshot,
 )
 from soulmate_core.domain.ports import (
@@ -60,6 +66,9 @@ from soulmate_core.domain.ports import (
     ServiceIdentityRepository,
     SourceRepository,
     SystemMetadataRepository,
+    TargetKeyAliasRepository,
+    TargetKeyCatalogRepository,
+    TargetKeyEmbeddingRepository,
 )
 
 __all__ = [
@@ -119,5 +128,14 @@ __all__ = [
     "SourceDeletion",
     "SourceRepository",
     "SystemMetadataRepository",
+    "TargetKeyAlias",
+    "TargetKeyAliasMethod",
+    "TargetKeyAliasRepository",
+    "TargetKeyAliasStatus",
+    "TargetKeyCatalogRepository",
+    "TargetKeyEmbedding",
+    "TargetKeyEmbeddingRepository",
+    "TargetKeyLabel",
+    "TargetKeyLabelSource",
     "UserModelSnapshot",
 ]

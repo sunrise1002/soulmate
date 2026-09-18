@@ -149,7 +149,18 @@ class LLMConfig(ConfigModel):
 
 
 class EmbeddingConfig(ConfigModel):
-    provider: Literal["local"] = "local"
+    """Local key embeddings; the pinned artifact is only downloaded on owner request."""
+
+    provider: Literal["none", "local"] = "none"
+    model_id: Literal["bge-m3-int8"] = "bge-m3-int8"
+    idle_release_seconds: int = Field(default=300, ge=30, le=3600)
+
+
+class KeyAliasesConfig(ConfigModel):
+    """Canonical target key aliases; disabling them rebuilds from original keys."""
+
+    enabled: bool = True
+    semantic_threshold: float = Field(default=0.85, ge=0.5, le=1.0)
 
 
 class Settings(ConfigModel):
@@ -163,6 +174,7 @@ class Settings(ConfigModel):
     vector: VectorConfig = Field(default_factory=VectorConfig)
     llm: LLMConfig = Field(default_factory=LLMConfig)
     embedding: EmbeddingConfig = Field(default_factory=EmbeddingConfig)
+    key_aliases: KeyAliasesConfig = Field(default_factory=KeyAliasesConfig)
 
     @property
     def tls_directory(self) -> Path:
@@ -182,6 +194,11 @@ class Settings(ConfigModel):
             packaged = Path(__file__).resolve().parent / "web_client"
             return packaged if packaged.is_dir() else None
         return directory.expanduser().resolve()
+
+    @property
+    def models_directory(self) -> Path:
+        """Resolve where downloaded model artifacts live, without creating anything."""
+        return (self.data_dir.expanduser() / "models").resolve()
 
     @property
     def database_path(self) -> Path:

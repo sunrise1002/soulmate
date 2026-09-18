@@ -53,7 +53,11 @@ uppercase, and separating nested names with two underscores. For example,
 | `storage.backend` | `SOULMATE_STORAGE__BACKEND` | `sqlite` | Persistent storage backend. `sqlite` is the only accepted value. |
 | `storage.path` | `SOULMATE_STORAGE__PATH` | unset | Explicit database file. When unset, uses `DATA_DIR/soulmate.db`. |
 | `vector.backend` | `SOULMATE_VECTOR__BACKEND` | `sqlite_vec` | Accepts `sqlite_vec` or `cosine`; vector storage/search remains deferred, so this currently records intent rather than enabling a working vector index. |
-| `embedding.provider` | `SOULMATE_EMBEDDING__PROVIDER` | `local` | Embedding provider selector. `local` is the only accepted value; embedding execution remains deferred. |
+| `embedding.provider` | `SOULMATE_EMBEDDING__PROVIDER` | `none` | Accepts `none` or `local`. `local` uses the pinned on-device model for cross-language key matching, and only after the owner installs it; nothing is downloaded automatically. |
+| `embedding.model_id` | `SOULMATE_EMBEDDING__MODEL_ID` | `bge-m3-int8` | Pinned artifact identifier. `bge-m3-int8` is the only accepted value (ADR-016). |
+| `embedding.idle_release_seconds` | `SOULMATE_EMBEDDING__IDLE_RELEASE_SECONDS` | `300` | Seconds of inactivity after which the loaded model is released. Accepts 30 to 3600. |
+| `key_aliases.enabled` | `SOULMATE_KEY_ALIASES__ENABLED` | `true` | Group near-duplicate target keys under one canonical key. Disabling it rebuilds the model from the original keys, because evidence is never rewritten. |
+| `key_aliases.semantic_threshold` | `SOULMATE_KEY_ALIASES__SEMANTIC_THRESHOLD` | `0.85` | Similarity above which a key pair is suggested for owner review. Accepts 0.5 to 1.0; similarity never merges keys by itself. |
 
 ### Privacy and model provider
 
@@ -188,8 +192,8 @@ Connector HTTP destinations must appear in the installed manifest and pass the s
 privacy-mode policy as model calls. `offline` denies all connector network access.
 
 Privacy mode accepts `strict_local`, `hybrid`, and `offline`. Storage accepts
-`sqlite`; vector backend accepts `sqlite_vec` or `cosine`; provider defaults are
-Ollama and local embeddings. `strict_local` and `offline` restrict model requests
+`sqlite`; vector backend accepts `sqlite_vec` or `cosine`; the provider default is
+Ollama, and local embeddings are off until the owner installs the model. `strict_local` and `offline` restrict model requests
 to literal loopback endpoints. `hybrid` also allows external HTTPS endpoints, but
 never plaintext external HTTP. The egress policy is enforced inside both HTTP
 adapters immediately before every request.

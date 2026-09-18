@@ -17,6 +17,27 @@ def test_defaults_are_local_and_do_not_create_storage(tmp_path: Path) -> None:
     assert not settings.database_path.parent.exists()
 
 
+def test_embeddings_are_disabled_until_the_owner_enables_them(tmp_path: Path) -> None:
+    # Given: an installation without embedding configuration, when settings load,
+    settings = load_settings(environ={})
+
+    # Then: no model is selected and its directory is only a resolved path
+    assert settings.embedding.provider == "none"
+    assert settings.embedding.model_id == "bge-m3-int8"
+    assert settings.embedding.idle_release_seconds == 300
+    assert settings.models_directory == tmp_path / "data" / "models"
+    assert not settings.models_directory.exists()
+
+
+def test_idle_release_seconds_rejects_values_outside_its_range() -> None:
+    # Given: an out-of-range idle release setting, when settings load,
+    with pytest.raises(ConfigurationError) as error:
+        load_settings(environ={"SOULMATE_EMBEDDING__IDLE_RELEASE_SECONDS": "29"})
+
+    # Then: the configuration is refused instead of silently clamped
+    assert "idle_release_seconds" in str(error.value)
+
+
 def test_nested_environment_overrides_preserve_other_toml_settings(tmp_path: Path) -> None:
     config = tmp_path / "config.toml"
     config.write_text('[server]\nhost = "::1"\nport = 8000\n', encoding="utf-8")
@@ -118,6 +139,7 @@ def test_example_configuration_is_valid() -> None:
     settings = load_settings(root / "config.example.toml", environ={})
     assert settings.privacy.mode == "strict_local"
     assert settings.llm.provider == "ollama"
+    assert settings.embedding.provider == "none"
 
 
 def test_lan_access_is_disabled_with_a_loopback_default() -> None:

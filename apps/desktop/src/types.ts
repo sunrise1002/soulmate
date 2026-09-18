@@ -200,6 +200,69 @@ export interface Preference {
   model_version: number;
 }
 
+export type KeyAliasStatus = "active" | "suggested" | "rejected";
+export type KeyAliasReviewAction = "approve" | "reject" | "invert";
+
+export interface KeyAlias {
+  target_type: "fact" | "preference" | "goal" | "constraint";
+  alias_key: string;
+  canonical_key: string;
+  polarity: 1 | -1;
+  method: "normalized" | "semantic" | "owner";
+  status: KeyAliasStatus;
+  similarity: number | null;
+  algorithm_version: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KeyAliasList {
+  enabled: boolean;
+  aliases: KeyAlias[];
+}
+
+export type KeyLabelSource = "extracted" | "owner";
+
+export interface KeyLabel {
+  target_type: "fact" | "preference" | "goal" | "constraint";
+  key: string;
+  label: string | null;
+  aliases: string[];
+  source: KeyLabelSource;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KeyLabelList {
+  labels: KeyLabel[];
+}
+
+export interface EmbeddingModelFile {
+  name: string;
+  installed: boolean;
+  downloaded_bytes: number;
+  expected_bytes: number;
+}
+
+export interface EmbeddingModel {
+  provider: string;
+  model_id: string;
+  display_name: string;
+  license: string;
+  source: string;
+  dimensions: number;
+  download_bytes: number;
+  peak_memory_bytes: number;
+  installed: boolean;
+  downloading: boolean;
+  downloaded_bytes: number;
+  expected_bytes: number;
+  can_download: boolean;
+  privacy_mode: string;
+  error: string | null;
+  files: EmbeddingModelFile[];
+}
+
 export interface ModelSummary {
   version: number | null;
   algorithm_version: string | null;

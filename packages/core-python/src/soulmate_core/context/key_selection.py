@@ -3,31 +3,43 @@
 import json
 import re
 from collections import Counter
-from collections.abc import Collection, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 
 from soulmate_core.domain import Constraint, DerivedModel, Fact, Goal, Preference
 
 KEY_TYPES = ("facts", "preferences", "goals", "constraints")
 _WORD_PATTERN = re.compile(r"[^\W_]+", re.UNICODE)
-_RECENT_SCORE = 4
-_LEXICAL_SCORE = 2
-_DOMAIN_SCORE = 1
+_RECENT_SCORE = 4.0
+_LEXICAL_SCORE = 2.0
+_DOMAIN_SCORE = 1.0
 
 type _Record = Fact | Preference | Goal | Constraint
 
 
 @dataclass(frozen=True, slots=True)
 class KeySelectionPolicy:
-    """Budget for known keys; small models are shared whole to avoid missed matches."""
+    """Budget and scoring weights; small models are shared whole to avoid misses.
+
+    ``semantic_weight`` scales a cosine similarity into the same scale as the
+    lexical and domain signals, so a cross-language match can outrank a key that
+    merely shares a word. ``semantic_floor`` discards weak similarities, because
+    every key has some similarity to every message.
+    """
 
     send_all_threshold: int = 100
     limit: int = 50
     namespace_limit: int = 100
+    semantic_weight: float = 3.0
+    semantic_floor: float = 0.3
 
     def __post_init__(self) -> None:
         if min(self.send_all_threshold, self.limit, self.namespace_limit) < 0:
             raise ValueError("Key selection budgets must not be negative.")
+        if self.semantic_weight < 0:
+            raise ValueError("The semantic weight must not be negative.")
+        if not 0.0 <= self.semantic_floor <= 1.0:
+            raise ValueError("The semantic floor must be between zero and one.")
 
 
 def _words(value: object) -> set[str]:
@@ -58,18 +70,23 @@ def select_known_keys(
     recent_keys: Collection[str] = (),
     domain: str | None = None,
     key_types: Sequence[str] = KEY_TYPES,
+    semantic_scores: Mapping[str, float] | None = None,
     policy: KeySelectionPolicy | None = None,
 ) -> dict[str, list[str]]:
     """Return namespaces plus the known keys most likely to matter for ``query``.
 
-    Keys score by recent use, word overlap with the query or categorical value, and
-    domain match; ties prefer confident, recently updated keys. Keys that are missed
-    here can still be created under a listed namespace.
+    Keys score by recent use, word overlap with the query or categorical value,
+    domain match, and the supplied semantic similarity between the query and the
+    key; ties prefer confident, recently updated keys. ``semantic_scores`` maps a
+    key name to a cosine similarity and is empty whenever no embedding model is
+    available, which leaves the lexical behavior of step A unchanged. Keys that are
+    missed here can still be created under a listed namespace.
     """
     unknown = set(key_types) - set(KEY_TYPES)
     if unknown:
         raise ValueError(f"Unknown key types: {', '.join(sorted(unknown))}.")
     active = policy or KeySelectionPolicy()
+    similarities = semantic_scores or {}
     candidates = [
         (key_type, record) for key_type in key_types for record in _records(model, key_type)
     ]
@@ -78,20 +95,26 @@ def select_known_keys(
     if len(all_keys) > active.send_all_threshold:
         query_words = _words(query)
         normalized_domain = None if domain is None else domain.casefold()
-        best: dict[tuple[str, str], tuple[int, float, float]] = {}
+        best: dict[tuple[str, str], tuple[float, float, float]] = {}
         for key_type, record in candidates:
             record_words = _words(record.key)
             if not isinstance(record, Preference):
                 record_words |= _words(record.value)
             record_domain = record.context.get("domain")
+            similarity = similarities.get(record.key, 0.0)
             score = (
-                (_RECENT_SCORE if record.key in recent_keys else 0)
-                + (_LEXICAL_SCORE if query_words & record_words else 0)
+                (_RECENT_SCORE if record.key in recent_keys else 0.0)
+                + (_LEXICAL_SCORE if query_words & record_words else 0.0)
                 + (
                     _DOMAIN_SCORE
                     if normalized_domain is not None
                     and str(record_domain).casefold() == normalized_domain
-                    else 0
+                    else 0.0
+                )
+                + (
+                    active.semantic_weight * similarity
+                    if similarity >= active.semantic_floor
+                    else 0.0
                 )
             )
             rank = (score, record.confidence, record.updated_at.timestamp())

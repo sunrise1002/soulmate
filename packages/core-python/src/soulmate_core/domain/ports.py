@@ -20,6 +20,7 @@ from soulmate_core.domain.models import (
     DelegationStatus,
     DerivedModel,
     Evidence,
+    EvidenceTargetType,
     Job,
     Message,
     PairedDevice,
@@ -31,6 +32,10 @@ from soulmate_core.domain.models import (
     ServiceIdentity,
     Source,
     SourceDeletion,
+    TargetKeyAlias,
+    TargetKeyAliasStatus,
+    TargetKeyEmbedding,
+    TargetKeyLabel,
     UserModelSnapshot,
 )
 
@@ -147,6 +152,46 @@ class EvidenceRepository(Protocol):
     def remove(self, evidence_id: str) -> bool: ...
 
     def current_revision(self, profile_id: str) -> int: ...
+
+
+class TargetKeyAliasRepository(Protocol):
+    """Owner-reviewable key aliases; every write advances the evidence revision."""
+
+    def upsert(self, alias: TargetKeyAlias) -> TargetKeyAlias: ...
+
+    def get(
+        self, profile_id: str, target_type: EvidenceTargetType, alias_key: str
+    ) -> TargetKeyAlias | None: ...
+
+    def list_for_profile(
+        self, profile_id: str, status: TargetKeyAliasStatus | None = None
+    ) -> tuple[TargetKeyAlias, ...]: ...
+
+    def remove(self, profile_id: str, target_type: EvidenceTargetType, alias_key: str) -> bool: ...
+
+
+class TargetKeyCatalogRepository(Protocol):
+    """Owner-language key labels; extraction may add them but never replace them."""
+
+    def upsert(self, entry: TargetKeyLabel) -> TargetKeyLabel: ...
+
+    def get(
+        self, profile_id: str, target_type: EvidenceTargetType, key: str
+    ) -> TargetKeyLabel | None: ...
+
+    def list_for_profile(self, profile_id: str) -> tuple[TargetKeyLabel, ...]: ...
+
+    def remove(self, profile_id: str, target_type: EvidenceTargetType, key: str) -> bool: ...
+
+
+class TargetKeyEmbeddingRepository(Protocol):
+    """Derived key vectors; rows of other models are dropped when the model changes."""
+
+    def replace_many(self, embeddings: Collection[TargetKeyEmbedding]) -> int: ...
+
+    def list_for_model(self, profile_id: str, model_id: str) -> tuple[TargetKeyEmbedding, ...]: ...
+
+    def remove_other_models(self, profile_id: str, model_id: str) -> int: ...
 
 
 class PersonalModelRepository(Protocol):

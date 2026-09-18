@@ -19,6 +19,7 @@ from soulmate_core.domain import (
 )
 
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService
+from soulmate_daemon.key_aliases import alias_repository
 from soulmate_daemon.runtime import build_external_identity_service, runtime_of
 from soulmate_daemon.security import Actor, ActorKind
 from soulmate_daemon.system import DEFAULT_PROFILE_ID
@@ -260,6 +261,7 @@ def _decision_service(app: FastAPI) -> DecisionService:
         models=repositories.personal_models,
         outcomes=repositories.outcomes,
         provider=None,
+        aliases=alias_repository(repositories, runtime_of(app)["settings"]),
     )
 
 

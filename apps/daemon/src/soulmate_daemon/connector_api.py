@@ -12,10 +12,10 @@ from soulmate_connector_sdk import (
     ConnectorRegistration,
 )
 from soulmate_core.domain import Job
-from soulmate_core.preferences import ModelRebuilder
 from sqlalchemy.exc import IntegrityError
 
 from soulmate_daemon.connectors import ConnectorError, ConnectorService
+from soulmate_daemon.key_aliases import model_rebuilder
 from soulmate_daemon.runtime import runtime_of
 from soulmate_daemon.system import DEFAULT_PROFILE_ID
 
@@ -250,7 +250,7 @@ def build_connector_router(app: FastAPI) -> APIRouter:
         except ConnectorError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         repositories = runtime_of(app)["repositories"]
-        snapshot = ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
+        snapshot = model_rebuilder(repositories, runtime_of(app)["settings"]).rebuild(
             DEFAULT_PROFILE_ID
         )
         return ConnectorRemovalResponse(

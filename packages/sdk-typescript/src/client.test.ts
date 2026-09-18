@@ -123,6 +123,88 @@ describe("SoulmateClient", () => {
     );
   });
 
+  it("sends key alias operations with keys only in request bodies", async () => {
+    // Given: a local owner client
+    const { fetch, calls } = stub(200, {});
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      fetch,
+    });
+    const alias = {
+      target_type: "preference",
+      alias_key: "ui/theme?x",
+    } as const;
+
+    // When: the owner lists, merges, reviews, and removes aliases
+    await client.keyAliases();
+    await client.mergeKeys("preference", "ui.theme.light", "ui.theme.dark", -1);
+    await client.mergeKeys("fact", "Home.City", "home.city");
+    await client.reviewKeyAlias(alias, "invert");
+    await client.removeKeyAlias(alias);
+
+    // Then: paths stay fixed and keys never reach the URL
+    expect(calls.map((call) => [call.init?.method, call.url])).toEqual([
+      ["GET", "http://127.0.0.1:7432/v1/key-aliases"],
+      ["POST", "http://127.0.0.1:7432/v1/key-aliases"],
+      ["POST", "http://127.0.0.1:7432/v1/key-aliases"],
+      ["POST", "http://127.0.0.1:7432/v1/key-aliases/review"],
+      ["POST", "http://127.0.0.1:7432/v1/key-aliases/remove"],
+    ]);
+    expect(calls.map((call) => call.init?.body)).toEqual([
+      undefined,
+      JSON.stringify({
+        target_type: "preference",
+        alias_key: "ui.theme.light",
+        canonical_key: "ui.theme.dark",
+        polarity: -1,
+      }),
+      JSON.stringify({
+        target_type: "fact",
+        alias_key: "Home.City",
+        canonical_key: "home.city",
+        polarity: 1,
+      }),
+      JSON.stringify({
+        target_type: "preference",
+        alias_key: "ui/theme?x",
+        action: "invert",
+      }),
+      JSON.stringify({ target_type: "preference", alias_key: "ui/theme?x" }),
+    ]);
+  });
+
+  it.each([
+    [403, "This action is only available on the owner's device."],
+    [404, "Key alias was not found."],
+    [409, "Key aliases are disabled in the configuration."],
+    [422, "The service request failed with status 422."],
+  ])("surfaces alias failure %s as a typed error", async (status, message) => {
+    // Given: a service that refuses an alias review
+    const { fetch } = stub(
+      status,
+      status === 422
+        ? { detail: [{ loc: ["body", "action"] }] }
+        : { detail: message },
+    );
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      fetch,
+    });
+
+    // When: the owner reviews an alias
+    const error = await client
+      .reviewKeyAlias(
+        { target_type: "preference", alias_key: "ui.theme.dark_mode" },
+        "approve",
+      )
+      .catch((caught: unknown) => caught);
+
+    // Then: the status and a readable message are preserved
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(status);
+    expect((error as ApiError).message).toBe(message);
+  });
+
   it("exposes active learning, advice, and outcome operations", async () => {
     // Given: a paired client and successful local service
     const { fetch, calls } = stub(200, {});
@@ -376,6 +458,119 @@ describe("SoulmateClient", () => {
 
     // When/Then: the original transport error surfaces
     await expect(client.health()).rejects.toThrow("Network request failed");
+  });
+
+  it("sends key label operations with keys only in request bodies", async () => {
+    // Given: a local owner client
+    const { fetch, calls } = stub(200, {});
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      fetch,
+    });
+
+    // When: the owner lists, names, and clears a key label
+    await client.keyLabels();
+    await client.setKeyLabel("preference", "ui/theme?x", "giao diện tối", [
+      "nền tối",
+    ]);
+    await client.removeKeyLabel({
+      target_type: "preference",
+      key: "ui/theme?x",
+    });
+
+    // Then: the Tauri bridge never sees a key in a path or query string
+    expect(calls.map((call) => [call.init?.method, call.url])).toEqual([
+      ["GET", "http://127.0.0.1:7432/v1/key-labels"],
+      ["POST", "http://127.0.0.1:7432/v1/key-labels"],
+      ["POST", "http://127.0.0.1:7432/v1/key-labels/remove"],
+    ]);
+    expect(calls[1]?.init?.body).toBe(
+      JSON.stringify({
+        target_type: "preference",
+        key: "ui/theme?x",
+        label: "giao diện tối",
+        aliases: ["nền tối"],
+      }),
+    );
+  });
+
+  it("clears a key label by sending an explicit null name", async () => {
+    // Given: a local owner client
+    const { fetch, calls } = stub(200, {});
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      fetch,
+    });
+
+    // When: the owner keeps only aliases
+    await client.setKeyLabel("fact", "home.city", null);
+
+    // Then: the absent name is explicit rather than an omitted field
+    expect(calls[0]?.init?.body).toBe(
+      JSON.stringify({
+        target_type: "fact",
+        key: "home.city",
+        label: null,
+        aliases: [],
+      }),
+    );
+  });
+
+  it("drives the embedding model without ever downloading implicitly", async () => {
+    // Given: a local owner client
+    const { fetch, calls } = stub(200, {});
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      fetch,
+    });
+
+    // When: the owner inspects and then acts on the local model
+    await client.embeddingModel();
+    await client.downloadEmbeddingModel();
+    await client.cancelEmbeddingModelDownload();
+    await client.importEmbeddingModelFile(
+      "tokenizer.json",
+      "/tmp/tokenizer.json",
+    );
+    await client.removeEmbeddingModel();
+
+    // Then: reading is a plain GET and every change is an explicit POST
+    expect(calls.map((call) => [call.init?.method, call.url])).toEqual([
+      ["GET", "http://127.0.0.1:7432/v1/embedding-model"],
+      ["POST", "http://127.0.0.1:7432/v1/embedding-model/download"],
+      ["POST", "http://127.0.0.1:7432/v1/embedding-model/cancel"],
+      ["POST", "http://127.0.0.1:7432/v1/embedding-model/import"],
+      ["POST", "http://127.0.0.1:7432/v1/embedding-model/remove"],
+    ]);
+    expect(calls[3]?.init?.body).toBe(
+      JSON.stringify({
+        file_name: "tokenizer.json",
+        source_path: "/tmp/tokenizer.json",
+      }),
+    );
+  });
+
+  it("reports a refused model download with its reason", async () => {
+    // Given: a service that refuses the download in offline mode
+    const { fetch } = stub(409, {
+      detail: "The configured privacy mode denies downloading a model.",
+    });
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      fetch,
+    });
+
+    // When: the owner presses download anyway
+    const error = await client
+      .downloadEmbeddingModel()
+      .catch((caught: unknown) => caught);
+
+    // Then: the owner-facing reason survives the transport
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).status).toBe(409);
+    expect((error as ApiError).message).toBe(
+      "The configured privacy mode denies downloading a model.",
+    );
   });
 
   it("returns a client bound to a new credential after re-pairing", async () => {

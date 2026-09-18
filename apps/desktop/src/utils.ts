@@ -26,3 +26,11 @@ export function preferenceLabel(value: number): string {
   if (magnitude >= 0.4) return direction;
   return `Slightly ${direction.toLowerCase()}`;
 }
+
+/** Show download and memory sizes the way the owner sees them on disk. */
+export function formatBytes(value: number): string {
+  if (value < 1_000_000) return `${String(Math.round(value / 1000))} KB`;
+  if (value < 1_000_000_000)
+    return `${String(Math.round(value / 1_000_000))} MB`;
+  return `${(value / 1_000_000_000).toFixed(1)} GB`;
+}

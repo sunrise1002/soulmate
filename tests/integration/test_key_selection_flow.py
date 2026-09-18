@@ -12,7 +12,10 @@ from soulmate_core.domain import Evidence, EvidenceTargetType, RawEvent
 from soulmate_daemon.app import create_app
 from soulmate_daemon.config import Settings
 from soulmate_daemon.conversation import ConversationService
+from soulmate_daemon.key_semantics import enqueue_key_embedding_refresh, refresh_from_payload
 from soulmate_llm_providers import FakeLLMProvider
+
+from tests.key_embedding_support import FakeConceptEmbedding
 
 pytestmark = pytest.mark.integration
 
@@ -102,6 +105,9 @@ def _chat_and_learn(
             models=repositories.personal_models,
             provider=provider,
             jobs=repositories.jobs,
+            aliases=repositories.key_aliases,
+            catalog=repositories.key_catalog,
+            semantics=app.state.runtime["key_semantics"],
         ).retry_learning(job.payload)
     )
     return str(body["conversation_id"])
@@ -235,3 +241,90 @@ def test_decision_filtering_prefers_keys_from_same_domain_decisions(tmp_path: Pa
     assert "ui.theme.dark" in known["preferences"]
     assert "work.remote" not in known["preferences"]
     assert len(known["preferences"]) == KEY_LIMIT
+
+
+def _labelled_output(key: str, label: str) -> dict[str, object]:
+    output = _preference_output(key)
+    preferences = output["preferences"]
+    assert isinstance(preferences, list)
+    preferences[0]["label"] = label
+    return output
+
+
+def _refresh_key_embeddings(app: FastAPI) -> None:
+    """Run the durable refresh the daemon scheduler would queue in the background."""
+    runtime = app.state.runtime
+    semantics = runtime["key_semantics"]
+    assert semantics is not None
+    repositories = runtime["repositories"]
+    job = enqueue_key_embedding_refresh(
+        repositories.jobs, repositories.evidence, semantics, PROFILE_ID
+    )
+    assert job is not None
+    assert refresh_from_payload(semantics, job.payload).embedded_count > 0
+
+
+def test_semantic_retrieval_shares_a_key_named_in_another_language(tmp_path: Path) -> None:
+    # Given: a large model that learned ui.theme.dark with low confidence from a
+    # Vietnamese message, and an embedding model that is installed
+    provider = FakeLLMProvider(
+        responses=["Noted.", "Noted."],
+        structured_responses=[
+            _labelled_output("ui.theme.dark", "giao diện tối"),
+            _preference_output(),
+        ],
+    )
+    embeddings = FakeConceptEmbedding()
+    app = create_app(
+        Settings(data_dir=tmp_path / "owner-data"), provider=provider, embeddings=embeddings
+    )
+    with owner_client(app) as client:
+        _seed_confident_fillers(app)
+        _chat_and_learn(client, app, provider, "Tôi thích giao diện tối")
+        _refresh_key_embeddings(app)
+
+        # When: a new conversation mentions the same topic in Vietnamese only
+        _chat_and_learn(client, app, provider, "giao diện tối")
+
+    # Then: the key is shared although no word is shared and confidence is low,
+    # which lexical ranking alone could not do
+    known = _last_chat_known_keys(provider)
+    assert "ui.theme.dark" in known["preferences"]
+    assert len(known["preferences"]) == KEY_LIMIT
+
+
+def test_the_extracted_label_is_stored_for_the_key(tmp_path: Path) -> None:
+    # Given: a chat message whose extraction proposes an owner-language label
+    provider = FakeLLMProvider(
+        responses=["Noted."],
+        structured_responses=[_labelled_output("ui.theme.dark", "giao diện tối")],
+    )
+    app = create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
+    with owner_client(app) as client:
+        # When: the message is learned
+        _chat_and_learn(client, app, provider, "Tôi thích giao diện tối")
+
+    # Then: the catalog keeps the wording the owner used, marked as extracted
+    repositories = app.state.runtime["repositories"]
+    stored = repositories.key_catalog.get(
+        PROFILE_ID, EvidenceTargetType.PREFERENCE, "ui.theme.dark"
+    )
+    assert stored is not None
+    assert (stored.label, stored.source.value) == ("giao diện tối", "extracted")
+
+
+def test_without_an_embedding_model_no_vector_is_stored(tmp_path: Path) -> None:
+    # Given: the default configuration, which enables no embedding model
+    provider = FakeLLMProvider(
+        responses=["Noted."],
+        structured_responses=[_labelled_output("ui.theme.dark", "giao diện tối")],
+    )
+    app = create_app(Settings(data_dir=tmp_path / "owner-data"), provider=provider)
+    with owner_client(app) as client:
+        # When: a message is learned
+        _chat_and_learn(client, app, provider, "Tôi thích giao diện tối")
+
+    # Then: no key semantics service exists and nothing derived was written
+    runtime = app.state.runtime
+    assert runtime["key_semantics"] is None
+    assert runtime["repositories"].key_embeddings.list_for_model(PROFILE_ID, "bge-m3-int8") == ()
