@@ -71,6 +71,50 @@ export interface KeyAliasRemoval {
   snapshot_version: number;
 }
 
+export type KeyLabelSource = "extracted" | "owner";
+
+/** Owner-language name of one target key; it is also what the model embeds. */
+export interface KeyLabel {
+  target_type: EvidenceTargetType;
+  key: string;
+  label: string | null;
+  aliases: string[];
+  source: KeyLabelSource;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KeyLabelList {
+  labels: KeyLabel[];
+}
+
+export interface EmbeddingModelFile {
+  name: string;
+  installed: boolean;
+  downloaded_bytes: number;
+  expected_bytes: number;
+}
+
+/** Everything the owner sees before deciding to download a local model. */
+export interface EmbeddingModel {
+  provider: string;
+  model_id: string;
+  display_name: string;
+  license: string;
+  source: string;
+  dimensions: number;
+  download_bytes: number;
+  peak_memory_bytes: number;
+  installed: boolean;
+  downloading: boolean;
+  downloaded_bytes: number;
+  expected_bytes: number;
+  can_download: boolean;
+  privacy_mode: string;
+  error: string | null;
+  files: EmbeddingModelFile[];
+}
+
 export interface Message {
   id: string;
   role: "user" | "assistant";

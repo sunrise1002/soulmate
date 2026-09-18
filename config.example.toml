@@ -72,3 +72,7 @@ idle_release_seconds = 300
 # preference. Evidence keeps its original keys, so disabling this rebuilds the
 # model from them.
 enabled = true
+# Cosine similarity at which two different keys are suggested as duplicates when
+# embeddings are enabled. Suggestions always wait for your review, because
+# opposite keys such as dark and light also score highly.
+semantic_threshold = 0.85

@@ -7,13 +7,23 @@ from typing import Annotated
 from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
-from soulmate_core.domain import Evidence, EvidenceTargetType
+from soulmate_core.domain import (
+    Evidence,
+    EvidenceTargetType,
+    TargetKeyLabel,
+    TargetKeyLabelSource,
+)
 
 EXTRACTOR_VERSION = "conversation-evidence-v1"
 KEY_REUSE_RULES = """Key rules: when a key in the supplied known keys describes the same concept,
 reuse that exact key instead of inventing a variant. Otherwise prefer placing a new key under a
 listed namespace. Represent one concept as one signed axis (for example ui.theme.dark with -1..1)
 rather than separate keys for each opposite."""
+KEY_LABEL_RULES = """Label rules: set label to a short name for the key in the language the user
+wrote, and aliases to other wordings the user might use for it, separated by commas. Use empty
+strings when the key needs no label."""
+LABEL_MAX_LENGTH = 200
+ALIAS_MAX_COUNT = 5
 SENSITIVE_TERMS = frozenset(
     {"finance", "health", "identity", "medical", "politics", "religion", "sexual"}
 )
@@ -23,7 +33,23 @@ class ProposalModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class PreferenceProposal(ProposalModel):
+class LabelledProposal(ProposalModel):
+    """Shared optional owner-language naming of the target key."""
+
+    label: Annotated[str, Field(max_length=LABEL_MAX_LENGTH)] = ""
+    aliases: Annotated[str, Field(max_length=LABEL_MAX_LENGTH * ALIAS_MAX_COUNT)] = ""
+
+    def label_aliases(self) -> tuple[str, ...]:
+        """Split the comma-separated aliases, keeping the first of any duplicates."""
+        seen: dict[str, None] = {}
+        for value in self.aliases.split(","):
+            trimmed = value.strip()[:LABEL_MAX_LENGTH]
+            if trimmed and trimmed != self.label.strip():
+                seen.setdefault(trimmed, None)
+        return tuple(seen)[:ALIAS_MAX_COUNT]
+
+
+class PreferenceProposal(LabelledProposal):
     target_key: Annotated[str, Field(min_length=1, max_length=200)]
     value: Annotated[float, Field(ge=-1.0, le=1.0)]
     strength: Annotated[float, Field(ge=0.0, le=1.0)]
@@ -31,7 +57,7 @@ class PreferenceProposal(ProposalModel):
     context: dict[str, JsonValue] = Field(default_factory=dict)
 
 
-class CategoricalProposal(ProposalModel):
+class CategoricalProposal(LabelledProposal):
     target_key: Annotated[str, Field(min_length=1, max_length=200)]
     value: JsonValue
     strength: Annotated[float, Field(ge=0.0, le=1.0)]
@@ -50,6 +76,7 @@ class EvidenceProposals(ProposalModel):
 class ReviewedEvidence:
     accepted: tuple[Evidence, ...]
     rejected_count: int
+    labels: tuple[TargetKeyLabel, ...] = ()
 
 
 def extraction_schema() -> dict[str, object]:
@@ -71,13 +98,23 @@ def extraction_schema() -> dict[str, object]:
         "strength": {"type": "number"},
         "confidence": {"type": "number"},
         "context": {"type": "array", "items": context_entry},
+        "label": {"type": "string"},
+        "aliases": {"type": "string"},
     }
 
     def proposal(value_schema: dict[str, object]) -> dict[str, object]:
         return {
             "type": "object",
             "properties": {**common_properties, "value": value_schema},
-            "required": ["target_key", "value", "strength", "confidence", "context"],
+            "required": [
+                "target_key",
+                "value",
+                "strength",
+                "confidence",
+                "context",
+                "label",
+                "aliases",
+            ],
             "additionalProperties": False,
         }
 
@@ -141,8 +178,13 @@ def review_proposals(
     extractor_model: str,
     created_at: datetime,
 ) -> ReviewedEvidence:
-    """Automatically accept ordinary proposals and hold sensitive claims back."""
+    """Automatically accept ordinary proposals and hold sensitive claims back.
+
+    Labels travel with accepted evidence only, so a rejected sensitive claim never
+    leaves its owner-language wording behind in the key catalog.
+    """
     accepted: list[Evidence] = []
+    labels: dict[tuple[EvidenceTargetType, str], TargetKeyLabel] = {}
     rejected = 0
     groups: tuple[
         tuple[EvidenceTargetType, list[PreferenceProposal] | list[CategoricalProposal]], ...
@@ -175,4 +217,30 @@ def review_proposals(
                     source_message_id=source_message_id,
                 )
             )
-    return ReviewedEvidence(tuple(accepted), rejected)
+            label = _label(item, target_type, profile_id, created_at)
+            if label is not None:
+                labels.setdefault((target_type, item.target_key), label)
+    return ReviewedEvidence(tuple(accepted), rejected, tuple(labels.values()))
+
+
+def _label(
+    item: PreferenceProposal | CategoricalProposal,
+    target_type: EvidenceTargetType,
+    profile_id: str,
+    created_at: datetime,
+) -> TargetKeyLabel | None:
+    """Return the extracted owner-language naming of a key, or ``None`` when absent."""
+    label = item.label.strip()[:LABEL_MAX_LENGTH]
+    aliases = item.label_aliases()
+    if not label and not aliases:
+        return None
+    return TargetKeyLabel(
+        profile_id=profile_id,
+        target_type=target_type,
+        key=item.target_key,
+        label=label or None,
+        aliases=aliases,
+        source=TargetKeyLabelSource.EXTRACTED,
+        created_at=created_at,
+        updated_at=created_at,
+    )

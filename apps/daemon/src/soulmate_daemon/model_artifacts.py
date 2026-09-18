@@ -26,7 +26,7 @@ class ModelArtifactError(RuntimeError):
 
 @dataclass(frozen=True, slots=True)
 class ModelFile:
-    """One pinned file of an artifact; ``approximate_bytes`` is only shown to the owner."""
+    """One pinned file of an artifact; ``approximate_bytes`` is the size P6 downloaded."""
 
     name: str
     url: str
@@ -71,8 +71,10 @@ BGE_M3_INT8 = ModelArtifact(
     dimensions=1024,
     max_tokens=128,
     pooling="cls",
-    # Measured in the P0 spike on macOS arm64: about 1.8 GB resident while loaded.
-    peak_memory_bytes=1_800_000_000,
+    # Measured while loaded on macOS arm64: 1765 MB in the P0 spike and 1908 MB when
+    # P6 re-ran the same harness against the downloaded artifact; the owner is shown
+    # the larger, rounded figure before a download.
+    peak_memory_bytes=2_000_000_000,
     weights_file="model_int8.onnx",
     tokenizer_file="tokenizer.json",
     files=(
@@ -80,13 +82,13 @@ BGE_M3_INT8 = ModelArtifact(
             name="model_int8.onnx",
             url="https://huggingface.co/Xenova/bge-m3/resolve/main/onnx/model_int8.onnx",
             sha256="a206e10e995aa2a833924bcd725ba5dd6c3425cd34bac3cf2b5677cd2a1c51d6",
-            approximate_bytes=568_000_000,
+            approximate_bytes=568_456_694,
         ),
         ModelFile(
             name="tokenizer.json",
             url="https://huggingface.co/Xenova/bge-m3/resolve/main/tokenizer.json",
             sha256="6710678b12670bc442b99edc952c4d996ae309a7020c1fa0096dd245c2faf790",
-            approximate_bytes=17_100_000,
+            approximate_bytes=17_082_821,
         ),
     ),
 )

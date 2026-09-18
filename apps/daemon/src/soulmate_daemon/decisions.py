@@ -36,6 +36,7 @@ from soulmate_llm_providers import LLMMessage, LLMProvider
 
 from soulmate_daemon.extraction import KEY_REUSE_RULES
 from soulmate_daemon.key_aliases import register_normalized_aliases
+from soulmate_daemon.key_semantics import KeySemanticsService
 
 FEATURE_EXTRACTION_PROMPT = f"""Extract comparable preference features for each decision option.
 Use stable dotted English keys; known_keys lists known preference keys and namespaces.
@@ -93,6 +94,7 @@ class DecisionService:
         outcomes: OutcomeRepository,
         provider: LLMProvider | None,
         aliases: TargetKeyAliasRepository | None,
+        semantics: KeySemanticsService | None = None,
     ) -> None:
         self._decisions = decisions
         self._raw_events = raw_events
@@ -100,6 +102,7 @@ class DecisionService:
         self._outcomes = outcomes
         self._provider = provider
         self._aliases = aliases
+        self._semantics = semantics
         self._rebuilder = ModelRebuilder(evidence, models, aliases)
 
     async def create(
@@ -124,14 +127,20 @@ class DecisionService:
                 for option in historical_options
                 for key in option.features
             }
+            query = " ".join(
+                [question, *(f"{item.label} {item.description}" for item in option_inputs)]
+            )
             known_keys = select_known_keys(
                 snapshot.model,
-                query=" ".join(
-                    [question, *(f"{item.label} {item.description}" for item in option_inputs)]
-                ),
+                query=query,
                 recent_keys=resolved_keys,
                 domain=domain,
                 key_types=("preferences",),
+                semantic_scores=(
+                    None
+                    if self._semantics is None
+                    else self._semantics.query_scores(profile_id, query)
+                ),
             )
             raw = await self._provider.generate_structured(
                 [

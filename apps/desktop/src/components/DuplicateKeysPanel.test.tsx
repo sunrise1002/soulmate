@@ -201,6 +201,41 @@ describe("duplicate keys panel", () => {
     expect(await screen.findByText(/opposite of/)).not.toBeNull();
   });
 
+  it("explains a semantic suggestion with its similarity", async () => {
+    // Given: a suggestion that only similar wording produced
+    serve({
+      enabled: true,
+      aliases: [
+        alias({
+          alias_key: "appearance.night",
+          method: "semantic",
+          status: "suggested",
+          similarity: 0.917,
+        }),
+      ],
+    });
+
+    // When: the panel renders
+    render(<DuplicateKeysPanel revision={0} onChanged={vi.fn()} />);
+
+    // Then: the owner sees why the pair was suggested before merging it
+    expect(
+      await screen.findByText(/similar wording, 92% alike/i),
+    ).not.toBeNull();
+  });
+
+  it("names no similarity for an automatic merge", async () => {
+    // Given: a merge produced by equal normalized keys
+    serve({ enabled: true, aliases: [alias({})] });
+
+    // When: the panel renders
+    render(<DuplicateKeysPanel revision={0} onChanged={vi.fn()} />);
+
+    // Then: no similarity is claimed
+    expect(await screen.findByText(/same as/)).not.toBeNull();
+    expect(screen.queryByText(/similar wording/i)).toBe(null);
+  });
+
   it("shows merges read-only when key merging is disabled", async () => {
     // Given: aliases disabled in configuration
     serve({ enabled: false, aliases: [alias({})] });

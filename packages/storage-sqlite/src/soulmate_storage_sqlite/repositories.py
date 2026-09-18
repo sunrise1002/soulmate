@@ -63,6 +63,10 @@ from soulmate_storage_sqlite.key_aliases import (
     bump_evidence_revision,
     prune_unsupported_keys,
 )
+from soulmate_storage_sqlite.key_metadata import (
+    SqliteTargetKeyCatalogRepository,
+    SqliteTargetKeyEmbeddingRepository,
+)
 from soulmate_storage_sqlite.schema import (
     ActiveQuestionRow,
     ApiCredentialRow,
@@ -2157,6 +2161,8 @@ class Repositories:
         self.active_questions = SqliteActiveQuestionRepository(sessions)
         self.evidence = SqliteEvidenceRepository(sessions)
         self.key_aliases = SqliteTargetKeyAliasRepository(sessions)
+        self.key_catalog = SqliteTargetKeyCatalogRepository(sessions)
+        self.key_embeddings = SqliteTargetKeyEmbeddingRepository(sessions)
         self.personal_models = SqlitePersonalModelRepository(sessions)
         self.audit_events = SqliteAuditEventRepository(sessions)
         self.jobs = SqliteJobRepository(sessions)

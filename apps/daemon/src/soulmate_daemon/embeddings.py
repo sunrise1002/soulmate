@@ -84,7 +84,10 @@ class LocalOnnxEmbedding:
         self._last_used = self._clock()
         try:
             return session.embed(texts)
-        except (OSError, RuntimeError, ValueError) as exc:
+        except Exception as exc:
+            # A native runtime defines its own exception tree: every onnxruntime
+            # error derives straight from Exception, so narrowing here would let a
+            # broken model escape instead of degrading to the lexical ranking.
             self.release()
             raise EmbeddingUnavailableError("The embedding model failed while running.") from exc
 
@@ -104,7 +107,9 @@ class LocalOnnxEmbedding:
             raise EmbeddingUnavailableError("The embedding model is not installed.")
         try:
             session = self._loader()
-        except (ImportError, OSError, RuntimeError, ValueError) as exc:
+        except Exception as exc:
+            # Loading raises whatever the runtime, the tokenizer, or the file system
+            # raises; a corrupt or foreign model file must still degrade quietly.
             raise EmbeddingUnavailableError("The embedding model could not be loaded.") from exc
         self._session = session
         return session

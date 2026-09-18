@@ -79,3 +79,29 @@ first artifact can be stored, or every backup fails.
 Windows, Linux, and x64 behavior is unverified: the spike ran only on macOS arm64.
 Step P6 owns the packaged cross-platform smoke test, and the fallback to step A
 exists precisely because a native runtime may fail to load there.
+
+## Verification (step P6, 2026-09-18)
+
+The pinned artifact was downloaded and run for the first time on macOS arm64.
+Both SHA-256 pins matched the published files byte for byte, and the recorded
+sizes were replaced with the exact ones (568,456,694 and 17,082,821 bytes). The
+`bge-m3` int8 export pools inside the graph, so `_OnnxSession` returns its output
+directly; vectors are 1024-dimensional and L2-normalized, a warm single text costs
+about 8–9 ms, and the P0 retrieval harness reproduced its numbers against the real
+model (97.7% Vietnamese recall inside the 50-key budget without labels, 100% with
+them, and 6 of 27 opposite pairs still above the 0.85 review threshold).
+
+Two facts recorded above were corrected by that first real run:
+
+- Peak resident memory is about 1.9 GB, not 1.8 GB. The owner-facing estimate is
+  now 2.0 GB so the dialog never understates it.
+- Every `onnxruntime` exception derives directly from `Exception`, not from
+  `RuntimeError`. The adapter's failure handling was widened accordingly;
+  narrowing it would have let a corrupt model file escape as an unhandled error
+  instead of falling back to the lexical ranking this ADR relies on.
+
+The runtimes are packaged as the optional `soulmate-daemon[embeddings]` extra, so
+a plain install stays unchanged while the desktop sidecar bundles them.
+`tokenizers` pulls `huggingface-hub` transitively; the product never imports it
+and loads the tokenizer from the verified local file only, so no second download
+path exists.
