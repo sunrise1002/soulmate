@@ -5,15 +5,14 @@
 This plan was recorded on 2026-09-17 as an owner-requested cross-phase increment.
 Planning is recorded and the owner answered all open decisions on 2026-09-17
 (see [Owner decisions](#owner-decisions)). On 2026-09-17 the owner authorized
-implementation; steps P1 and P2 are complete locally, and steps P3, P0, P4, and
-P5 are complete locally on 2026-09-18. Step P0 produced
+implementation; steps P1 and P2 are complete locally, and steps P3, P0, P4, P5,
+and P6 are complete locally on 2026-09-18. Step P0 produced
 [ADR-016](../architecture/decisions/ADR-016-local-multilingual-key-embeddings.md)
 and the [P0 spike report](key-consistency-p0-spike-report.md), and the owner
 confirmed `bge-m3` int8 as the default model and quantization on 2026-09-18.
-Step P6 has not started and still stops for verification. This plan does not start
-Phase 13 or authorize Phase 14. Temporary hand-over notes for the next session live in
-[working notes](key-consistency-increment-progress.md); delete that file when the
-increment finishes.
+**The increment is complete**; its outcome, measurements, and limitations are
+recorded in the [increment report](key-consistency-increment-report.md). This plan
+does not start Phase 13 or authorize Phase 14.
 
 Parts B (multilingual labels and local embeddings) and C (key canonicalization and
 aliases) change persistence, add native runtime dependencies, and introduce a
@@ -155,7 +154,7 @@ Each increment stops for verification before the next one starts.
 | P3 | Wire C: automatic normalized aliases, predictor and pairwise mapping, owner API and review UI — complete on 2026-09-18 | Integration and client tests: passed locally (`pnpm check`, 500 Python tests and 122 client tests) |
 | P4 | Embedding port, null and ONNX adapters, model manager and egress handling — complete on 2026-09-18 | Tests for failed download, SHA mismatch, offline and strict modes using fakes: passed locally (`pnpm check`, 582 Python tests). The real ONNX runtime and the real artifact are still unexercised; they belong to P6 |
 | P5 | Extraction labels, embedding and backfill job, semantic scoring, semantic alias suggestions — complete on 2026-09-18 | "giao diện tối" retrieves `ui.theme.dark` in `tests/integration/test_key_selection_flow.py` with a fake embedder: passed locally (`pnpm check`, 698 Python tests, 125 client tests) |
-| P6 | Sidecar packaging with `onnxruntime`, size check, smoke test against the real artifact, the model download and key label UI; documentation, changelog, phase status | `pnpm check:all` and a sidecar build |
+| P6 | Sidecar packaging with `onnxruntime`, size check, smoke test against the real artifact, the model download and key label UI; documentation, changelog, phase status — complete on 2026-09-18 | `pnpm check` and `pnpm check:all` passed locally (739 Python, 54 SDK, 39 desktop, 46 web, 27 mobile, 7 Rust tests), the sidecar rebuilt at 74.7 MB, and 12 opt-in tests ran against the downloaded artifact; both SHA-256 pins confirmed. See the [increment report](key-consistency-increment-report.md) |
 
 Unit tests continue to avoid network access and real models; the ONNX adapter is
 exercised by an opt-in test marker and the P6 smoke test.

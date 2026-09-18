@@ -1,19 +1,18 @@
 """Measure one ONNX embedding model against the packaged key retrieval dataset.
 
 This is the reproducible P0 spike runner for the key consistency increment. It is
-a development tool, not product code: `onnxruntime`, `tokenizers`, and `numpy` are
-deliberately absent from `uv.lock` until step P4 decides on them, so run it from a
-throwaway environment and pass an already downloaded model file:
+a development tool, not product code, and it never downloads anything: pass an
+already installed artifact, for example the one an owner download placed in
+`DATA_DIR/models/bge-m3-int8`. Since step P6 the embedding runtimes are pinned in
+`uv.lock` through the `soulmate-daemon[embeddings]` extra, so the workspace
+environment can run it directly:
 
-    uv venv /tmp/key-spike/.venv
-    uv pip install --python /tmp/key-spike/.venv/bin/python onnxruntime tokenizers numpy
-    PYTHONPATH=packages/core-python/src /tmp/key-spike/.venv/bin/python \
-        scripts/key_embedding_spike.py --model bge-m3-int8 \
-        --onnx /tmp/key-spike/models/bge-m3.int8.onnx \
-        --tokenizer /tmp/key-spike/models/bge-m3.tokenizer.json --pooling cls
+    uv run --locked python scripts/key_embedding_spike.py --model bge-m3-int8 \
+        --onnx "$DATA_DIR/models/bge-m3-int8/model_int8.onnx" \
+        --tokenizer "$DATA_DIR/models/bge-m3-int8/tokenizer.json" --pooling cls
 
 It prints one JSON object with retrieval quality, antonym similarity, latency, and
-peak resident memory. It never downloads anything by itself.
+peak resident memory.
 """
 
 import argparse

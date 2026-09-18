@@ -17,12 +17,11 @@ and manual uploads, and fresh-install latest restore. It does not start Phase 13
 or authorize a later phase. See the
 [remote backup increment report](phases/remote-backup-increment-report.md).
 
-The owner authorized the key consistency increment on 2026-09-17, and step P1 of
-its [plan](phases/key-consistency-increment-plan.md) is implemented locally:
+The owner authorized the key consistency increment on 2026-09-17, and its
+[plan](phases/key-consistency-increment-plan.md) is now fully implemented
+locally. This does not start Phase 13 or authorize a later phase. Step P1 added
 `normalize_key`, the `TargetKeyAlias` domain record, and alias-aware aggregation
-inside the kernel, with no persistence, no wiring, and no new dependency. Steps
-P0 and P2 to P6 are not implemented. This does not start Phase 13 or authorize a
-later phase. Step P2 (migration `0011`, alias repository, revision bump, deletion
+inside the kernel, with no persistence, no wiring, and no new dependency. Step P2 (migration `0011`, alias repository, revision bump, deletion
 cleanup, and archive coverage) followed on the same day, and step P3 (automatic
 normalized aliases, alias-aware prediction, the owner alias API, and the desktop
 and web review list) on 2026-09-18. Step P0 closed on 2026-09-18 with ADR-016, a
@@ -37,9 +36,19 @@ manager, and the owner-only `/v1/embedding-model` API; `embedding.provider`
 defaults to `none`, so no model is downloaded or loaded unless the owner asks.
 Step P5 followed on 2026-09-18 with extracted key labels, a durable key embedding
 refresh job, semantic key retrieval, and owner-reviewed semantic merge
-suggestions. Step P6 (sidecar packaging with `onnxruntime`, the first run against
-the real artifact, the model download UI, and final documentation) is not
-implemented. See the
+suggestions. Step P6 closed the increment on 2026-09-18: the embedding runtimes
+are packaged as the optional `soulmate-daemon[embeddings]` extra and bundled into
+the desktop sidecar (42.6 MB to 74.7 MB, with a build-time size budget), the
+pinned artifact was downloaded and run for the first time with both SHA-256 pins
+confirmed and the P0 retrieval numbers reproduced, the desktop and web Model
+screens gained the model download panel and an owner-editable name for each key
+through a new owner-only `/v1/key-labels` API, and `soulmate embedding-model`
+reports or verifies a local model without downloading one. That first real run
+also found and fixed a defect: every `onnxruntime` exception derives from
+`Exception` rather than `RuntimeError`, so a corrupt model would have raised
+instead of falling back to the word-overlap ranking. The increment is complete
+locally. See the
+[increment report](phases/key-consistency-increment-report.md) and the
 [P0 spike report](phases/key-consistency-p0-spike-report.md).
 
 ## Reports
@@ -232,6 +241,39 @@ model has ever run, so semantic quality rests on the P0 measurements and fakes;
 brute-force cosine scoring is pure Python rather than `numpy`; the model download
 UI is still missing; and the owner cannot yet edit a key label through an API or
 screen.
+
+Step P6 was implemented on 2026-09-18 and completes the increment. `onnxruntime`,
+`tokenizers`, and `numpy` are pinned in `uv.lock` through the optional
+`soulmate-daemon[embeddings]` extra, so a plain install is unchanged while the
+desktop sidecar bundles them; the sidecar grew from 42.6 MB to 74.7 MB, its build
+now fails above a 220 MB budget, and it smoke-tests that the packaged one-file
+binary can load its runtimes. `soulmate embedding-model` reports the model, its
+size, its memory need, and the runtime versions without downloading or loading
+anything, and `--verify` loads an installed model once and embeds a synthetic
+probe; the rebuilt sidecar was proven that way against the downloaded artifact. The desktop
+and web Model screens now expose the P4 download API — model name and license,
+download size, memory need, progress, stop, removal, discarding a partial
+download, and the reason when the privacy mode refuses — and a new owner-only
+`/v1/key-labels` API lets the owner name a key in their own language; extraction
+may never overwrite that name, naming or clearing a key advances the evidence
+revision so its vector is recomputed, and the audit log keeps only the shape of
+the change. The pinned artifact was downloaded and executed for the first time:
+both SHA-256 pins matched the published files, the recorded sizes are now exact,
+and the P0 harness reproduced 97.7% Vietnamese recall inside the 50-key budget
+without labels and 100% with them. That run also found a defect: every
+`onnxruntime` exception derives from `Exception` rather than `RuntimeError`, so a
+corrupt model file would have escaped `LocalOnnxEmbedding` as an unhandled error
+instead of falling back to the word-overlap ranking; both handlers were widened
+and two regression tests added. Peak resident memory measured 1.9 GB, so the
+owner-facing estimate is now 2.0 GB. `pnpm check` and `pnpm check:all` passed
+locally with 739 Python tests, 54 SDK, 39 desktop, 46 web, and 27 mobile client
+tests, and seven Rust tests; 12 further tests run only against a downloaded
+artifact behind the opt-in `local_model` marker. Limitations: remote CI is still
+unverified, only macOS arm64 has run the real model, coverage collection is still
+unavailable (pytest-cov is not installed), the semantic weight and floor in
+`KeySelectionPolicy` remain untuned against real vectors, and no client screen
+creates an owner merge. See the
+[increment report](phases/key-consistency-increment-report.md).
 
 On 2026-09-16, desktop daemon restart and application-exit cleanup were corrected
 for the PyInstaller one-file sidecar. The shell now uses a private graceful

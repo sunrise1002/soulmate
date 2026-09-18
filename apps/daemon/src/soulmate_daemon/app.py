@@ -56,6 +56,7 @@ from soulmate_daemon.key_aliases import (
     model_rebuilder,
     register_normalized_aliases,
 )
+from soulmate_daemon.key_label_api import build_key_label_router
 from soulmate_daemon.key_semantics import (
     KEY_EMBEDDING_INTERVAL_SECONDS,
     KEY_EMBEDDING_REFRESH_JOB,
@@ -1412,6 +1413,7 @@ def create_app(
     app.include_router(build_connector_router(app))
     app.include_router(build_delegation_router(app))
     app.include_router(build_key_alias_router(app))
+    app.include_router(build_key_label_router(app))
     app.include_router(build_embedding_router(app))
     mount_web_client(app, resolved_settings.web_client_directory)
     return app

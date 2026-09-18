@@ -5,7 +5,9 @@ import getpass
 import json
 import os
 import socket
-from datetime import UTC, datetime
+import time
+from datetime import UTC, datetime, timedelta
+from importlib import import_module
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
@@ -13,6 +15,7 @@ from urllib.request import ProxyHandler, build_opener
 
 from alembic.util.exc import CommandError
 from soulmate_connector_sdk import discover_connectors
+from soulmate_core.embeddings import EmbeddingUnavailableError
 from soulmate_core.evaluation import evaluate_dataset, load_dataset
 from soulmate_core.importing import ImportFormat
 from soulmate_mcp.server import main as mcp_main
@@ -20,8 +23,10 @@ from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy.exc import SQLAlchemyError
 
 from soulmate_daemon.config import ConfigurationError, Settings, load_settings
+from soulmate_daemon.embeddings import LocalOnnxEmbedding, artifact_store
 from soulmate_daemon.imports import ChatImportService
 from soulmate_daemon.key_aliases import model_rebuilder
+from soulmate_daemon.model_artifacts import ModelArtifactStore
 from soulmate_daemon.portability import (
     ARCHIVE_MAGIC,
     ArchiveService,
@@ -173,6 +178,72 @@ def _evaluate(dataset_path: Path | None) -> int:
         return 1
     print(json.dumps({"evaluated": True, **report.as_dict()}, sort_keys=True))
     return 0
+
+
+EMBEDDING_RUNTIME_MODULES = ("numpy", "onnxruntime", "tokenizers")
+
+
+def _embedding_runtime() -> dict[str, str]:
+    """Report the optional native runtimes without loading a model."""
+    versions: dict[str, str] = {}
+    for module in EMBEDDING_RUNTIME_MODULES:
+        try:
+            versions[module] = str(import_module(module).__version__)
+        except (AttributeError, ImportError):
+            versions[module] = "missing"
+    return versions
+
+
+# A synthetic pair, so verification never embeds anything the owner wrote.
+EMBEDDING_PROBE = ("ui theme dark | giao diện tối", "giao diện tối")
+
+
+def _verify_embedding(settings: Settings, store: ModelArtifactStore) -> dict[str, object]:
+    """Load the installed model once and embed a fixed synthetic pair."""
+    if not store.installed():
+        return {"verified": False, "error": "The model is not installed."}
+    provider = LocalOnnxEmbedding(
+        store, idle_timeout=timedelta(seconds=settings.embedding.idle_release_seconds)
+    )
+    started = time.monotonic()
+    try:
+        vectors = provider.embed(EMBEDDING_PROBE)
+    except EmbeddingUnavailableError as exc:
+        return {"verified": False, "error": str(exc)}
+    finally:
+        provider.release()
+    return {
+        "verified": True,
+        "dimensions": len(vectors[0]),
+        "elapsed_ms": round((time.monotonic() - started) * 1000.0, 1),
+    }
+
+
+def _embedding_model(settings: Settings, verify: bool = False) -> int:
+    """Show what a local embedding model would need; never download one."""
+    store = artifact_store(settings)
+    status = store.status()
+    runtime = _embedding_runtime()
+    verification = _verify_embedding(settings, store) if verify else {}
+    print(
+        json.dumps(
+            {
+                **verification,
+                "provider": settings.embedding.provider,
+                "model_id": store.artifact.model_id,
+                "license": store.artifact.license,
+                "directory": str(store.directory),
+                "installed": status.installed,
+                "downloaded_bytes": status.downloaded_bytes,
+                "download_bytes": store.artifact.download_bytes,
+                "peak_memory_bytes": store.artifact.peak_memory_bytes,
+                "runtime": runtime,
+                "runtime_available": all(value != "missing" for value in runtime.values()),
+            },
+            sort_keys=True,
+        )
+    )
+    return 0 if verification.get("verified", True) else 1
 
 
 def _list_connectors() -> int:
@@ -433,9 +504,16 @@ def _parser() -> argparse.ArgumentParser:
         ("status", "Query the running local daemon"),
         ("doctor", "Inspect local configuration and persistence"),
         ("rebuild-model", "Rebuild the Personal Model from stored evidence"),
+        ("embedding-model", "Report the local embedding model and its runtimes"),
     ):
         subcommand = commands.add_parser(command, help=help_text)
         subcommand.add_argument("--config", type=Path, help="Path to a TOML configuration file")
+        if command == "embedding-model":
+            subcommand.add_argument(
+                "--verify",
+                action="store_true",
+                help="Load the installed model once and embed a synthetic probe",
+            )
     evaluate = commands.add_parser("evaluate", help="Run reproducible decision evaluation")
     evaluate.add_argument("--dataset", type=Path, help="Path to an evaluation JSON dataset")
     commands.add_parser("mcp", help="Run the scoped MCP stdio adapter")
@@ -521,4 +599,6 @@ def main() -> None:
         raise SystemExit(_remote_restore_latest(settings))
     if args.command == "import":
         raise SystemExit(_import_history(settings, args.path, args.format, args.name))
+    if args.command == "embedding-model":
+        raise SystemExit(_embedding_model(settings, args.verify))
     raise SystemExit(_rebuild_model(settings))

@@ -1,6 +1,7 @@
 """Build and smoke-test the platform-specific desktop daemon sidecar."""
 
 import argparse
+import json
 import os
 import shutil
 import socket
@@ -10,6 +11,10 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+
+# The sidecar was about 43 MB before the embedding runtimes and about 150 MB after
+# them; the budget leaves room for patch releases without hiding a jump.
+MAX_SIDECAR_MB = 220
 
 
 def _target_triple() -> str:
@@ -109,9 +114,36 @@ def _smoke_test_managed_shutdown(executable: Path) -> None:
                         process.wait(timeout=5)
 
 
+def _check_size(destination: Path, limit_bytes: int) -> int:
+    """Keep the bundled embedding runtimes from growing the sidecar unnoticed."""
+    size = destination.stat().st_size
+    print(f"sidecar size: {size / 1e6:.1f} MB (limit {limit_bytes / 1e6:.0f} MB)", file=sys.stderr)
+    if size > limit_bytes:
+        raise RuntimeError(
+            f"The sidecar is {size / 1e6:.1f} MB, above the {limit_bytes / 1e6:.0f} MB budget."
+        )
+    return size
+
+
+def _smoke_test_embedding_runtime(executable: Path) -> None:
+    """Verify the bundled embedding runtimes import; no model is downloaded or loaded."""
+    result = subprocess.run(  # noqa: S603 -- executable is the sidecar built above.
+        [str(executable), "embedding-model"], check=True, capture_output=True, text=True, timeout=60
+    )
+    report = json.loads(result.stdout)
+    if not report["runtime_available"]:
+        raise RuntimeError(f"The sidecar cannot load its embedding runtimes: {report['runtime']}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--if-missing", action="store_true")
+    parser.add_argument(
+        "--max-size-mb",
+        type=int,
+        default=MAX_SIDECAR_MB,
+        help="Fail when the packaged sidecar grows past this size.",
+    )
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     target = _target_triple()
@@ -154,6 +186,14 @@ def main() -> None:
                 "soulmate_core",
                 "--collect-data",
                 "soulmate_daemon",
+                # Local embeddings (ADR-016): the runtimes are imported lazily, so
+                # they are collected explicitly instead of being found by analysis.
+                "--collect-all",
+                "onnxruntime",
+                "--collect-all",
+                "tokenizers",
+                "--collect-submodules",
+                "numpy",
                 str(root / "apps" / "daemon" / "sidecar.py"),
             ],
             cwd=root,
@@ -172,7 +212,9 @@ def main() -> None:
     subprocess.run(  # noqa: S603 -- verifies bundled connector metadata and imports.
         [str(destination), "connectors"], check=True, capture_output=True, text=True, timeout=30
     )
+    _smoke_test_embedding_runtime(destination)
     _smoke_test_managed_shutdown(destination)
+    _check_size(destination, args.max_size_mb * 1_000_000)
     print(destination.relative_to(root))
 
 

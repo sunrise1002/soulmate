@@ -33,6 +33,13 @@ Root `pnpm check` wraps Python, frontend, and native desktop checks. Format the
 workspace with `pnpm format`. The pre-commit hook uses the same locked Python
 tools; `uv` must be available on the PATH inherited by Git and your editor.
 
+`pytest` deselects the `local_model` marker by default. Those checks load the real
+568 MB embedding artifact, so they run only when a model is already installed:
+
+```sh
+SOULMATE_TEST_MODEL_DIR="$DATA_DIR/models" uv run --locked pytest -m local_model
+```
+
 Unit tests must avoid network and real LLMs. Integration tests currently start a
 temporary loopback daemon and clean it up. Use synthetic data and temporary
 directories. Add relevant migration/restart tests when persistence is introduced.

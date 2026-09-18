@@ -7,10 +7,12 @@ import type {
 } from "@soulmate/sdk";
 
 import { DuplicateKeys } from "./DuplicateKeys.tsx";
+import { EmbeddingModel } from "./EmbeddingModel.tsx";
+import { KeyLabels } from "./KeyLabels.tsx";
 
 interface Props {
   client: SoulmateClient;
-  /** Key alias review is owner-only; paired devices would be refused. */
+  /** Key alias, key name, and model review are owner-only; devices are refused. */
   isOwner: boolean;
   onAuthError: (error: unknown) => void;
 }
@@ -100,7 +102,15 @@ export function ModelScreen({ client, isOwner, onAuthError }: Props) {
           </div>
         )}
       </div>
+      {isOwner && <EmbeddingModel client={client} />}
       {isOwner && <DuplicateKeys client={client} onChanged={load} />}
+      {isOwner && (
+        <KeyLabels
+          client={client}
+          keys={preferences.map((item) => item.key)}
+          onChanged={load}
+        />
+      )}
       <ul className="preferences">
         {preferences.map((preference) => (
           <li key={`${preference.key}-${String(preference.model_version)}`}>

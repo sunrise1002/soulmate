@@ -184,6 +184,46 @@ def test_a_missing_native_runtime_degrades_instead_of_failing(tmp_path: Path) ->
     assert isinstance(error.value.__cause__, ImportError)
 
 
+class NativeRuntimeError(Exception):
+    """Mirror an onnxruntime failure: it derives from Exception, not RuntimeError."""
+
+
+def test_a_native_load_failure_degrades_instead_of_failing(tmp_path: Path) -> None:
+    # Given: a corrupt model file, which onnxruntime reports with its own exception
+    sessions: list[FakeSession] = []
+    adapter = _adapter(
+        _installed_store(tmp_path),
+        sessions,
+        FakeClock(),
+        failure=NativeRuntimeError("INVALID_PROTOBUF : Protobuf parsing failed."),
+    )
+
+    # When: an embedding was requested
+    with pytest.raises(EmbeddingUnavailableError) as error:
+        adapter.embed(["giao diện tối"])
+
+    # Then: the port contract holds for an exception tree the adapter cannot enumerate
+    assert "could not be loaded" in str(error.value)
+    assert isinstance(error.value.__cause__, NativeRuntimeError)
+
+
+def test_a_native_run_failure_releases_the_session(tmp_path: Path) -> None:
+    # Given: a loaded session whose native run fails
+    store = _installed_store(tmp_path)
+    session = FakeSession(failure=NativeRuntimeError("RUNTIME_EXCEPTION : Non-zero status code."))
+    adapter = LocalOnnxEmbedding(
+        store, idle_timeout=IDLE, loader=lambda: session, clock=FakeClock()
+    )
+
+    # When: an embedding was requested
+    with pytest.raises(EmbeddingUnavailableError) as error:
+        adapter.embed(["giao diện tối"])
+
+    # Then: the broken session was dropped and the caller can fall back
+    assert "failed while running" in str(error.value)
+    assert isinstance(error.value.__cause__, NativeRuntimeError)
+
+
 def test_a_failing_model_run_releases_the_session(tmp_path: Path) -> None:
     # Given: a session that raises while running
     store = _installed_store(tmp_path)

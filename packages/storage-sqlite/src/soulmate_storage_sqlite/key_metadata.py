@@ -14,6 +14,7 @@ from soulmate_core.domain.models import (
 from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
+from soulmate_storage_sqlite.key_aliases import bump_evidence_revision
 from soulmate_storage_sqlite.schema import TargetKeyCatalogRow, TargetKeyEmbeddingRow
 
 _OWNER = TargetKeyLabelSource.OWNER.value
@@ -77,6 +78,11 @@ class SqliteTargetKeyCatalogRepository:
             row.label_source = entry.source.value
             row.updated_at = entry.updated_at
             session.flush()
+            if entry.source is TargetKeyLabelSource.OWNER:
+                # An owner label changes the embedded text of the key. Extraction
+                # labels need no bump of their own: the evidence they arrive with
+                # already advanced the revision the refresh job is keyed by.
+                bump_evidence_revision(session, entry.profile_id)
             return self._to_domain(row)
 
     def get(
@@ -101,6 +107,9 @@ class SqliteTargetKeyCatalogRepository:
             if row is None:
                 return False
             session.delete(row)
+            session.flush()
+            # The key is embedded without its label from now on, so its vector is stale.
+            bump_evidence_revision(session, profile_id)
             return True
 
     @staticmethod

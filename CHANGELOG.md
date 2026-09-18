@@ -4,6 +4,29 @@
 
 ### Added
 
+- Local model packaging and owner control for the key consistency increment
+  (step P6), which completes the increment. The embedding runtimes are now a
+  pinned optional extra (`soulmate-daemon[embeddings]`: `onnxruntime`,
+  `tokenizers`, `numpy`), so a plain install is unchanged while the desktop
+  sidecar bundles them; the packaged sidecar grew from 43 MB to 75 MB, its build
+  fails above a 220 MB budget, and it now smoke-tests that the bundled runtimes
+  load. A new `soulmate embedding-model` command reports the model, its size,
+  its memory need, and the runtimes without downloading or loading anything, and
+  `soulmate embedding-model --verify` loads an installed model once and embeds a
+  synthetic probe, so a packaged build can be proven to work on a new platform.
+  The desktop and web Model screens gained the download panel the API has had
+  since P4: it names the model and its license, states the download size and the
+  memory it needs before anything is fetched, shows progress, and offers stop,
+  removal, and discarding a partial download; offline mode explains why the
+  button is unavailable. Both clients can now write the owner's own name for a
+  key through a new owner-only API (`GET`/`POST /v1/key-labels` and
+  `/v1/key-labels/remove`), which extraction may never overwrite; naming a key
+  advances the evidence revision so its stored vector is recomputed, and the
+  audit log records only the shape of the change, never the wording. The
+  TypeScript SDK gained `embeddingModel`, `downloadEmbeddingModel`,
+  `cancelEmbeddingModelDownload`, `importEmbeddingModelFile`,
+  `removeEmbeddingModel`, `keyLabels`, `setKeyLabel`, and `removeKeyLabel`.
+
 - Multilingual key retrieval for the key consistency increment (step P5): key
   labels, derived key vectors, semantic key retrieval, and reviewed semantic
   merge suggestions. Chat extraction may now return an optional `label` and
@@ -259,15 +282,28 @@
   hooks, Conventional Commit and branch validation, CI enforcement, issue/PR
   templates, security guidance, and documented GitHub ruleset settings.
 
-No embeddings, real-provider evaluation, remote MCP transport,
+Local key embeddings exist but stay switched off until the owner downloads the
+pinned model. No real-provider evaluation, remote MCP transport,
 signing/notarization, automatic updates, plugin sandbox, or live third-party
 service connector has been implemented. Delegation grants authorization but does
 not execute or verify third-party side effects. Imported and connector sources are
 normalized locally but do not automatically invoke an LLM or create derived
 Evidence.
 
+### Fixed
+
+- A corrupt or foreign local embedding model could raise an unhandled error
+  instead of falling back to the word-overlap key ranking. Every `onnxruntime`
+  exception derives directly from `Exception` rather than from `RuntimeError`, so
+  the adapter's narrower handling never caught them. Found by the first real run
+  of the pinned artifact in step P6.
+
 ### Changed
 
+- The pinned `bge-m3` int8 artifact now records the exact published file sizes
+  and a 2.0 GB peak-memory estimate, measured when step P6 downloaded and ran it
+  for the first time. Both SHA-256 pins were confirmed against the published
+  files, and the P0 retrieval numbers reproduced against the real model.
 - Natural-language decision feature extraction now sends the current Personal
   Model preference keys (keys only, no values) to the provider and asks it to
   reuse them, so options such as `ui.theme.dark` match preferences learned from

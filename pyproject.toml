@@ -15,6 +15,9 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+  # The desktop sidecar bundles the local embedding runtimes, so the development
+  # environment installs the same extra and can exercise them (ADR-016).
+  "soulmate-daemon[embeddings]",
   "boto3-stubs[s3]>=1.40,<2",
   "httpx>=0.28,<1",
   "mypy>=1.15,<2",
@@ -119,8 +122,9 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
-addopts = "-ra --strict-config --strict-markers"
+addopts = "-ra --strict-config --strict-markers -m 'not local_model'"
 markers = [
   "integration: checks application boundaries and local process behavior",
   "evaluation: reproducible decision-model evaluation",
+  "local_model: runs the real local embedding model; opt in with -m local_model",
 ]
