@@ -499,7 +499,7 @@
               <tr><td><a href="architecture/decisions/ADR-004-evidence-derived-model.md">004</a></td><td>Evidence-based derived model</td><td><a href="architecture/decisions/ADR-011-portable-archives.md">011</a></td><td>Credential-free authenticated archives</td></tr>
               <tr><td><a href="architecture/decisions/ADR-005-provider-abstraction.md">005</a></td><td>LLM provider abstraction</td><td><a href="architecture/decisions/ADR-012-connector-plugins.md">012</a></td><td>Permissioned connector plugins</td></tr>
               <tr><td><a href="architecture/decisions/ADR-006-no-default-telemetry.md">006</a></td><td>No cloud telemetry by default</td><td><a href="architecture/decisions/ADR-013-delegated-action-policy.md">013</a></td><td>Prediction-bound delegated actions</td></tr>
-              <tr><td><a href="architecture/decisions/ADR-015-optional-remote-backups.md">015</a></td><td>Optional encrypted remote backups</td><td>014</td><td>Reserved for planned Phase 13</td></tr>
+              <tr><td><a href="architecture/decisions/ADR-015-optional-remote-backups.md">015</a></td><td>Optional encrypted remote backups</td><td><a href="architecture/decisions/ADR-014-decision-io-provenance.md">014</a></td><td>Decision I/O and trusted provenance</td></tr>
               <tr><td><a href="architecture/decisions/ADR-007-desktop-daemon.md">007</a></td><td>Desktop daemon model</td><td><a href="architecture/decisions/ADR-016-local-multilingual-key-embeddings.md">016</a></td><td>Local multilingual key embeddings</td></tr>
             </tbody>
           </table>
@@ -775,6 +775,7 @@ pnpm --filter @soulmate/desktop tauri build   # native installer → src-tauri/t
               <tr><td>Data</td><td><code>GET</code>/<code>DELETE /v1/data/sources[/{id}]</code>, <code>POST /v1/data/imports|backups|exports|restores</code>, and owner-only remote backup status/upload/latest-restore routes</td></tr>
               <tr><td>Connectors</td><td><code>GET /v1/connectors/catalog</code>, <code>GET</code>/<code>POST /v1/connectors</code>, <code>PATCH</code>/<code>DELETE /v1/connectors/{id}</code>, <code>POST /v1/connectors/{id}/sync</code>, <code>GET /v1/connectors/syncs/{job_id}</code></td></tr>
               <tr><td>Delegation</td><td><code>GET</code>/<code>POST</code>/<code>DELETE /v1/delegation-policies[/{id}]</code>, <code>GET /v1/delegation-requests</code>, <code>POST /v1/delegation-requests/{id}/approve|reject</code></td></tr>
+              <tr><td>Decision I/O</td><td><code>GET</code>/<code>POST</code>/<code>DELETE /v1/decision-io/sources[/{id}]</code>, <code>GET /v1/decision-io/observations[?status=…]</code>, <code>POST /v1/decision-io/observations/{id}/confirm|reject</code></td></tr>
               <tr><td>Audit</td><td><code>GET /v1/audit/events</code> — metadata only, never keys or payloads.</td></tr>
             </tbody>
           </table>
@@ -783,7 +784,11 @@ pnpm --filter @soulmate/desktop tauri build   # native installer → src-tauri/t
 <pre><code>GET  /v1/external/model-summary          POST /v1/external/predict-choice
 GET  /v1/external/preference-summary     POST /v1/external/rank-options
 POST /v1/external/record-decision        POST /v1/external/find-similar-decisions
-POST /v1/external/record-outcome
+POST /v1/external/record-outcome           (deprecated: stores an unconfirmed observation)
+POST /v1/external/decision-io/interactions  interaction:record
+POST /v1/external/decision-io/decisions     decision:record
+POST /v1/external/decision-io/resolutions   decision:resolution:record
+POST /v1/external/decision-io/outcomes      outcome:observe
 POST /v1/external/delegation-requests
 GET  /v1/external/delegation-requests/{id}
 POST /v1/external/delegation-requests/{id}/complete</code></pre>
@@ -972,9 +977,9 @@ pnpm check:all   # adds lockfile checks, Git hooks, and Python/web/desktop build
         <section id="status">
           <h2>17. Status &amp; limitations <a class="anchor" href="#status">#</a></h2>
           <p>
-            <span class="badge ok">Phase 12 complete locally</span>
-            Phases 0–12 are implemented and verified locally on macOS arm64. No later product phase is
-            defined or authorized — do not infer a Phase 13. Any further autonomous execution,
+            <span class="badge ok">Phase 13 complete locally</span>
+            Phases 0–13 are implemented and verified locally on macOS arm64. No later product phase is
+            defined or authorized — do not infer a Phase 14. Any further autonomous execution,
             notifications, policy language, or safety-critical behavior needs newly specified,
             explicitly authorized scope.
           </p>

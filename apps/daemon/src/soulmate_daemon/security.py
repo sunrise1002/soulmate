@@ -8,7 +8,10 @@ from soulmate_core.access import (
     AGENT_DELEGATE,
     DECISION_PREDICT,
     DECISION_RECORD,
+    DECISION_RESOLUTION_RECORD,
+    INTERACTION_RECORD,
     MODEL_SUMMARY_READ,
+    OUTCOME_OBSERVE,
     OUTCOME_RECORD,
     PREFERENCE_SUMMARY_READ,
     ExternalAccessError,
@@ -52,6 +55,7 @@ OWNER_ONLY_RULES: tuple[tuple[str | None, str], ...] = (
     (None, "/v1/connectors"),
     (None, "/v1/delegation-policies"),
     (None, "/v1/delegation-requests"),
+    (None, "/v1/decision-io"),
     (None, "/v1/key-aliases"),
     (None, "/v1/key-labels"),
     (None, "/v1/embedding-model"),
@@ -70,6 +74,10 @@ EXTERNAL_SCOPE_RULES: tuple[tuple[str, str, str], ...] = (
     ("POST", "/v1/external/find-similar-decisions", DECISION_PREDICT),
     ("POST", "/v1/external/record-decision", DECISION_RECORD),
     ("POST", "/v1/external/record-outcome", OUTCOME_RECORD),
+    ("POST", "/v1/external/decision-io/interactions", INTERACTION_RECORD),
+    ("POST", "/v1/external/decision-io/decisions", DECISION_RECORD),
+    ("POST", "/v1/external/decision-io/resolutions", DECISION_RESOLUTION_RECORD),
+    ("POST", "/v1/external/decision-io/outcomes", OUTCOME_OBSERVE),
 )
 
 

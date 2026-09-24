@@ -5,10 +5,10 @@ the previous phase before planning or implementing the current phase.
 
 ## Authorized scope
 
-Phase 12 — Delegated Decision Agent is complete locally. Phase 13 — Decision I/O
-and trusted provenance has a recorded plan, but implementation has not started and
-requires a separate explicit owner instruction. No Phase 14 or later work is
-defined or authorized for implementation.
+Phase 13 — Decision I/O and trusted provenance was authorized by the owner on
+2026-09-23 and is complete locally; it stopped at its exit review. See the
+[Phase 13 report](phases/phase-13-report.md). No Phase 14 or later work is defined
+or authorized for implementation.
 
 An owner-authorized cross-phase portability increment for optional encrypted
 remote backup is complete locally. It keeps SQLite as the local primary store,
@@ -68,7 +68,7 @@ locally. See the
 | Phase 10 | Complete locally | [Phase 10 report](phases/phase-10-report.md) | Remote CI, cross-platform restore, large archives, and native mobile builds unverified |
 | Phase 11 | Complete locally | [Phase 11 report](phases/phase-11-report.md) | Remote CI, plugin sandboxing/signing, scheduled sync, real service connectors, and cross-platform packaged discovery unverified |
 | Phase 12 | Complete locally | [Phase 12 report](phases/phase-12-report.md) | Remote CI, broad real-world confidence calibration, external action verification, notifications, and cross-platform packaged behavior unverified |
-| Phase 13 | Planned; not started | [Phase 13 plan](phases/phase-13-plan.md) | Implementation requires explicit owner instruction; ADR and contracts are not yet accepted |
+| Phase 13 | Complete locally | [Phase 13 report](phases/phase-13-report.md) | Remote CI and cross-platform packaged behavior unverified; no adapter consumes the push contracts yet |
 
 ## Phase 12 exit criteria
 
@@ -77,14 +77,23 @@ prediction-bound action, receive automatic authority only inside exact owner-set
 low/medium impact and confidence limits, wait for owner confirmation otherwise,
 and complete one durable authorization without receiving raw Personal Model data.
 
+## Phase 13 exit criteria
+
+Passed locally on macOS arm64. Every externally ingested lifecycle record carries
+source, acquisition, consent, actor, policy-version, and event provenance; an
+external caller cannot assign eligibility or owner authority; agent content cannot
+change derived beliefs; agent-reported satisfaction and regret stay unconfirmed
+until the owner confirms them with their own values; technical, behavioral, and
+owner-reported outcomes are stored separately; retries are idempotent and
+conflicts rejected; out-of-order observations correlate only with their own
+decision; and source removal deletes derivative data and rebuilds the model.
+
 ## Next action
 
-When the owner explicitly authorizes implementation, execute only the recorded
-[Phase 13 plan](phases/phase-13-plan.md), beginning with ADR-014 and the contract
-freeze. Follow specification section 74, validate the complete phase, update its
-report and this status, then stop. Do not infer authorization for agent hooks,
-Git observation, shadow prediction, later autonomous execution, notifications,
-policy expansion, or safety-critical behavior.
+Stop for owner review of the [Phase 13 report](phases/phase-13-report.md). Do not
+implement a Codex or Claude Code hook, Git observer, passive detection, shadow
+predictor, MCP v2 surface, or delegation change until a new phase is planned from
+that report and explicitly authorized.
 
 ## Repository governance
 

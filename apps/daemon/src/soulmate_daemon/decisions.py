@@ -7,6 +7,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from soulmate_core.context import select_known_keys
+from soulmate_core.decision_io import OWNER_LOCAL_EVENT
 from soulmate_core.decisions import (
     DecisionAdvisor,
     DecisionPredictor,
@@ -252,6 +253,7 @@ class DecisionService:
             content={"decision_id": decision_id, "chosen_option_id": chosen_option_id},
             created_at=now,
             ingested_at=now,
+            provenance=OWNER_LOCAL_EVENT,
         )
         resolution = DecisionResolution(
             id=resolution_id,
@@ -305,6 +307,7 @@ class DecisionService:
             },
             created_at=now,
             ingested_at=now,
+            provenance=OWNER_LOCAL_EVENT,
         )
         outcome = DecisionOutcome(
             id=f"outcome_{uuid4().hex}",

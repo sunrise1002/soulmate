@@ -14,6 +14,7 @@ from sqlalchemy import (
     LargeBinary,
     String,
     Text,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
@@ -40,6 +41,23 @@ class SourceRow(Base):
     source_type: Mapped[str] = mapped_column(String, nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    provider: Mapped[str | None] = mapped_column(String, nullable=True)
+    acquisition_method: Mapped[str] = mapped_column(String, nullable=False)
+    consent_mode: Mapped[str] = mapped_column(String, nullable=False)
+    consent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    data_classes_json: Mapped[str] = mapped_column(Text, nullable=False)
+    author_scope: Mapped[str] = mapped_column(String, nullable=False)
+    raw_retention_policy: Mapped[str] = mapped_column(String, nullable=False)
+    adapter_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    parser_version: Mapped[str | None] = mapped_column(String, nullable=True)
+    policy_profile_version: Mapped[str] = mapped_column(String, nullable=False)
+    service_identity_id: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    # Migration 0012 adds the provenance columns in place. SQLite cannot add a
+    # table check to an existing table without rebuilding it, and rebuilding a
+    # foreign-key target risks cascading deletes, so the domain records in
+    # soulmate_core.domain.provenance enforce this vocabulary instead.
+    __table_args__ = (Index("ix_sources_profile_created", "profile_id", "created_at", "id"),)
 
 
 class RawEventRow(Base):
@@ -57,10 +75,28 @@ class RawEventRow(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     sensitivity: Mapped[str] = mapped_column(String, nullable=False)
+    schema_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    external_event_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    actor_type: Mapped[str] = mapped_column(String, nullable=False)
+    evidence_eligibility: Mapped[str] = mapped_column(String, nullable=False)
+    correlation_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    # SQLite cannot add a foreign key to an existing table, so migration 0012 adds
+    # these references as plain columns. The Decision I/O repository resolves and
+    # removes them explicitly instead.
+    causation_event_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    content_fingerprint: Mapped[str | None] = mapped_column(String, nullable=True)
 
     __table_args__ = (
         Index("ix_raw_events_profile_created", "profile_id", "created_at"),
         Index("ix_raw_events_source", "source_id"),
+        Index("ix_raw_events_correlation", "profile_id", "correlation_id"),
+        Index(
+            "uq_raw_events_source_external",
+            "source_id",
+            "external_event_id",
+            unique=True,
+            sqlite_where=text("external_event_id IS NOT NULL"),
+        ),
     )
 
 
@@ -113,10 +149,24 @@ class DecisionEventRow(Base):
     context_json: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    origin: Mapped[str] = mapped_column(String, nullable=False)
+    purpose: Mapped[str] = mapped_column(String, nullable=False)
+    # Added to an existing table by migration 0012; see RawEventRow above.
+    source_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    external_decision_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    source_event_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     __table_args__ = (
         CheckConstraint("status IN ('open', 'resolved')", name="ck_decision_events_status"),
         Index("ix_decision_events_profile_created", "profile_id", "created_at", "id"),
+        Index("ix_decision_events_source", "source_id"),
+        Index(
+            "uq_decision_events_source_external",
+            "source_id",
+            "external_decision_id",
+            unique=True,
+            sqlite_where=text("external_decision_id IS NOT NULL"),
+        ),
     )
 
 
@@ -131,8 +181,16 @@ class DecisionOptionRow(Base):
     description: Mapped[str] = mapped_column(Text, nullable=False)
     features_json: Mapped[str] = mapped_column(Text, nullable=False)
     feature_confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    external_option_id: Mapped[str | None] = mapped_column(String, nullable=True)
 
     __table_args__ = (
+        Index(
+            "uq_decision_options_external",
+            "decision_id",
+            "external_option_id",
+            unique=True,
+            sqlite_where=text("external_option_id IS NOT NULL"),
+        ),
         CheckConstraint(
             "feature_confidence >= 0 AND feature_confidence <= 1",
             name="ck_decision_options_feature_confidence",
@@ -205,10 +263,146 @@ class DecisionOutcomeRow(Base):
         ForeignKey("raw_events.id", ondelete="RESTRICT"), nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attribution: Mapped[str] = mapped_column(String, nullable=False)
 
     __table_args__ = (
         CheckConstraint("satisfaction >= 0 AND satisfaction <= 1", name="ck_outcomes_satisfaction"),
         Index("ix_decision_outcomes_profile_created", "profile_id", "created_at", "id"),
+    )
+
+
+class ResolutionObservationRow(Base):
+    __tablename__ = "resolution_observations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    source_id: Mapped[str] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"), nullable=False
+    )
+    source_event_id: Mapped[str] = mapped_column(
+        ForeignKey("raw_events.id", ondelete="CASCADE"), nullable=False
+    )
+    actor_type: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    disposition: Mapped[str] = mapped_column(String, nullable=False)
+    decision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decision_events.id", ondelete="CASCADE"), nullable=True
+    )
+    external_decision_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    chosen_option_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decision_options.id", ondelete="CASCADE"), nullable=True
+    )
+    external_option_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    correlation_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reason_code: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('unmatched', 'pending', 'confirmed', 'rejected')",
+            name="ck_resolution_observations_status",
+        ),
+        CheckConstraint(
+            "actor_type IN ('owner', 'agent', 'assistant', 'system', 'third_party', 'unknown')",
+            name="ck_resolution_observations_actor_type",
+        ),
+        CheckConstraint(
+            "disposition IN ('accepted', 'modified', 'replaced', 'reverted', 'unknown')",
+            name="ck_resolution_observations_disposition",
+        ),
+        CheckConstraint(
+            "decision_id IS NOT NULL OR external_decision_id IS NOT NULL",
+            name="ck_resolution_observations_decision_reference",
+        ),
+        CheckConstraint(
+            "(status = 'confirmed') = (confirmed_at IS NOT NULL)",
+            name="ck_resolution_observations_confirmation",
+        ),
+        Index(
+            "ix_resolution_observations_profile_status", "profile_id", "status", "created_at", "id"
+        ),
+        Index("ix_resolution_observations_decision", "decision_id"),
+        Index("ix_resolution_observations_source", "source_id"),
+        Index("ix_resolution_observations_external", "profile_id", "external_decision_id"),
+    )
+
+
+class OutcomeObservationRow(Base):
+    __tablename__ = "outcome_observations"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)
+    profile_id: Mapped[str] = mapped_column(
+        ForeignKey("profiles.id", ondelete="CASCADE"), nullable=False
+    )
+    source_id: Mapped[str] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"), nullable=False
+    )
+    source_event_id: Mapped[str] = mapped_column(
+        ForeignKey("raw_events.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String, nullable=False)
+    actor_type: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, nullable=False)
+    decision_id: Mapped[str | None] = mapped_column(
+        ForeignKey("decision_events.id", ondelete="CASCADE"), nullable=True
+    )
+    external_decision_id: Mapped[str | None] = mapped_column(String, nullable=True)
+    technical_status: Mapped[str | None] = mapped_column(String, nullable=True)
+    disposition: Mapped[str | None] = mapped_column(String, nullable=True)
+    satisfaction: Mapped[float | None] = mapped_column(Float, nullable=True)
+    regret: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reason_code: Mapped[str | None] = mapped_column(String, nullable=True)
+
+    __table_args__ = (
+        CheckConstraint(
+            "kind IN ('technical', 'user_behavior', 'owner_reported')",
+            name="ck_outcome_observations_kind",
+        ),
+        CheckConstraint(
+            "status IN ('unmatched', 'pending', 'confirmed', 'rejected')",
+            name="ck_outcome_observations_status",
+        ),
+        CheckConstraint(
+            "actor_type IN ('owner', 'agent', 'assistant', 'system', 'third_party', 'unknown')",
+            name="ck_outcome_observations_actor_type",
+        ),
+        CheckConstraint(
+            "(kind = 'technical') = (technical_status IS NOT NULL)",
+            name="ck_outcome_observations_technical_status",
+        ),
+        CheckConstraint(
+            "(kind = 'user_behavior') = (disposition IS NOT NULL)",
+            name="ck_outcome_observations_disposition",
+        ),
+        CheckConstraint(
+            "kind = 'owner_reported' OR (satisfaction IS NULL AND regret IS NULL)",
+            name="ck_outcome_observations_wellbeing_scope",
+        ),
+        CheckConstraint(
+            "kind <> 'owner_reported' OR (satisfaction IS NOT NULL AND regret IS NOT NULL)",
+            name="ck_outcome_observations_wellbeing_complete",
+        ),
+        CheckConstraint(
+            "satisfaction IS NULL OR (satisfaction >= 0 AND satisfaction <= 1)",
+            name="ck_outcome_observations_satisfaction",
+        ),
+        CheckConstraint(
+            "decision_id IS NOT NULL OR external_decision_id IS NOT NULL",
+            name="ck_outcome_observations_decision_reference",
+        ),
+        CheckConstraint(
+            "(status = 'confirmed') = (confirmed_at IS NOT NULL)",
+            name="ck_outcome_observations_confirmation",
+        ),
+        Index("ix_outcome_observations_profile_status", "profile_id", "status", "created_at", "id"),
+        Index("ix_outcome_observations_decision", "decision_id"),
+        Index("ix_outcome_observations_source", "source_id"),
+        Index("ix_outcome_observations_external", "profile_id", "external_decision_id"),
     )
 
 

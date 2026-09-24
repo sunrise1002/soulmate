@@ -1,0 +1,53 @@
+"""Provider-neutral Decision I/O classification and ingestion rules."""
+
+from soulmate_core.decision_io.ingestion import (
+    DecisionIoConflictError,
+    DecisionIoRepository,
+    DecisionIoSourceRemoval,
+    IngestionResult,
+    IngestionWrite,
+    SourceObservationCounts,
+)
+from soulmate_core.decision_io.policy import (
+    MAX_EVENT_CONTENT_BYTES,
+    MAX_EXTERNAL_ID_LENGTH,
+    OWNER_LOCAL_EVENT,
+    POLICY_PROFILE_VERSION,
+    SUPPORTED_SCHEMA_VERSIONS,
+    UNSUPPORTED_RETENTION_POLICIES,
+    DecisionIoError,
+    EventClassification,
+    canonical_content,
+    classify_event,
+    content_fingerprint,
+    derive_eligibility,
+    may_promote_resolution,
+    outcome_kind_for,
+    retained_content,
+    validate_retention_policy,
+)
+
+__all__ = [
+    "MAX_EVENT_CONTENT_BYTES",
+    "MAX_EXTERNAL_ID_LENGTH",
+    "OWNER_LOCAL_EVENT",
+    "POLICY_PROFILE_VERSION",
+    "SUPPORTED_SCHEMA_VERSIONS",
+    "UNSUPPORTED_RETENTION_POLICIES",
+    "DecisionIoConflictError",
+    "DecisionIoError",
+    "DecisionIoRepository",
+    "DecisionIoSourceRemoval",
+    "EventClassification",
+    "IngestionResult",
+    "IngestionWrite",
+    "SourceObservationCounts",
+    "canonical_content",
+    "classify_event",
+    "content_fingerprint",
+    "derive_eligibility",
+    "may_promote_resolution",
+    "outcome_kind_for",
+    "retained_content",
+    "validate_retention_policy",
+]

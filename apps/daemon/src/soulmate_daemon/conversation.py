@@ -7,6 +7,7 @@ from typing import Literal
 from uuid import uuid4
 
 from soulmate_core.context import ContextCompiler, select_known_keys
+from soulmate_core.decision_io import OWNER_LOCAL_EVENT
 from soulmate_core.domain import (
     Conversation,
     ConversationRepository,
@@ -273,6 +274,7 @@ class ConversationService:
             },
             created_at=now,
             ingested_at=now,
+            provenance=OWNER_LOCAL_EVENT,
         )
         if conversation is None:
             self._conversations.add(Conversation(resolved_id, profile_id, now, now))

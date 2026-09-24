@@ -20,7 +20,6 @@ import type {
   DecisionHistoryItem,
   DecisionOptionInput,
   DecisionPrediction,
-  DecisionOutcome,
   DelegationPolicy,
   DelegationRequest,
   DelegationRequestInput,
@@ -61,6 +60,20 @@ import type {
   RemoteBackupStatus,
   SourceDeletionResult,
 } from "./types.ts";
+import type {
+  DecisionIoDecisionInput,
+  DecisionIoIngestion,
+  DecisionIoInteractionInput,
+  DecisionIoObservation,
+  DecisionIoOutcomeInput,
+  DecisionIoResolutionInput,
+  DecisionIoSource,
+  DecisionIoSourceInput,
+  DecisionIoSourceRemoval,
+  ExternalOutcomeObservation,
+  ObservationStatus,
+  OwnerOutcomeConfirmation,
+} from "./decision-io-types.ts";
 
 export type FetchLike = (
   input: string,
@@ -492,6 +505,57 @@ export class SoulmateClient {
     );
   }
 
+  decisionIoSources(): Promise<DecisionIoSource[]> {
+    return this.request<DecisionIoSource[]>("GET", "/v1/decision-io/sources");
+  }
+
+  registerDecisionIoSource(
+    input: DecisionIoSourceInput,
+  ): Promise<DecisionIoSource> {
+    return this.request<DecisionIoSource>(
+      "POST",
+      "/v1/decision-io/sources",
+      input,
+    );
+  }
+
+  removeDecisionIoSource(sourceId: string): Promise<DecisionIoSourceRemoval> {
+    return this.request<DecisionIoSourceRemoval>(
+      "DELETE",
+      `/v1/decision-io/sources/${encodeURIComponent(sourceId)}`,
+    );
+  }
+
+  decisionIoObservations(
+    status?: ObservationStatus,
+  ): Promise<DecisionIoObservation[]> {
+    const query =
+      status === undefined ? "" : `?status=${encodeURIComponent(status)}`;
+    return this.request<DecisionIoObservation[]>(
+      "GET",
+      `/v1/decision-io/observations${query}`,
+    );
+  }
+
+  /** Turn an outcome observation into owner wellbeing with the owner's own report. */
+  confirmOutcomeObservation(
+    observationId: string,
+    confirmation: OwnerOutcomeConfirmation,
+  ): Promise<DecisionIoObservation> {
+    return this.request<DecisionIoObservation>(
+      "POST",
+      `/v1/decision-io/observations/${encodeURIComponent(observationId)}/confirm`,
+      { ...confirmation, notes: confirmation.notes ?? null },
+    );
+  }
+
+  rejectObservation(observationId: string): Promise<DecisionIoObservation> {
+    return this.request<DecisionIoObservation>(
+      "POST",
+      `/v1/decision-io/observations/${encodeURIComponent(observationId)}/reject`,
+    );
+  }
+
   delegationPolicies(): Promise<DelegationPolicy[]> {
     return this.request<DelegationPolicy[]>("GET", "/v1/delegation-policies");
   }
@@ -699,13 +763,17 @@ export class SoulmateClient {
     );
   }
 
+  /**
+   * @deprecated Stores an unconfirmed observation, never owner wellbeing. Use
+   * `observeDecisionIoOutcome` for technical or behavioral results.
+   */
   recordExternalOutcome(
     decisionId: string,
     satisfaction: number,
     regret: boolean,
     notes?: string,
-  ): Promise<DecisionOutcome> {
-    return this.request<DecisionOutcome>(
+  ): Promise<ExternalOutcomeObservation> {
+    return this.request<ExternalOutcomeObservation>(
       "POST",
       "/v1/external/record-outcome",
       {
@@ -714,6 +782,46 @@ export class SoulmateClient {
         regret,
         notes: notes ?? null,
       },
+    );
+  }
+
+  recordDecisionIoInteraction(
+    input: DecisionIoInteractionInput,
+  ): Promise<DecisionIoIngestion> {
+    return this.request<DecisionIoIngestion>(
+      "POST",
+      "/v1/external/decision-io/interactions",
+      input,
+    );
+  }
+
+  recordDecisionIoDecision(
+    input: DecisionIoDecisionInput,
+  ): Promise<DecisionIoIngestion> {
+    return this.request<DecisionIoIngestion>(
+      "POST",
+      "/v1/external/decision-io/decisions",
+      input,
+    );
+  }
+
+  recordDecisionIoResolution(
+    input: DecisionIoResolutionInput,
+  ): Promise<DecisionIoIngestion> {
+    return this.request<DecisionIoIngestion>(
+      "POST",
+      "/v1/external/decision-io/resolutions",
+      input,
+    );
+  }
+
+  observeDecisionIoOutcome(
+    input: DecisionIoOutcomeInput,
+  ): Promise<DecisionIoIngestion> {
+    return this.request<DecisionIoIngestion>(
+      "POST",
+      "/v1/external/decision-io/outcomes",
+      input,
     );
   }
 

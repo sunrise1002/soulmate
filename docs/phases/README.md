@@ -33,6 +33,7 @@ Available reports:
 - [Phase 10](phase-10-report.md)
 - [Phase 11](phase-11-report.md)
 - [Phase 12](phase-12-report.md)
+- [Phase 13](phase-13-report.md), with its [plan](phase-13-plan.md)
 
 Owner-authorized cross-phase increments:
 
@@ -41,8 +42,6 @@ Owner-authorized cross-phase increments:
   with its [plan](key-consistency-increment-plan.md) and
   [P0 spike report](key-consistency-p0-spike-report.md)
 
-Planned work:
-
-- [Phase 13 — Decision I/O and trusted provenance](phase-13-plan.md). Planning is
-  recorded, implementation has not started, and a separate explicit owner
-  instruction is required before work begins.
+No later phase is planned or authorized. Phase 14 and later directions in the
+Phase 13 plan are sequencing notes only and require a new plan and explicit owner
+authorization.

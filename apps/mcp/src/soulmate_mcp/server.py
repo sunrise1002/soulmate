@@ -107,7 +107,10 @@ TOOLS: tuple[dict[str, object], ...] = (
     },
     {
         "name": "record_outcome",
-        "description": "Record owner-reported satisfaction and regret for a resolved decision.",
+        "description": (
+            "Report the owner's satisfaction and regret for a resolved decision. The report "
+            "is stored as an unconfirmed observation until the owner confirms it."
+        ),
         "inputSchema": {
             "type": "object",
             "additionalProperties": False,

@@ -10,6 +10,8 @@ import {
 import { useCallback, useEffect, useState } from "react";
 import type { SyntheticEvent } from "react";
 
+import { DecisionIoObservationsPanel } from "../components/DecisionIoObservationsPanel.tsx";
+import { DecisionIoSourcesPanel } from "../components/DecisionIoSourcesPanel.tsx";
 import { EmptyState } from "../components/EmptyState.tsx";
 import { apiRequest } from "../runtime.ts";
 import type {
@@ -28,8 +30,11 @@ const scopeLabels: Record<string, string> = {
   "agent:delegate": "Request delegated actions",
   "decision:predict": "Predict and rank decisions",
   "decision:record": "Record decisions",
+  "decision:resolution:record": "Report decision choices",
+  "interaction:record": "Report activity",
   "model:summary:read": "Read model summary",
-  "outcome:record": "Record outcomes",
+  "outcome:observe": "Report technical and behavioral outcomes",
+  "outcome:record": "Report satisfaction for your confirmation",
   "preference:summary:read": "Read preference summary",
 };
 
@@ -51,6 +56,7 @@ export function ExternalAgentsScreen() {
   const [allowAutomatic, setAllowAutomatic] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sourcesRevision, setSourcesRevision] = useState(0);
 
   const load = useCallback(async () => {
     try {
@@ -601,6 +607,18 @@ export function ExternalAgentsScreen() {
           <p className="muted">No delegated actions have been requested.</p>
         )}
       </div>
+
+      <DecisionIoSourcesPanel
+        identities={identities}
+        onChanged={() => {
+          setSourcesRevision((value) => value + 1);
+          void load();
+        }}
+      />
+      <DecisionIoObservationsPanel
+        revision={sourcesRevision}
+        onChanged={() => void load()}
+      />
 
       <div className="card audit-card">
         <p className="section-label">Local audit log</p>

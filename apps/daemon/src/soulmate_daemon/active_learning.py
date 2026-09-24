@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from soulmate_core.decision_io import OWNER_LOCAL_EVENT
 from soulmate_core.domain import (
     ActiveQuestion,
     ActiveQuestionRepository,
@@ -74,6 +75,7 @@ class ActiveLearningService:
             content={"question_id": question_id, "choice": choice},
             created_at=now,
             ingested_at=now,
+            provenance=OWNER_LOCAL_EVENT,
         )
         answer = QuestionAnswer(answer_id, question_id, choice, event.id, now)
         learned = answer_evidence(question=question, answer=answer, profile_id=profile_id)

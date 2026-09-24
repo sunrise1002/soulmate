@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 from soulmate_connector_sdk import SourceConnector, discover_connectors
+from soulmate_core.decision_io import OWNER_LOCAL_EVENT
 from soulmate_core.domain import (
     ActiveQuestion,
     AuditEvent,
@@ -53,6 +54,7 @@ from soulmate_daemon.conversation import (
     ConversationService,
 )
 from soulmate_daemon.data_api import build_data_router
+from soulmate_daemon.decision_io_api import build_decision_io_router
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService, ResolutionResult
 from soulmate_daemon.delegation_api import build_delegation_router
 from soulmate_daemon.embedding_api import build_embedding_router
@@ -1160,6 +1162,7 @@ def create_app(
             },
             created_at=now,
             ingested_at=now,
+            provenance=OWNER_LOCAL_EVENT,
         )
         evidence = Evidence(
             id=f"evidence_{uuid4().hex}",
@@ -1449,6 +1452,7 @@ def create_app(
     app.include_router(build_data_router(app))
     app.include_router(build_connector_router(app))
     app.include_router(build_delegation_router(app))
+    app.include_router(build_decision_io_router(app))
     app.include_router(build_key_alias_router(app))
     app.include_router(build_key_label_router(app))
     app.include_router(build_learning_router(app))

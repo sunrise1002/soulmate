@@ -12,9 +12,9 @@ There is no Soulmate cloud. Each owner runs their own service.
 architecture, technology, usage, API, and privacy boundaries in one page. For a
 source checkout, use the dedicated [setup, build, and run guide](docs/contributor-guide/setup.md).
 
-**Current status:** Phases 0–12 are complete locally; Phase 12 is the Delegated
-Decision Agent. See [phase status](docs/phase-status.md) and the
-[Phase 12 report](docs/phases/phase-12-report.md). Remote CI remains unverified.
+**Current status:** Phases 0–13 are complete locally; Phase 13 is Decision I/O and
+trusted provenance. See [phase status](docs/phase-status.md) and the
+[Phase 13 report](docs/phases/phase-13-report.md). Remote CI remains unverified.
 
 ## Source quick start
 
@@ -156,7 +156,7 @@ loopback. Device and data management stay on the owner's machine.
 | [Setup, build, and run](docs/contributor-guide/setup.md) | Source prerequisites, installation, `.env`, providers, run modes, artifacts, and troubleshooting |
 | [Technical specification](<Open Personal Decision Agent — Technical Product Specification & Implementation Plan.md>) | Authoritative product definition and phase order |
 | [Phase status](docs/phase-status.md) | What is built and what is authorized |
-| [Architecture & ADRs](docs/architecture/README.md) | Layering rules and implemented ADRs through ADR-015; ADR-014 is reserved for Phase 13 |
+| [Architecture & ADRs](docs/architecture/README.md) | Layering rules and implemented ADRs ADR-001 through ADR-016 |
 | [Security boundaries](docs/security/README.md) | Privacy and security guarantees in force |
 | [CONTRIBUTING.md](CONTRIBUTING.md) · [AGENTS.md](AGENTS.md) | Human and AI agent rules — read before implementing |
 

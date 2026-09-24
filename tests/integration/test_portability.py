@@ -23,6 +23,8 @@ from soulmate_daemon.system import DEFAULT_PROFILE_ID, ensure_installation
 from soulmate_storage_sqlite import Database, Repositories
 from sqlalchemy import text
 
+from .legacy_schema import insert_legacy_evidence
+
 pytestmark = pytest.mark.integration
 NOW = datetime(2026, 9, 12, tzinfo=UTC)
 
@@ -169,7 +171,7 @@ def test_backup_restores_data_but_not_credentials_or_installation_identity(
     restored_repositories = Repositories(restored_database.sessions())
 
     assert created.encrypted is False
-    assert restored.schema_revision_after == "0011_key_consistency"
+    assert restored.schema_revision_after == "0012_phase_13"
     assert restored.installation_id != original_installation
     assert restored_repositories.raw_events.get(event.id) == event
     assert restored_repositories.evidence.get("evidence_manual") is not None
@@ -184,31 +186,8 @@ def test_encrypted_export_authenticates_and_migrates_an_older_model(
 ) -> None:
     source_settings = Settings(data_dir=tmp_path / "old-machine")
     database, repositories = _storage(source_settings.database_path, "0007_phase_9")
-    event = RawEvent(
-        "event_old",
-        DEFAULT_PROFILE_ID,
-        None,
-        "synthetic",
-        {},
-        NOW,
-        NOW,
-    )
-    repositories.raw_events.add(event)
-    repositories.evidence.add(
-        Evidence(
-            "evidence_old",
-            DEFAULT_PROFILE_ID,
-            EvidenceTargetType.PREFERENCE,
-            "tools.local_first",
-            1.0,
-            1.0,
-            1.0,
-            {},
-            "explicit_statement",
-            event.id,
-            "old-model-v1",
-            NOW,
-        )
+    insert_legacy_evidence(
+        database, "evidence_old", DEFAULT_PROFILE_ID, "tools.local_first", NOW, value_json="1.0"
     )
     # The 0007 schema predates key aliases, so the old model is built without them.
     ModelRebuilder(repositories.evidence, repositories.personal_models).rebuild(
@@ -229,7 +208,7 @@ def test_encrypted_export_authenticates_and_migrates_an_older_model(
     restored = restore_archive(target_settings, archive, "correct horse battery")
 
     assert restored.schema_revision_before == "0007_phase_9"
-    assert restored.schema_revision_after == "0011_key_consistency"
+    assert restored.schema_revision_after == "0012_phase_13"
     with sqlite3.connect(target_settings.database_path) as connection:
         columns = {
             row[1] for row in connection.execute("PRAGMA table_info(conversations)").fetchall()

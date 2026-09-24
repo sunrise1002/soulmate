@@ -7,6 +7,7 @@ from uuid import uuid4
 from fastapi import APIRouter, FastAPI, HTTPException, Query, Request
 from pydantic import BaseModel, Field, field_validator, model_validator
 from soulmate_core.access import SERVICE_SCOPES, ExternalAccessError
+from soulmate_core.decision_io import DecisionIoConflictError
 from soulmate_core.decisions import ResolvedDecision, find_similar_decisions
 from soulmate_core.domain import (
     ApiCredential,
@@ -15,9 +16,12 @@ from soulmate_core.domain import (
     DecisionOption,
     DecisionPrediction,
     DecisionStatus,
+    ObservationStatus,
+    OutcomeKind,
     ServiceIdentity,
 )
 
+from soulmate_daemon.decision_io import DecisionIoService
 from soulmate_daemon.decisions import DecisionOptionInput, DecisionService
 from soulmate_daemon.key_aliases import alias_repository
 from soulmate_daemon.runtime import build_external_identity_service, runtime_of
@@ -195,11 +199,16 @@ class ExternalOutcomeRequest(BaseModel):
 
 
 class ExternalOutcomeResponse(BaseModel):
+    """The response keeps its original fields and states the stored semantics."""
+
     id: str
     decision_id: str
     satisfaction: float
     regret: bool
     created_at: datetime
+    status: str
+    kind: str
+    requires_owner_confirmation: bool
 
 
 def _actor(request: Request) -> Actor:
@@ -249,6 +258,16 @@ def _audit_owner_action(
             metadata={"service_identity_id": identity_id, **(metadata or {})},
             created_at=datetime.now(UTC),
         )
+    )
+
+
+def _decision_io_service(app: FastAPI) -> DecisionIoService:
+    repositories = runtime_of(app)["repositories"]
+    return DecisionIoService(
+        sources=repositories.sources,
+        decision_io=repositories.decision_io,
+        decisions=repositories.decisions,
+        audits=repositories.audit_events,
     )
 
 
@@ -576,25 +595,56 @@ def build_external_router(app: FastAPI) -> APIRouter:
     def external_record_outcome(
         request: Request, payload: ExternalOutcomeRequest
     ) -> ExternalOutcomeResponse:
-        _actor(request)
-        try:
-            outcome = _decision_service(app).record_outcome(
-                DEFAULT_PROFILE_ID,
-                payload.decision_id,
-                payload.satisfaction,
-                payload.regret,
-                payload.notes,
+        """Compatibility wrapper: an external report is an observation, not wellbeing.
+
+        Deprecated in favour of `/v1/external/decision-io/outcomes`. Owner
+        satisfaction and regret now require an owner confirmation (ADR-014).
+        """
+        actor = _actor(request)
+        repositories = runtime_of(app)["repositories"]
+        stored = repositories.decisions.get(payload.decision_id)
+        if stored is None or stored[0].profile_id != DEFAULT_PROFILE_ID:
+            raise HTTPException(status_code=404, detail="Decision was not found.")
+        if stored[0].status is not DecisionStatus.RESOLVED:
+            raise HTTPException(
+                status_code=409,
+                detail="An outcome can be recorded only after the decision is resolved.",
             )
-        except KeyError as exc:
-            raise HTTPException(status_code=404, detail="Decision was not found.") from exc
-        except ValueError as exc:
+        now = datetime.now(UTC)
+        service = _decision_io_service(app)
+        if actor.service_identity_id is None:
+            raise HTTPException(status_code=401, detail="An external service API key is required.")
+        source = service.compatibility_source(
+            DEFAULT_PROFILE_ID,
+            actor.service_identity_id,
+            actor.service_identity_name or actor.service_identity_id,
+            now,
+        )
+        try:
+            result = service.record_reported_wellbeing(
+                profile_id=DEFAULT_PROFILE_ID,
+                source=source,
+                decision_id=payload.decision_id,
+                satisfaction=payload.satisfaction,
+                regret=payload.regret,
+                notes=payload.notes.strip() if payload.notes is not None else None,
+                now=now,
+            )
+        except DecisionIoConflictError as exc:
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return ExternalOutcomeResponse(
-            id=outcome.id,
-            decision_id=outcome.decision_id,
-            satisfaction=outcome.satisfaction,
-            regret=outcome.regret,
-            created_at=outcome.created_at,
+            id=result.outcome_observation_id or result.event_id,
+            decision_id=payload.decision_id,
+            satisfaction=payload.satisfaction,
+            regret=payload.regret,
+            created_at=now,
+            status=(
+                ObservationStatus.PENDING.value
+                if result.observation_status is None
+                else result.observation_status.value
+            ),
+            kind=OutcomeKind.OWNER_REPORTED.value,
+            requires_owner_confirmation=True,
         )
 
     return router

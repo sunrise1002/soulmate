@@ -54,10 +54,30 @@ from soulmate_core.domain.models import (
     SourceDeletion,
     UserModelSnapshot,
 )
+from soulmate_core.domain.provenance import (
+    AcquisitionMethod,
+    AuthorScope,
+    ConsentMode,
+    DataClass,
+    EventProvenance,
+    OutcomeAttribution,
+    RawRetentionPolicy,
+    SourceProvenance,
+)
 from sqlalchemy import and_, case, delete, func, or_, select, update
 from sqlalchemy.dialects.sqlite import insert
 from sqlalchemy.orm import Session, sessionmaker
 
+from soulmate_storage_sqlite.decision_io import (
+    SqliteDecisionIoRepository,
+    decision_of,
+    event_provenance_columns,
+    evidence_row,
+    option_of,
+    raw_event_of,
+    source_of,
+    source_provenance_columns,
+)
 from soulmate_storage_sqlite.key_aliases import (
     SqliteTargetKeyAliasRepository,
     bump_evidence_revision,
@@ -148,6 +168,7 @@ class SqliteSourceRepository:
                     source_type=source.source_type,
                     name=source.name,
                     created_at=source.created_at,
+                    **source_provenance_columns(source.provenance),
                 )
             )
 
@@ -156,7 +177,7 @@ class SqliteSourceRepository:
             row = session.get(SourceRow, source_id)
             if row is None:
                 return None
-            return Source(row.id, row.profile_id, row.source_type, row.name, _utc(row.created_at))
+            return source_of(row)
 
     def list_for_profile(self, profile_id: str) -> tuple[Source, ...]:
         with self._sessions() as session:
@@ -165,10 +186,7 @@ class SqliteSourceRepository:
                 .where(SourceRow.profile_id == profile_id)
                 .order_by(SourceRow.created_at.desc(), SourceRow.id.desc())
             )
-            return tuple(
-                Source(row.id, row.profile_id, row.source_type, row.name, _utc(row.created_at))
-                for row in rows
-            )
+            return tuple(source_of(row) for row in rows)
 
     def add_import(
         self,
@@ -199,6 +217,7 @@ class SqliteSourceRepository:
                     source_type=source.source_type,
                     name=source.name,
                     created_at=source.created_at,
+                    **source_provenance_columns(source.provenance),
                 )
             )
             session.flush()
@@ -234,6 +253,7 @@ class SqliteSourceRepository:
                     created_at=item.created_at,
                     ingested_at=item.ingested_at,
                     sensitivity=item.sensitivity,
+                    **event_provenance_columns(item.provenance),
                 )
                 for item in events
             )
@@ -316,6 +336,7 @@ class SqliteRawEventRepository:
                     created_at=event.created_at,
                     ingested_at=event.ingested_at,
                     sensitivity=event.sensitivity,
+                    **event_provenance_columns(event.provenance),
                 )
             )
 
@@ -324,16 +345,7 @@ class SqliteRawEventRepository:
             row = session.get(RawEventRow, event_id)
             if row is None:
                 return None
-            return RawEvent(
-                id=row.id,
-                profile_id=row.profile_id,
-                source_id=row.source_id,
-                event_type=row.event_type,
-                content=json.loads(row.content_json),
-                created_at=_utc(row.created_at),
-                ingested_at=_utc(row.ingested_at),
-                sensitivity=row.sensitivity,
-            )
+            return raw_event_of(row)
 
 
 class SqliteConversationRepository:
@@ -455,6 +467,11 @@ class SqliteDecisionRepository:
                     context_json=_json_dump(decision.context),
                     status=decision.status.value,
                     created_at=decision.created_at,
+                    origin=decision.origin.value,
+                    purpose=decision.purpose.value,
+                    source_id=decision.source_id,
+                    external_decision_id=decision.external_decision_id,
+                    source_event_id=decision.source_event_id,
                 )
             )
             session.add_all(
@@ -465,6 +482,7 @@ class SqliteDecisionRepository:
                     description=item.description,
                     features_json=_json_dump(item.features),
                     feature_confidence=item.feature_confidence,
+                    external_option_id=item.external_option_id,
                 )
                 for item in options
             )
@@ -653,26 +671,11 @@ class SqliteDecisionRepository:
 
     @staticmethod
     def _event_to_domain(row: DecisionEventRow) -> DecisionEvent:
-        return DecisionEvent(
-            id=row.id,
-            profile_id=row.profile_id,
-            domain=row.domain,
-            question=row.question,
-            context=json.loads(row.context_json),
-            status=DecisionStatus(row.status),
-            created_at=_utc(row.created_at),
-        )
+        return decision_of(row)
 
     @staticmethod
     def _option_to_domain(row: DecisionOptionRow) -> DecisionOption:
-        return DecisionOption(
-            id=row.id,
-            decision_id=row.decision_id,
-            label=row.label,
-            description=row.description,
-            features=json.loads(row.features_json),
-            feature_confidence=row.feature_confidence,
-        )
+        return option_of(row)
 
     @staticmethod
     def _prediction_to_domain(row: DecisionPredictionRow) -> DecisionPrediction:
@@ -755,6 +758,7 @@ class SqliteOutcomeRepository:
                     notes=outcome.notes,
                     source_event_id=outcome.source_event_id,
                     created_at=outcome.created_at,
+                    attribution=outcome.attribution.value,
                 )
             )
 
@@ -801,6 +805,7 @@ class SqliteOutcomeRepository:
             notes=row.notes,
             source_event_id=row.source_event_id,
             created_at=_utc(row.created_at),
+            attribution=OutcomeAttribution(row.attribution),
         )
 
 
@@ -912,24 +917,7 @@ class SqliteEvidenceRepository:
                 )
                 if conversation is None or conversation.profile_id != evidence.profile_id:
                     raise ValueError("Evidence source message must belong to the same profile.")
-            session.add(
-                EvidenceRow(
-                    id=evidence.id,
-                    profile_id=evidence.profile_id,
-                    target_type=evidence.target_type.value,
-                    target_key=evidence.target_key,
-                    value_json=_json_dump(evidence.value),
-                    strength=evidence.strength,
-                    confidence=evidence.confidence,
-                    context_json=_json_dump(evidence.context),
-                    source_type=evidence.source_type,
-                    source_event_id=evidence.source_event_id,
-                    extractor_version=evidence.extractor_version,
-                    extractor_model=evidence.extractor_model,
-                    source_message_id=evidence.source_message_id,
-                    created_at=evidence.created_at,
-                )
-            )
+            session.add(evidence_row(evidence))
             bump_evidence_revision(session, evidence.profile_id)
 
     def get(self, evidence_id: str) -> Evidence | None:
@@ -1903,6 +1891,17 @@ class SqliteConnectorRegistrationRepository:
                     source_type=f"connector:{registration.connector_id}",
                     name=registration.name,
                     created_at=registration.created_at,
+                    **source_provenance_columns(
+                        SourceProvenance(
+                            provider=registration.connector_id,
+                            acquisition_method=AcquisitionMethod.CONNECTOR_PULL,
+                            consent_mode=ConsentMode.OWNER_EXPLICIT,
+                            consent_at=registration.created_at,
+                            data_classes=(DataClass.METADATA,),
+                            author_scope=AuthorScope.MIXED,
+                            raw_retention_policy=RawRetentionPolicy.STRUCTURED_ONLY,
+                        )
+                    ),
                 )
             )
             session.flush()
@@ -2015,6 +2014,7 @@ class SqliteConnectorRegistrationRepository:
                     created_at=item.created_at,
                     ingested_at=item.ingested_at,
                     sensitivity=item.sensitivity,
+                    **event_provenance_columns(EventProvenance()),
                 )
                 for item in accepted
             )
@@ -2174,6 +2174,7 @@ class Repositories:
         self.conversations = SqliteConversationRepository(sessions)
         self.messages = SqliteMessageRepository(sessions)
         self.decisions = SqliteDecisionRepository(sessions)
+        self.decision_io = SqliteDecisionIoRepository(sessions)
         self.outcomes = SqliteOutcomeRepository(sessions)
         self.active_questions = SqliteActiveQuestionRepository(sessions)
         self.evidence = SqliteEvidenceRepository(sessions)

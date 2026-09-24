@@ -26,6 +26,13 @@ so neither can drift from the daemon contract.
 - Phase 12 methods cover owner policy configuration and approval plus scoped agent
   request, status, and completion operations. Impact comes from the stored owner
   policy rather than external input.
+- Phase 13 Decision I/O types live in `decision-io-types.ts`. Owner methods
+  register, inspect, and remove pushed sources and confirm or reject
+  observations; adapter methods push interactions, decisions, resolutions, and
+  technical or behavioral outcomes. Responses carry the daemon-assigned
+  eligibility and observation state and flag idempotent replays as `duplicate`.
+  `recordExternalOutcome` is deprecated: it now stores an unconfirmed
+  observation and returns `ExternalOutcomeObservation` instead of an outcome.
 
 The transport is injectable, so callers can wrap it. The mobile client uses that
 to refuse any request that leaves the paired origin.

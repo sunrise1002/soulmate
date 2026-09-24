@@ -5,9 +5,10 @@
 This plan was recorded on 2026-09-14 after review of the post-MVP architecture
 delta and the repository delivered through Phase 12.
 
-Planning is approved. Implementation has not started and requires a separate,
-explicit owner instruction. This document authorizes neither Phase 14 work nor
-automatic continuation beyond the Phase 13 exit review.
+Planning is approved. The owner authorized implementation on 2026-09-23; results
+are recorded in the [Phase 13 report](phase-13-report.md). This document
+authorizes neither Phase 14 work nor automatic continuation beyond the Phase 13
+exit review.
 
 The 2026-09-17 provider-compatibility maintenance increment does not change this
 plan's scope, ordering, migration number, or authorization gate. It strengthens the

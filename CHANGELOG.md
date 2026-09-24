@@ -4,6 +4,45 @@
 
 ### Added
 
+- Phase 13 Decision I/O and trusted provenance (ADR-014). Sources now record a
+  provider, acquisition method, consent mode and time, declared data classes,
+  author scope, raw retention policy, adapter and parser versions, the
+  policy-profile version, and the one service identity allowed to push to them.
+  Raw events carry a schema version, an external event ID, the reported actor, a
+  daemon-derived evidence eligibility, correlation and causation IDs, and a
+  content fingerprint. New `resolution_observations` and `outcome_observations`
+  keep reported choices and results apart from canonical records, with
+  `unmatched`, `pending`, `confirmed`, and `rejected` states and separate
+  `technical`, `user_behavior`, and `owner_reported` semantics. Migration
+  `0012_phase_13` adds these in place and backfills conservatively: only records
+  the owner created in Soulmate itself become owner-authored and eligible;
+  imported and connector events stay contextual, connector sources stay
+  unverified, existing decisions become `legacy`, and existing outcomes are
+  marked `legacy_unverified`. Four least-privilege scopes
+  (`interaction:record`, `decision:record`, `decision:resolution:record`,
+  `outcome:observe`) guard a bounded push surface under
+  `/v1/external/decision-io/`; each request commits its event and projection
+  atomically, identical retries replay the original result, and reusing an
+  external event ID for different content returns 409. An owner-authored,
+  eligible choice for a known decision is promoted once to the canonical
+  resolution and its choice Evidence; everything else stays an observation, and
+  an observation that arrives before its decision is correlated later without
+  ever attaching to an unrelated one. Promotion, correlation, and the choice
+  Evidence commit in the same transaction as the event; only the model rebuild
+  runs afterwards. Owner-only routes under `/v1/decision-io/` approve, inspect,
+  and remove sources (removal deletes the provenance graph and rebuilds the
+  model) and confirm or reject observations: confirming a reported choice
+  applies it once as the canonical resolution, and confirming a satisfaction
+  report requires the owner's own values.
+  `metadata_only` sources store no event content and `delete_after_extraction`
+  is rejected. The TypeScript SDK gained `registerDecisionIoSource`,
+  `decisionIoSources`, `removeDecisionIoSource`, `decisionIoObservations`,
+  `confirmOutcomeObservation`, `rejectObservation`,
+  `recordDecisionIoInteraction`, `recordDecisionIoDecision`,
+  `recordDecisionIoResolution`, and `observeDecisionIoOutcome`; the desktop
+  External agents screen gained source approval, capability and volume
+  inspection, removal with its consequence, and observation review.
+
 - Local model packaging and owner control for the key consistency increment
   (step P6), which completes the increment. The embedding runtimes are now a
   pinned optional extra (`soulmate-daemon[embeddings]`: `onnxruntime`,
@@ -299,6 +338,19 @@ Evidence.
   of the pinned artifact in step P6.
 
 ### Changed
+
+- **Behavior change:** `POST /v1/external/record-outcome` (and the MCP
+  `record_outcome` tool) no longer writes owner satisfaction and regret. It is
+  now a deprecated compatibility wrapper that stores an unconfirmed
+  `owner_reported` observation under a per-identity compatibility source; the
+  owner must confirm it with their own values before it becomes wellbeing. The
+  response keeps its fields and adds `status`, `kind`, and
+  `requires_owner_confirmation`, and the SDK's `recordExternalOutcome` now
+  returns `ExternalOutcomeObservation` instead of the incorrect
+  `DecisionOutcome` type. Owner outcome recording is unchanged.
+- Records the owner creates in Soulmate itself (chat messages, corrections,
+  active-question answers, decision resolutions, and outcomes) now carry
+  owner-authored, eligible event provenance.
 
 - The pinned `bge-m3` int8 artifact now records the exact published file sizes
   and a 2.0 GB peak-memory estimate, measured when step P6 downloaded and ran it

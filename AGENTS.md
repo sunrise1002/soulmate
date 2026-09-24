@@ -23,9 +23,8 @@ data merely to satisfy this code convention.
 
 Phase 12 delegated-action Policy Engine, owner impact classification, confidence
 thresholds, agent permissions, and durable approval workflow are complete locally.
-Phase 13 Decision I/O and trusted provenance has a recorded implementation plan,
-but implementation has not started and requires a separate explicit user
-instruction. No Phase 14 or later implementation is defined or authorized. Remote
+Phase 13 Decision I/O and trusted provenance is complete locally and stopped at
+its exit review. No Phase 14 or later implementation is defined or authorized. Remote
 CI verification for completed phases remains unconfirmed.
 For every later phase, follow specification section 74: plan only the current
 phase, implement small increments, validate, update documentation and phase status,

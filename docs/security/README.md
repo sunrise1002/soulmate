@@ -62,6 +62,25 @@ metadata. Source removal deletes connector RawEvents and derivative Evidence bef
 rebuilding the model. Installed Python plugins execute as trusted owner-selected
 code rather than inside a security sandbox; see ADR-012.
 
+Decision I/O source approval, inspection, observation review, and source removal
+are owner-only. A pushed source is bound to one service identity; another identity
+cannot write to it even with the right scope. Each event family needs its own
+scope (`interaction:record`, `decision:record`, `decision:resolution:record`, or
+`outcome:observe`), and events outside the source's declared data classes or
+author scope are rejected before persistence. The request can report an actor but
+never an evidence eligibility, profile, impact, or authority: the daemon derives
+eligibility from the owner-approved source and a recorded policy-profile version.
+Agent, assistant, system, and third-party content is never eligible, technical
+results are ignored for learning, and satisfaction or regret reported by an
+external service is stored only as an unconfirmed observation until the owner
+confirms it with their own values. `metadata_only` sources keep no event content;
+`delete_after_extraction` is rejected until extraction has a durable success
+marker. Soulmate cannot verify the data class of free-form content inside a
+structured event, so adapters remain responsible for sending only what their
+source declares. Decision I/O audit events contain identifiers, event types,
+classifications, and counts only. External event IDs are idempotent per source;
+reusing one for different content is refused. See ADR-014.
+
 The service certificate is self-signed and generated locally with an owner-only
 private key. Browsers show a warning until the owner accepts it, and mobile
 transport pinning requires a native network configuration built from the stored
@@ -71,4 +90,4 @@ internet exposure is not supported.
 Do not put personal data or secrets into issue reports, logs, fixtures, source
 control, or CI artifacts. Use synthetic fixtures and keep runtime data outside
 tracked source. See ADR-001, ADR-005, ADR-006, ADR-008, ADR-009, ADR-010,
-ADR-011, ADR-012, and ADR-015.
+ADR-011, ADR-012, ADR-014, and ADR-015.

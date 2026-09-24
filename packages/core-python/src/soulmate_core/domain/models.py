@@ -1,9 +1,17 @@
 """Domain records shared by persistence ports and application services."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from enum import StrEnum
 from typing import Any
+
+from soulmate_core.domain.provenance import (
+    DecisionOrigin,
+    DecisionPurpose,
+    EventProvenance,
+    OutcomeAttribution,
+    SourceProvenance,
+)
 
 
 def _require_utc_aware(*values: datetime | None) -> None:
@@ -112,6 +120,7 @@ class Source:
     source_type: str
     name: str
     created_at: datetime
+    provenance: SourceProvenance = field(default_factory=SourceProvenance)
 
     def __post_init__(self) -> None:
         _require_utc_aware(self.created_at)
@@ -129,9 +138,12 @@ class RawEvent:
     created_at: datetime
     ingested_at: datetime
     sensitivity: str = "normal"
+    provenance: EventProvenance = field(default_factory=EventProvenance)
 
     def __post_init__(self) -> None:
         _require_utc_aware(self.created_at, self.ingested_at)
+        if self.provenance.external_event_id is not None and self.source_id is None:
+            raise ValueError("An externally identified event must reference its source.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -181,11 +193,18 @@ class DecisionEvent:
     context: dict[str, object]
     status: DecisionStatus
     created_at: datetime
+    origin: DecisionOrigin = DecisionOrigin.OWNER_APP
+    purpose: DecisionPurpose = DecisionPurpose.OWNER_INTERACTIVE
+    source_id: str | None = None
+    external_decision_id: str | None = None
+    source_event_id: str | None = None
 
     def __post_init__(self) -> None:
         _require_utc_aware(self.created_at)
         if not self.domain.strip() or not self.question.strip():
             raise ValueError("Decision domain and question must not be empty.")
+        if self.external_decision_id is not None and self.source_id is None:
+            raise ValueError("An externally identified decision must reference its source.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -196,6 +215,7 @@ class DecisionOption:
     description: str
     features: dict[str, float]
     feature_confidence: float
+    external_option_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.label.strip() or not self.description.strip():
@@ -268,6 +288,7 @@ class DecisionOutcome:
     notes: str | None
     source_event_id: str
     created_at: datetime
+    attribution: OutcomeAttribution = OutcomeAttribution.OWNER_CONFIRMED
 
     def __post_init__(self) -> None:
         _require_utc_aware(self.created_at)

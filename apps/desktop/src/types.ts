@@ -518,3 +518,61 @@ export interface AuditEvent {
   metadata: Record<string, unknown> | null;
   created_at: string;
 }
+
+export type DecisionIoDataClass =
+  | "metadata"
+  | "decision"
+  | "correction"
+  | "outcome"
+  | "prompt"
+  | "response"
+  | "file_content"
+  | "diff";
+
+export type DecisionIoRetention =
+  "metadata_only" | "structured_only" | "full_content";
+
+export interface DecisionIoSource {
+  id: string;
+  name: string;
+  provider: string | null;
+  consent_at: string | null;
+  data_classes: DecisionIoDataClass[];
+  author_scope: "owner_only" | "agent_only" | "mixed";
+  raw_retention_policy: DecisionIoRetention;
+  policy_profile_version: string;
+  service_identity_id: string | null;
+  raw_event_count: number;
+  decision_count: number;
+  resolution_observation_count: number;
+  outcome_observation_count: number;
+  unmatched_observation_count: number;
+}
+
+export interface DecisionIoSourceRemoval {
+  source_id: string;
+  raw_event_count: number;
+  decision_count: number;
+  observation_count: number;
+  evidence_count: number;
+  model_rebuilt: boolean;
+}
+
+export type ObservationStatus =
+  "unmatched" | "pending" | "confirmed" | "rejected";
+
+export interface DecisionIoObservation {
+  id: string;
+  kind: "resolution" | "technical" | "user_behavior" | "owner_reported";
+  source_id: string;
+  actor_type: string;
+  status: ObservationStatus;
+  decision_id: string | null;
+  external_decision_id: string | null;
+  disposition: string | null;
+  technical_status: string | null;
+  satisfaction: number | null;
+  regret: boolean | null;
+  created_at: string;
+  confirmed_at: string | null;
+}

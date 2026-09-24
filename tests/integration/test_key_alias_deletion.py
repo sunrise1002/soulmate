@@ -23,6 +23,7 @@ from .key_alias_support import (
     metadata_keys,
     open_storage,
 )
+from .legacy_schema import insert_legacy_evidence
 
 pytestmark = pytest.mark.integration
 PREFERENCE = EvidenceTargetType.PREFERENCE
@@ -204,7 +205,7 @@ def test_local_backup_restores_aliases_catalog_and_embeddings(tmp_path: Path) ->
     target = Settings(data_dir=tmp_path / "target")
     restored = restore_archive(target, archive)
     # Then: every key table is restored at the head schema
-    assert restored.schema_revision_after == "0011_key_consistency"
+    assert restored.schema_revision_after == "0012_phase_13"
     assert _restored_table_keys(target) == {
         "aliases": {"ui.theme.dark_mode"},
         "catalog": {"ui.theme.dark"},
@@ -238,7 +239,7 @@ def test_phase_12_archive_restores_into_the_key_schema(tmp_path: Path) -> None:
     settings = Settings(data_dir=tmp_path / "old")
     database, repositories = open_storage(settings.database_path, "0010_phase_12")
     ensure_installation(repositories.system_metadata, repositories.profiles)
-    add_evidence(repositories, "evidence_old", "ui.theme.dark", profile_id=DEFAULT_PROFILE_ID)
+    insert_legacy_evidence(database, "evidence_old", DEFAULT_PROFILE_ID, "ui.theme.dark", NOW)
     archive = tmp_path / "old.dtwb"
     ArchiveService(settings, database).create(archive, created_at=NOW)
     database.close()
@@ -248,7 +249,7 @@ def test_phase_12_archive_restores_into_the_key_schema(tmp_path: Path) -> None:
     # Then: the schema is upgraded and the key tables start empty
     assert (restored.schema_revision_before, restored.schema_revision_after) == (
         "0010_phase_12",
-        "0011_key_consistency",
+        "0012_phase_13",
     )
     assert _restored_table_keys(target) == {"aliases": set(), "catalog": set(), "embeddings": set()}
 
@@ -302,4 +303,4 @@ def test_restore_treats_derived_embeddings_as_fresh(tmp_path: Path) -> None:
     # When: the archive is restored
     restored = restore_archive(target, archive)
     # Then: the restore proceeds
-    assert restored.schema_revision_after == "0011_key_consistency"
+    assert restored.schema_revision_after == "0012_phase_13"

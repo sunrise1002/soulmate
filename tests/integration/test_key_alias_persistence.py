@@ -20,6 +20,7 @@ from .key_alias_support import (
     open_storage,
     semantic,
 )
+from .legacy_schema import insert_legacy_evidence
 
 pytestmark = pytest.mark.integration
 PREFERENCE = EvidenceTargetType.PREFERENCE
@@ -47,7 +48,7 @@ def test_phase_12_database_upgrades_to_key_tables_and_downgrades_cleanly(tmp_pat
     # Given: a real 0010 database holding evidence
     database, repositories = open_storage(tmp_path / "soulmate.db", "0010_phase_12")
     add_profile(repositories)
-    add_evidence(repositories, "evidence_kept", "ui.theme.dark_mode")
+    insert_legacy_evidence(database, "evidence_kept", PROFILE, "ui.theme.dark_mode", NOW)
     assert database.engine is not None
     assert not NEW_TABLES & set(inspect(database.engine).get_table_names())
 
@@ -55,7 +56,7 @@ def test_phase_12_database_upgrades_to_key_tables_and_downgrades_cleanly(tmp_pat
     database.migrate()
     # Then: the key tables exist and evidence is untouched
     assert set(inspect(database.engine).get_table_names()) >= NEW_TABLES
-    assert database.current_revision() == "0011_key_consistency"
+    assert database.current_revision() == "0012_phase_13"
     assert repositories.evidence.get("evidence_kept") is not None
     repositories.key_aliases.upsert(alias("ui.theme.dark_mode", "ui.theme.dark"))
 

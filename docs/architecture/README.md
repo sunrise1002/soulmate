@@ -57,13 +57,21 @@ An owner-authorized portability increment adds optional encrypted remote backups
 without changing the primary database: the daemon owns a vendor-neutral storage
 port, an S3-compatible adapter, durable daily scheduling, and fresh-install latest
 restore. Local-only remains the default and the kernel imports no cloud SDK. See
-ADR-015; ADR-014 remains reserved for the planned Phase 13 decision.
+ADR-015.
 An owner-authorized key consistency increment adds deterministic target key
 normalization, owner-reviewed canonical key aliases, and alias-aware aggregation
 and prediction inside the kernel, with the alias review surface in the daemon and
 clients. Its planned local multilingual retrieval keeps embeddings behind a kernel
 port with a null default, an owner-initiated pinned model download, and semantic
 matches that may only ever suggest a merge, never apply one. See ADR-016.
+Phase 13 adds Decision I/O: versioned source provenance, a normalized event
+envelope, and resolution and outcome observations. The kernel owns the vocabulary,
+the deterministic eligibility and promotion rules, and a transactional repository
+port; the SQLite adapter commits each event with its projection atomically, and
+the daemon owns authentication, scopes, and the push REST surface. An adapter
+reports an actor; the daemon assigns eligibility, and only owner-authored choices
+or owner confirmations reach the canonical decision and wellbeing path. See
+ADR-014.
 
 ADRs below record decisions from specification section 65. Each ADR status states
 whether the decision is architectural only or already implemented.
@@ -83,5 +91,6 @@ whether the decision is architectural only or already implemented.
 | [011](decisions/ADR-011-portable-archives.md) | Credential-free authenticated portable archives |
 | [012](decisions/ADR-012-connector-plugins.md) | Permissioned connector plugins outside the kernel |
 | [013](decisions/ADR-013-delegated-action-policy.md) | Prediction-bound delegated action policy |
+| [014](decisions/ADR-014-decision-io-provenance.md) | Decision I/O and trusted provenance |
 | [015](decisions/ADR-015-optional-remote-backups.md) | Optional encrypted remote backups behind a storage port |
 | [016](decisions/ADR-016-local-multilingual-key-embeddings.md) | Local multilingual key embeddings behind an embedding port |

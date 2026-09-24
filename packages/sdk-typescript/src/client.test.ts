@@ -308,6 +308,8 @@ describe("SoulmateClient", () => {
     await client.preferenceSummary();
     await client.findSimilarDecisions(decision);
     await client.recordExternalDecision(decision);
+    // The deprecated compatibility wrapper stays supported until its removal.
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
     await client.recordExternalOutcome("decision/1", 0.8, false);
     await client.requestDelegation({
       decision_id: "decision/1",
@@ -336,6 +338,150 @@ describe("SoulmateClient", () => {
     expect(headersOf(calls[0] as Call).Authorization).toBe(
       "Bearer sk_soulmate.credential_1.secret",
     );
+  });
+
+  it("sends pushed Decision I/O events to their scoped endpoints", async () => {
+    // Given: an adapter client holding a service API key
+    const { fetch, calls } = stub(201, {});
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      credential: "sk_soulmate.credential_1.secret",
+      fetch,
+    });
+    const envelope = {
+      source_id: "source_1",
+      occurred_at: "2026-09-23T10:00:00+00:00",
+      actor_type: "agent" as const,
+    };
+
+    // When: each event family is reported
+    await client.recordDecisionIoInteraction({
+      ...envelope,
+      external_event_id: "event-1",
+      event_type: "action",
+    });
+    await client.recordDecisionIoDecision({
+      ...envelope,
+      external_event_id: "event-2",
+      external_decision_id: "decision-1",
+      domain: "code",
+      question: "Which refactor?",
+      options: [
+        {
+          external_option_id: "a",
+          label: "A",
+          description: "Extract",
+          features: { "code.simplicity": 1 },
+        },
+        {
+          external_option_id: "b",
+          label: "B",
+          description: "Keep",
+          features: { "code.simplicity": -1 },
+        },
+      ],
+    });
+    await client.recordDecisionIoResolution({
+      ...envelope,
+      actor_type: "owner",
+      external_event_id: "event-3",
+      external_decision_id: "decision-1",
+      external_option_id: "a",
+    });
+    await client.observeDecisionIoOutcome({
+      ...envelope,
+      external_event_id: "event-4",
+      external_decision_id: "decision-1",
+      kind: "technical",
+      technical_status: "succeeded",
+    });
+
+    // Then: every family goes to its own least-privilege endpoint
+    expect(calls.map((call) => call.url)).toEqual([
+      "http://127.0.0.1:7432/v1/external/decision-io/interactions",
+      "http://127.0.0.1:7432/v1/external/decision-io/decisions",
+      "http://127.0.0.1:7432/v1/external/decision-io/resolutions",
+      "http://127.0.0.1:7432/v1/external/decision-io/outcomes",
+    ]);
+    expect(calls.every((call) => call.init?.method === "POST")).toBe(true);
+    expect(calls[3]?.init?.body).toBe(
+      JSON.stringify({
+        ...envelope,
+        external_event_id: "event-4",
+        external_decision_id: "decision-1",
+        kind: "technical",
+        technical_status: "succeeded",
+      }),
+    );
+  });
+
+  it("exposes owner Decision I/O source and observation review", async () => {
+    // Given: a local owner client
+    const { fetch, calls } = stub(200, []);
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      fetch,
+    });
+
+    // When: the owner registers, inspects, reviews, and removes a source
+    await client.registerDecisionIoSource({
+      name: "Coding agent",
+      provider: "synthetic_agent",
+      service_identity_id: "service/1",
+      data_classes: ["metadata", "decision"],
+    });
+    await client.decisionIoSources();
+    await client.decisionIoObservations();
+    await client.decisionIoObservations("pending");
+    await client.confirmOutcomeObservation("observation/1", {
+      satisfaction: 0.6,
+      regret: false,
+    });
+    await client.rejectObservation("observation/2");
+    await client.removeDecisionIoSource("source/1");
+
+    // Then: owner-only paths are used and identifiers are encoded
+    expect(
+      calls.map((call) => `${String(call.init?.method)} ${call.url}`),
+    ).toEqual([
+      "POST http://127.0.0.1:7432/v1/decision-io/sources",
+      "GET http://127.0.0.1:7432/v1/decision-io/sources",
+      "GET http://127.0.0.1:7432/v1/decision-io/observations",
+      "GET http://127.0.0.1:7432/v1/decision-io/observations?status=pending",
+      "POST http://127.0.0.1:7432/v1/decision-io/observations/observation%2F1/confirm",
+      "POST http://127.0.0.1:7432/v1/decision-io/observations/observation%2F2/reject",
+      "DELETE http://127.0.0.1:7432/v1/decision-io/sources/source%2F1",
+    ]);
+    expect(calls[4]?.init?.body).toBe(
+      JSON.stringify({ satisfaction: 0.6, regret: false, notes: null }),
+    );
+  });
+
+  it("surfaces an idempotency conflict as an API error", async () => {
+    // Given: the daemon rejects a reused external event ID
+    const { fetch } = stub(409, {
+      detail: "The external event ID was already used for other content.",
+    });
+    const client = new SoulmateClient({
+      baseUrl: "http://127.0.0.1:7432",
+      credential: "sk_soulmate.credential_1.secret",
+      fetch,
+    });
+
+    // When: the conflicting event is sent
+    const attempt = client.recordDecisionIoInteraction({
+      source_id: "source_1",
+      external_event_id: "event-1",
+      occurred_at: "2026-09-23T10:00:00+00:00",
+      actor_type: "agent",
+    });
+
+    // Then: the caller receives the status and the daemon's reason
+    await expect(attempt).rejects.toMatchObject({
+      status: 409,
+      message: "The external event ID was already used for other content.",
+    });
+    await expect(attempt).rejects.toBeInstanceOf(ApiError);
   });
 
   it("exposes owner delegation policy and approval operations", async () => {
